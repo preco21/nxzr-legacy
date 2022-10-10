@@ -1,0 +1,12 @@
+[package]
+name = "nxzr_server"
+version = "0.1.0"
+authors = ["Plusb Preco <plusb21@gmail.com>"]
+description = "The NXZR project: the server application"
+repository = "https://github.com/preco21/nxzr"
+readme = "readme.md"
+license = "UNLICENSED"
+edition = "2021"
+publish = false
+
+[dependencies]

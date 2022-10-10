@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "nxzr_core",
+    "nxzr_server",
+    "nxzr_gui",
+]
