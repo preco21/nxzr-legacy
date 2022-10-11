@@ -10,3 +10,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+log = "0.4.17"
+env_logger = "0.9.1"
+tokio = { version = "1.21.2", features = ["full"] }
+bluer = { version = "0.15.1", features = ["full"] }
