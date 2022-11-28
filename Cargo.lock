@@ -398,6 +398,7 @@ dependencies = [
  "bluer",
  "env_logger",
  "log",
+ "nxzr_core",
  "tokio",
 ]
 
