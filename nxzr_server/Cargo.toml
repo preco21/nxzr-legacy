@@ -1,11 +1,11 @@
 [package]
 name = "nxzr_server"
-version = "0.1.0"
-authors = ["Plusb Preco <plusb21@gmail.com>"]
-description = "The NXZR project: the server application"
-repository = "https://github.com/preco21/nxzr"
-readme = "readme.md"
-license = "UNLICENSED"
+version.workspace = true
+description = "The NXZR project: the server"
+readme = "README.md"
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
 edition = "2021"
 publish = false
 

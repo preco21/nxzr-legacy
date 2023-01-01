@@ -1,11 +1,11 @@
 [package]
 name = "nxzr_core"
-version = "0.1.0"
-authors = ["Plusb Preco <plusb21@gmail.com>"]
+version.workspace = true
 description = "The NXZR project: the core module"
-repository = "https://github.com/preco21/nxzr"
-readme = "readme.md"
-license = "UNLICENSED"
+readme = "README.md"
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
 edition = "2021"
 publish = false
 

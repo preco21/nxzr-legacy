@@ -1,6 +1,8 @@
 [workspace]
-members = [
-    "nxzr_core",
-    "nxzr_server",
-    "nxzr_gui",
-]
+members = ["nxzr_core", "nxzr_server", "nxzr_gui"]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Plusb Preco <plusb21@gmail.com>"]
+repository = "https://github.com/preco21/nxzr"
+license = "UNLICENSED"
