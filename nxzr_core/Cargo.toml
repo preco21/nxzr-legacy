@@ -10,3 +10,5 @@ edition = "2021"
 publish = false
 
 [dependencies]
+strum = { version = "0.24.1", features = ["derive"] }
+strum_macros = "0.24"
