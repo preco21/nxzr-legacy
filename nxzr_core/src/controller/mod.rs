@@ -1,3 +1,3 @@
-pub mod controller;
+pub mod kind;
 pub mod protocol;
 pub mod report;
