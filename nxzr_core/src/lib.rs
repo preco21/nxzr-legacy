@@ -1,5 +1,4 @@
-mod controller;
-mod protocol;
+pub mod controller;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
