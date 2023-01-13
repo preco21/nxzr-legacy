@@ -1,4 +1,5 @@
 pub mod controller;
+pub(crate) mod error;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
