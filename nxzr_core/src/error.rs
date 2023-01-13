@@ -1,5 +1,11 @@
 use strum::Display;
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Error {
+    pub kind: ErrorKind,
+    pub message: String,
+}
+
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ErrorKind {
     Internal(InternalErrorKind),
@@ -8,13 +14,8 @@ pub enum ErrorKind {
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InternalErrorKind {
     Unknown,
+    ReportError,
     Io(std::io::ErrorKind),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Error {
-    pub kind: ErrorKind,
-    pub message: String,
 }
 
 impl Error {
