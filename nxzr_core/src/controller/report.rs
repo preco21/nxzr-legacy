@@ -14,6 +14,44 @@ impl std::error::Error for ReportError {}
 
 pub type ReportResult<T> = Result<T, ReportError>;
 
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum InputReportId {
+    Unknown,
+    // 0x21 Standard input reports used for subcommand replies
+    Standard,
+    // 0x30 Full input reports with IMU data instead of subcommand replies
+    Full,
+    // 0x31 Full input reports with NFC/IR data plus to IMU data
+    FullWithData,
+}
+
+impl InputReportId {
+    pub fn from_byte(byte: u8) -> InputReportId {
+        match byte {
+            0x21 => InputReportId::Standard,
+            0x30 => InputReportId::Full,
+            0x31 => InputReportId::FullWithData,
+            _ => InputReportId::Unknown,
+        }
+    }
+
+    pub fn to_byte(&self) -> u8 {
+        match self {
+            InputReportId::Standard => 0x21,
+            InputReportId::Full => 0x30,
+            InputReportId::FullWithData => 0x31,
+            _ => panic!("Unknown input report id cannot be converted to a byte."),
+        }
+    }
+
+    pub fn try_to_byte(&self) -> Option<u8> {
+        if let Self::Unknown = self {
+            return None;
+        }
+        Some(self.to_byte())
+    }
+}
+
 // Processes outgoing messages from the controller to the host(Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct InputReport {
@@ -57,9 +95,13 @@ impl InputReport {
         &self.data[7..13]
     }
 
-    pub fn subcommand_reply_data() {}
+    pub fn subcommand_reply_data(&self) -> &[u8] {
+        &self.data[16..51]
+    }
 
-    pub fn input_report_id() {}
+    pub fn input_report_id(&self) -> u8 {
+        &self.data[1]
+    }
 
     pub fn set_input_report_id() {}
 
