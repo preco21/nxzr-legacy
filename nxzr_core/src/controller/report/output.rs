@@ -86,10 +86,9 @@ impl OutputReport {
         self.data[2]
     }
 
-    // Sets output report timer between [0x0, 0xF]
-    pub fn set_timer(&mut self, timer: u64) -> ReportResult<()> {
+    pub fn set_timer(&mut self, timer: u64) {
+        // Sets output report timer between [0x0, 0xF]
         self.data[2] = u8::try_from(timer % 0x10).unwrap();
-        Ok(())
     }
 
     pub fn rumble_data(&self) -> &[u8] {
@@ -117,17 +116,17 @@ impl OutputReport {
         Ok(&self.data[12..])
     }
 
-    pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) -> ReportResult<()> {
+    pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) {
         let data_ref = data.as_ref();
         self.data
             .splice(12..12 + data_ref.len(), data_ref.iter().cloned());
-        Ok(())
     }
 
     pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> ReportResult<()> {
         if size > 0x1D || u32::from(size) + offset > 0x80000 {
             return Err(ReportError::OutOfRange);
         }
+        // Creates output report data with spi flash read subcommand
         self.set_output_report_id(OutputReportId::SubCommand)?;
         self.set_subcommand(Subcommand::SpiFlashRead)?;
         for i in 12..12 + 4 {
