@@ -53,7 +53,8 @@ impl InputReport {
     }
 
     pub fn with_data(data: impl AsRef<[u8]>) -> ReportResult<Self> {
-        // 50 is a standard input report size in format: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
+        // Length of 50 is a standard input report size in format
+        // See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
         Self::with_data_and_length(data, 50)
     }
 
