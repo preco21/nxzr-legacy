@@ -51,12 +51,12 @@ impl OutputReport {
     }
 
     pub fn with_data(data: impl AsRef<[u8]>) -> ReportResult<Self> {
-        Self::with_data_and_length(data, 12)
+        Self::with_data_and_len(data, 12)
     }
 
-    pub fn with_data_and_length(data: impl AsRef<[u8]>, length: usize) -> ReportResult<Self> {
+    pub fn with_data_and_len(data: impl AsRef<[u8]>, len: usize) -> ReportResult<Self> {
         let data_ref = data.as_ref();
-        let min_len = std::cmp::max(length, 12);
+        let min_len = std::cmp::max(len, 12);
         if data_ref.len() < min_len {
             return Err(ReportError::TooShortDataLength);
         }
