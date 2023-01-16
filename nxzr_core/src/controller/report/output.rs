@@ -127,11 +127,12 @@ impl OutputReport {
             return Err(ReportError::OutOfRange);
         }
         // Creates output report data with spi flash read subcommand
+        let mut cur_offset = offset;
         self.set_output_report_id(OutputReportId::SubCommand)?;
         self.set_subcommand(Subcommand::SpiFlashRead)?;
         for i in 12..12 + 4 {
-            self.data[i] = u8::try_from(offset % 0x100).unwrap();
-            offset = offset / 0x100;
+            self.data[i] = u8::try_from(cur_offset % 0x100).unwrap();
+            cur_offset = cur_offset / 0x100;
         }
         self.data[16] = size;
         Ok(())
