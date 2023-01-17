@@ -6,7 +6,7 @@ pub mod subcommand;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ReportError {
-    TooShortDataLength,
+    TooShort,
     Malformed,
     UnsupportedReportId,
     UnsupportedSubcommand,

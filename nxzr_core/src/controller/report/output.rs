@@ -58,7 +58,7 @@ impl OutputReport {
         let data_ref = data.as_ref();
         let min_len = std::cmp::max(len, 12);
         if data_ref.len() < min_len {
-            return Err(ReportError::TooShortDataLength);
+            return Err(ReportError::TooShort);
         }
         if data_ref[0] != 0xA2 {
             return Err(ReportError::Malformed);
@@ -111,7 +111,7 @@ impl OutputReport {
 
     pub fn subcommand_data(&self) -> ReportResult<&[u8]> {
         if self.data.len() < 13 {
-            return Err(ReportError::TooShortDataLength);
+            return Err(ReportError::TooShort);
         }
         Ok(&self.data[12..])
     }
