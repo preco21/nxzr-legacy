@@ -204,7 +204,29 @@ impl InputReport {
         Ok(())
     }
 
-    pub fn sub_0x10_spi_flash_read(&self) {}
+    pub fn sub_0x10_spi_flash_read(
+        &mut self,
+        offset: u32,
+        size: u8,
+        data: impl AsRef<[u8]>,
+    ) -> ReportResult<()> {
+        let data_r = data.as_ref();
+        if size > 0x1D || data_r.len() != size.into() {
+            return Err(ReportError::OutOfBounds);
+        }
+        // Creates input report data with spi flash read subcommand
+        self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead)?;
+        let mut cur_offset = offset;
+        // Write offset to data
+        for i in 16..16 + 4 {
+            self.data[i] = u8::try_from(cur_offset % 0x100).unwrap();
+            cur_offset = cur_offset / 0x100;
+        }
+        self.data[20] = size;
+        self.data
+            .splice(21..21 + data_r.len(), data_r.iter().cloned());
+        Ok(())
+    }
 
     pub fn sub_0x04_trigger_buttons_elapsed_time(&self) {}
 
