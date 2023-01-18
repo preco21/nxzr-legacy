@@ -55,16 +55,16 @@ impl OutputReport {
     }
 
     pub fn with_data_and_len(data: impl AsRef<[u8]>, len: usize) -> ReportResult<Self> {
-        let data_ref = data.as_ref();
+        let data_r = data.as_ref();
         let min_len = std::cmp::max(len, 12);
-        if data_ref.len() < min_len {
+        if data_r.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        if data_ref[0] != 0xA2 {
+        if data_r[0] != 0xA2 {
             return Err(ReportError::Malformed);
         }
         Ok(Self {
-            data: data_ref.to_vec(),
+            data: data_r.to_vec(),
         })
     }
 
@@ -110,21 +110,21 @@ impl OutputReport {
     }
 
     pub fn subcommand_data(&self) -> ReportResult<&[u8]> {
-        if self.data.len() < 13 {
-            return Err(ReportError::TooShort);
-        }
-        Ok(&self.data[12..])
+        let Some(slice) = self.data.get(12..) else {
+            return Err(ReportError::NoData);
+        };
+        Ok(slice)
     }
 
     pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) {
-        let data_ref = data.as_ref();
+        let data_r = data.as_ref();
         self.data
-            .splice(12..12 + data_ref.len(), data_ref.iter().cloned());
+            .splice(12..12 + data_r.len(), data_r.iter().cloned());
     }
 
     pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> ReportResult<()> {
         if size > 0x1D || u32::from(size) + offset > 0x80000 {
-            return Err(ReportError::OutOfRange);
+            return Err(ReportError::OutOfBounds);
         }
         // Creates output report data with spi flash read subcommand
         let mut cur_offset = offset;
