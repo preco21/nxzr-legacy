@@ -127,9 +127,9 @@ impl OutputReport {
             return Err(ReportError::OutOfBounds);
         }
         // Creates output report data with spi flash read subcommand
-        let mut cur_offset = offset;
         self.set_output_report_id(OutputReportId::SubCommand)?;
         self.set_subcommand(Subcommand::SpiFlashRead)?;
+        let mut cur_offset = offset;
         for i in 12..12 + 4 {
             self.data[i] = u8::try_from(cur_offset % 0x100).unwrap();
             cur_offset = cur_offset / 0x100;
@@ -138,7 +138,7 @@ impl OutputReport {
         Ok(())
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn bytes(&self) -> &[u8] {
         &self.data.as_slice()
     }
 }
