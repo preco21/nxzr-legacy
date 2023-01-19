@@ -1,5 +1,5 @@
 use super::{subcommand::Subcommand, ReportError, ReportResult};
-use crate::controller::kind::ControllerInfo;
+use crate::controller::kind::{ControllerType, CONTROLLER_INFO_MAP};
 use strum::Display;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -188,11 +188,14 @@ impl InputReport {
         &mut self,
         mac_addr: [u8; 6],
         fm_version: Option<[u8; 2]>,
-        controller_info: ControllerInfo,
+        controller_type: ControllerType,
     ) -> ReportResult<()> {
         let fm_version_u = match fm_version {
             Some(version) => version,
             None => [0x04, 0x00],
+        };
+        let Some(controller_info) = CONTROLLER_INFO_MAP.get(&controller_type) else {
+            return Err(ReportError::Invariant);
         };
         self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo)?;
         self.data.splice(16..16 + 2, fm_version_u);
@@ -230,7 +233,8 @@ impl InputReport {
 
     pub fn sub_0x04_trigger_buttons_elapsed_time(&self) {}
 
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn bytes(&self) -> &[u8] {
+        // TODO:
         &self.data.as_slice()
     }
 }
