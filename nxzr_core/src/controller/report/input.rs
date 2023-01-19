@@ -40,6 +40,19 @@ impl InputReportId {
     }
 }
 
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum TriggerButtonsElapsedTimeCommand {
+    LeftTrigger(u32),
+    RightTrigger(u32),
+    ZLeftTrigger(u32),
+    ZRightTrigger(u32),
+    SLeftTrigger(u32),
+    SRightTrigger(u32),
+    Home(u32),
+}
+
+const SUBCOMMAND_OFFSET: usize = 16;
+
 // Processes outgoing messages from the controller to the host(Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct InputReport {
@@ -104,7 +117,7 @@ impl InputReport {
 
     pub fn set_timer(&mut self, timer: u64) {
         // Sets input report timer [0x00-0xFF], usually set by the transport
-        self.data[2] = u8::try_from(timer % 0x100).unwrap();
+        self.data[2] = (timer % 0x100) as u8;
     }
 
     pub fn set_misc(&mut self) {
@@ -198,12 +211,14 @@ impl InputReport {
             return Err(ReportError::Invariant);
         };
         self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo)?;
-        self.data.splice(16..16 + 2, fm_version_u);
-        self.data[16 + 2] = controller_info.id;
-        self.data[16 + 3] = 0x02;
-        self.data.splice(16 + 4..16 + 10, mac_addr);
-        self.data[16 + 10] = 0x01;
-        self.data[16 + 11] = 0x01;
+        self.data
+            .splice(SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2, fm_version_u);
+        self.data[SUBCOMMAND_OFFSET + 2] = controller_info.id;
+        self.data[SUBCOMMAND_OFFSET + 3] = 0x02;
+        self.data
+            .splice(SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10, mac_addr);
+        self.data[SUBCOMMAND_OFFSET + 10] = 0x01;
+        self.data[SUBCOMMAND_OFFSET + 11] = 0x01;
         Ok(())
     }
 
@@ -221,8 +236,8 @@ impl InputReport {
         self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead)?;
         let mut cur_offset = offset;
         // Write offset to data
-        for i in 16..16 + 4 {
-            self.data[i] = u8::try_from(cur_offset % 0x100).unwrap();
+        for i in SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 4 {
+            self.data[i] = (cur_offset % 0x100) as u8;
             cur_offset = cur_offset / 0x100;
         }
         self.data[20] = size;
@@ -231,7 +246,65 @@ impl InputReport {
         Ok(())
     }
 
-    pub fn sub_0x04_trigger_buttons_elapsed_time(&self) {}
+    pub fn sub_0x04_trigger_buttons_elapsed_time(
+        &mut self,
+        commands: impl AsRef<[TriggerButtonsElapsedTimeCommand]>,
+    ) -> ReportResult<()> {
+        let commands_r = commands.as_ref();
+        const MAX_MS: u32 = 10 * 0xFFFF;
+        let mut set = |offset: usize, ms: u32| {
+            let value = (ms / 10) as u16;
+            self.data[SUBCOMMAND_OFFSET + offset] = (value & 0xFF) as u8;
+            self.data[SUBCOMMAND_OFFSET + offset + 1] = ((value & 0xFF00) >> 8) as u8;
+        };
+        for command in commands_r {
+            match *command {
+                TriggerButtonsElapsedTimeCommand::LeftTrigger(ms) => {
+                    if ms > MAX_MS {
+                        return Err(ReportError::Invariant);
+                    }
+                    set(0, ms);
+                }
+                TriggerButtonsElapsedTimeCommand::RightTrigger(ms) => {
+                    if ms > MAX_MS {
+                        return Err(ReportError::Invariant);
+                    }
+                    set(2, ms);
+                }
+                TriggerButtonsElapsedTimeCommand::ZLeftTrigger(ms) => {
+                    if ms > MAX_MS {
+                        return Err(ReportError::Invariant);
+                    }
+                    set(4, ms);
+                }
+                TriggerButtonsElapsedTimeCommand::ZRightTrigger(ms) => {
+                    if ms > MAX_MS {
+                        return Err(ReportError::Invariant);
+                    }
+                    set(6, ms);
+                }
+                TriggerButtonsElapsedTimeCommand::SLeftTrigger(ms) => {
+                    if ms > MAX_MS {
+                        return Err(ReportError::Invariant);
+                    }
+                    set(8, ms);
+                }
+                TriggerButtonsElapsedTimeCommand::SRightTrigger(ms) => {
+                    if ms > MAX_MS {
+                        return Err(ReportError::Invariant);
+                    }
+                    set(10, ms);
+                }
+                TriggerButtonsElapsedTimeCommand::Home(ms) => {
+                    if ms > MAX_MS {
+                        return Err(ReportError::Invariant);
+                    }
+                    set(12, ms);
+                }
+            };
+        }
+        Ok(())
+    }
 
     pub fn bytes(&self) -> &[u8] {
         // TODO:
