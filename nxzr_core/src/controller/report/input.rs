@@ -8,17 +8,17 @@ pub enum InputReportId {
     // 0x21 Standard input reports used for subcommand replies
     Standard,
     // 0x30 Full input reports with IMU data instead of subcommand replies
-    Full,
+    Imu,
     // 0x31 Full input reports with NFC/IR data plus to IMU data
-    FullWithData,
+    ImuWithNfcIrData,
 }
 
 impl InputReportId {
     pub fn from_byte(byte: u8) -> InputReportId {
         match byte {
             0x21 => InputReportId::Standard,
-            0x30 => InputReportId::Full,
-            0x31 => InputReportId::FullWithData,
+            0x30 => InputReportId::Imu,
+            0x31 => InputReportId::ImuWithNfcIrData,
             _ => InputReportId::Unknown,
         }
     }
@@ -26,8 +26,8 @@ impl InputReportId {
     pub fn to_byte(&self) -> u8 {
         match self {
             InputReportId::Standard => 0x21,
-            InputReportId::Full => 0x30,
-            InputReportId::FullWithData => 0x31,
+            InputReportId::Imu => 0x30,
+            InputReportId::ImuWithNfcIrData => 0x31,
             _ => panic!("Unknown input report id cannot be converted to a byte."),
         }
     }
@@ -153,7 +153,6 @@ impl InputReport {
     }
 
     pub fn set_vibrator_input(&mut self) {
-        // TODO: revisit
         self.data[13] = 0x80
     }
 
@@ -307,7 +306,11 @@ impl InputReport {
     }
 
     pub fn bytes(&self) -> &[u8] {
-        // TODO:
-        &self.data.as_slice()
+        match self.input_report_id() {
+            InputReportId::Standard => &self.data[..51],
+            InputReportId::Imu => &self.data[..50],
+            InputReportId::ImuWithNfcIrData => &self.data[..363],
+            _ => &self.data[..51],
+        }
     }
 }
