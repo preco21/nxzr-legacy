@@ -88,7 +88,7 @@ impl OutputReport {
 
     pub fn set_timer(&mut self, timer: u64) {
         // Sets output report timer between [0x0, 0xF]
-        self.data[2] = u8::try_from(timer % 0x10).unwrap();
+        self.data[2] = (timer % 0x10) as u8;
     }
 
     pub fn rumble_data(&self) -> &[u8] {
@@ -131,7 +131,7 @@ impl OutputReport {
         self.set_subcommand(Subcommand::SpiFlashRead)?;
         let mut cur_offset = offset;
         for i in 12..12 + 4 {
-            self.data[i] = u8::try_from(cur_offset % 0x100).unwrap();
+            self.data[i] = (cur_offset % 0x100) as u8;
             cur_offset = cur_offset / 0x100;
         }
         self.data[16] = size;
