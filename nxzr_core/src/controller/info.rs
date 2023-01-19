@@ -16,6 +16,7 @@ pub enum ControllerType {
 pub struct ControllerInfo {
     pub id: u8,
     pub connection_info: u8,
+    pub name: String,
 }
 
 lazy_static! {
@@ -26,6 +27,7 @@ lazy_static! {
             ControllerInfo {
                 id: 0x01,
                 connection_info: 0x0E,
+                name: "Joy-Con (L)".to_owned(),
             },
         );
         map.insert(
@@ -33,6 +35,7 @@ lazy_static! {
             ControllerInfo {
                 id: 0x02,
                 connection_info: 0x0E,
+                name: "Joy-Con (R)".to_owned(),
             },
         );
         map.insert(
@@ -40,6 +43,7 @@ lazy_static! {
             ControllerInfo {
                 id: 0x03,
                 connection_info: 0x00,
+                name: "Pro Controller".to_owned(),
             },
         );
         map
