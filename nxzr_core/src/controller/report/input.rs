@@ -1,5 +1,5 @@
 use super::{subcommand::Subcommand, ReportError, ReportResult};
-use crate::controller::kind::{ControllerType, CONTROLLER_INFO_MAP};
+use crate::controller::info::{ControllerType, CONTROLLER_INFO_MAP};
 use strum::Display;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]

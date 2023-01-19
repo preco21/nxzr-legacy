@@ -1,4 +1,4 @@
-pub mod kind;
+pub mod info;
 pub mod protocol;
 pub mod report;
 pub mod symbols;
