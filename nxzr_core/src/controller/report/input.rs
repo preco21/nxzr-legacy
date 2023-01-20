@@ -69,8 +69,8 @@ impl InputReport {
         Self { buf }
     }
 
-    pub fn with_raw(buf: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf = buf.as_ref();
+    pub fn with_raw(data: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
+        let buf = data.as_ref();
         // Length of 50 is a standard input report size in format
         // See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
         let min_len = match report_size {

@@ -50,8 +50,8 @@ impl OutputReport {
         Self { buf }
     }
 
-    pub fn with_raw(buf: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf = buf.as_ref();
+    pub fn with_raw(data: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
+        let buf = data.as_ref();
         let min_len = match report_size {
             Some(report_size) => std::cmp::max(report_size, 12),
             None => 12,
