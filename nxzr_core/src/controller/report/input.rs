@@ -59,59 +59,58 @@ const SUBCOMMAND_OFFSET: usize = 16;
 // Processes outgoing messages from the controller to the host(Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct InputReport {
-    data: Vec<u8>,
+    buf: Vec<u8>,
 }
 
 impl InputReport {
     pub fn new() -> Self {
-        let mut data: Vec<u8> = vec![0x00; 363];
-        data[0] = 0xA1;
-        Self { data }
+        let mut buf: Vec<u8> = vec![0x00; 363];
+        buf[0] = 0xA1;
+        Self { buf }
     }
 
-    pub fn with_data(data: impl AsRef<[u8]>) -> ReportResult<Self> {
+    pub fn with_raw(buf: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
+        let buf_r = buf.as_ref();
         // Length of 50 is a standard input report size in format
         // See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
-        Self::with_data_and_size(data, 50)
-    }
-
-    pub fn with_data_and_size(data: impl AsRef<[u8]>, report_size: usize) -> ReportResult<Self> {
-        let data_r = data.as_ref();
-        let min_len = std::cmp::max(report_size, 50);
-        if data_r.len() < min_len {
+        let min_len = match report_size {
+            Some(report_size) => std::cmp::max(report_size, 50),
+            None => 50,
+        };
+        if buf_r.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        if data_r[0] != 0xA1 {
+        if buf_r[0] != 0xA1 {
             return Err(ReportError::Malformed);
         }
         Ok(Self {
-            data: data_r.to_vec(),
+            buf: buf_r.to_vec(),
         })
     }
 
     pub fn clear_subcommand(&mut self) {
         // Clear subcommand reply data of 0x21 input reports
         for i in 14..51 {
-            self.data[i] = 0x00;
+            self.buf[i] = 0x00;
         }
     }
 
     pub fn stick_data(&self) -> &[u8] {
-        &self.data[7..13]
+        &self.buf[7..13]
     }
 
     pub fn subcommand_reply_data(&self) -> &[u8] {
-        &self.data[16..51]
+        &self.buf[16..51]
     }
 
     pub fn input_report_id(&self) -> InputReportId {
-        InputReportId::from_byte(self.data[1])
+        InputReportId::from_byte(self.buf[1])
     }
 
     pub fn set_input_report_id(&mut self, id: InputReportId) -> ReportResult<()> {
         match id.try_to_byte() {
             Some(byte) => {
-                self.data[1] = byte;
+                self.buf[1] = byte;
                 Ok(())
             }
             None => Err(ReportError::UnsupportedReportId),
@@ -120,16 +119,16 @@ impl InputReport {
 
     pub fn set_timer(&mut self, timer: u64) {
         // Sets input report timer [0x00-0xFF], usually set by the transport
-        self.data[2] = (timer % 0x100) as u8;
+        self.buf[2] = (timer % 0x100) as u8;
     }
 
     pub fn set_misc(&mut self) {
         // Indicates battery level + connection info
-        self.data[3] = 0x8E;
+        self.buf[3] = 0x8E;
     }
 
     pub fn set_button_status(&mut self, button_status: [u8; 3]) {
-        self.data[4..7].copy_from_slice(&button_status);
+        self.buf[4..7].copy_from_slice(&button_status);
     }
 
     pub fn set_analog_stick(
@@ -148,29 +147,29 @@ impl InputReport {
     }
 
     pub fn set_left_analog_stick(&mut self, stick_status: [u8; 3]) {
-        self.data[7..10].copy_from_slice(&stick_status);
+        self.buf[7..10].copy_from_slice(&stick_status);
     }
 
     pub fn set_right_analog_stick(&mut self, stick_status: [u8; 3]) {
-        self.data[10..13].copy_from_slice(&stick_status);
+        self.buf[10..13].copy_from_slice(&stick_status);
     }
 
     pub fn set_vibrator_input(&mut self) {
-        self.data[13] = 0x80
+        self.buf[13] = 0x80
     }
 
     pub fn ack(&self) -> u8 {
-        return self.data[14];
+        return self.buf[14];
     }
 
     pub fn set_ack(&mut self, ack: u8) {
-        self.data[14] = ack;
+        self.buf[14] = ack;
     }
 
     pub fn set_6axis_data(&mut self) {
         // FIXME: revisit
         for i in 14..50 {
-            self.data[i] = 0x00;
+            self.buf[i] = 0x00;
         }
     }
 
@@ -180,18 +179,18 @@ impl InputReport {
         if data_r.len() > 313 {
             return Err(ReportError::OutOfBounds);
         }
-        self.data[50..50 + data_r.len()].copy_from_slice(data_r);
+        self.buf[50..50 + data_r.len()].copy_from_slice(data_r);
         Ok(data_r.len() == 313)
     }
 
     pub fn reply_to_subcommand_id(&self) -> Subcommand {
-        Subcommand::from_byte(self.data[15])
+        Subcommand::from_byte(self.buf[15])
     }
 
     pub fn set_reply_to_subcommand_id(&mut self, id: Subcommand) -> ReportResult<()> {
         match id.try_to_byte() {
             Some(byte) => {
-                self.data[15] = byte;
+                self.buf[15] = byte;
                 Ok(())
             }
             None => Err(ReportError::UnsupportedSubcommand),
@@ -212,12 +211,12 @@ impl InputReport {
             return Err(ReportError::Invariant);
         };
         self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo)?;
-        self.data[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version_u);
-        self.data[SUBCOMMAND_OFFSET + 2] = controller_info.id;
-        self.data[SUBCOMMAND_OFFSET + 3] = 0x02;
-        self.data[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
-        self.data[SUBCOMMAND_OFFSET + 10] = 0x01;
-        self.data[SUBCOMMAND_OFFSET + 11] = 0x01;
+        self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version_u);
+        self.buf[SUBCOMMAND_OFFSET + 2] = controller_info.id;
+        self.buf[SUBCOMMAND_OFFSET + 3] = 0x02;
+        self.buf[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
+        self.buf[SUBCOMMAND_OFFSET + 10] = 0x01;
+        self.buf[SUBCOMMAND_OFFSET + 11] = 0x01;
         Ok(())
     }
 
@@ -236,11 +235,11 @@ impl InputReport {
         let mut cur_offset = offset;
         // Write offset to data
         for i in SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 4 {
-            self.data[i] = (cur_offset % 0x100) as u8;
+            self.buf[i] = (cur_offset % 0x100) as u8;
             cur_offset = cur_offset / 0x100;
         }
-        self.data[20] = size;
-        self.data[21..21 + data_r.len()].copy_from_slice(data_r);
+        self.buf[20] = size;
+        self.buf[21..21 + data_r.len()].copy_from_slice(data_r);
         Ok(())
     }
 
@@ -252,8 +251,8 @@ impl InputReport {
         const MAX_MS: u32 = 10 * 0xFFFF;
         let mut set = |offset: usize, ms: u32| {
             let value = (ms / 10) as u16;
-            self.data[SUBCOMMAND_OFFSET + offset] = (value & 0xFF) as u8;
-            self.data[SUBCOMMAND_OFFSET + offset + 1] = ((value & 0xFF00) >> 8) as u8;
+            self.buf[SUBCOMMAND_OFFSET + offset] = (value & 0xFF) as u8;
+            self.buf[SUBCOMMAND_OFFSET + offset + 1] = ((value & 0xFF00) >> 8) as u8;
         };
         for command in commands_r {
             match *command {
@@ -304,12 +303,12 @@ impl InputReport {
         Ok(())
     }
 
-    pub fn bytes(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
         match self.input_report_id() {
-            InputReportId::Standard => &self.data[..51],
-            InputReportId::Imu => &self.data[..50],
-            InputReportId::ImuWithNfcIrData => &self.data[..363],
-            _ => &self.data[..51],
+            InputReportId::Standard => &self.buf[..51],
+            InputReportId::Imu => &self.buf[..50],
+            InputReportId::ImuWithNfcIrData => &self.buf[..363],
+            _ => &self.buf[..51],
         }
     }
 }

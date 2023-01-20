@@ -40,42 +40,41 @@ impl OutputReportId {
 // Processes incoming messages from the host(Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct OutputReport {
-    data: Vec<u8>,
+    buf: Vec<u8>,
 }
 
 impl OutputReport {
     pub fn new() -> Self {
-        let mut data: Vec<u8> = vec![0x00; 50];
-        data[0] = 0xA2;
-        Self { data }
+        let mut buf: Vec<u8> = vec![0x00; 50];
+        buf[0] = 0xA2;
+        Self { buf }
     }
 
-    pub fn with_data(data: impl AsRef<[u8]>) -> ReportResult<Self> {
-        Self::with_data_and_size(data, 12)
-    }
-
-    pub fn with_data_and_size(data: impl AsRef<[u8]>, report_size: usize) -> ReportResult<Self> {
-        let data_r = data.as_ref();
-        let min_len = std::cmp::max(report_size, 12);
-        if data_r.len() < min_len {
+    pub fn with_raw(buf: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
+        let buf_r = buf.as_ref();
+        let min_len = match report_size {
+            Some(report_size) => std::cmp::max(report_size, 12),
+            None => 12,
+        };
+        if buf_r.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        if data_r[0] != 0xA2 {
+        if buf_r[0] != 0xA2 {
             return Err(ReportError::Malformed);
         }
         Ok(Self {
-            data: data_r.to_vec(),
+            buf: buf_r.to_vec(),
         })
     }
 
     pub fn output_report_id(&self) -> OutputReportId {
-        OutputReportId::from_byte(self.data[1])
+        OutputReportId::from_byte(self.buf[1])
     }
 
     pub fn set_output_report_id(&mut self, id: OutputReportId) -> ReportResult<()> {
         match id.try_to_byte() {
             Some(byte) => {
-                self.data[1] = byte;
+                self.buf[1] = byte;
                 Ok(())
             }
             None => Err(ReportError::UnsupportedReportId),
@@ -83,26 +82,26 @@ impl OutputReport {
     }
 
     pub fn timer(&self) -> u8 {
-        self.data[2]
+        self.buf[2]
     }
 
     pub fn set_timer(&mut self, timer: u64) {
         // Sets output report timer between [0x0, 0xF]
-        self.data[2] = (timer % 0x10) as u8;
+        self.buf[2] = (timer % 0x10) as u8;
     }
 
     pub fn rumble_data(&self) -> &[u8] {
-        &self.data[3..11]
+        &self.buf[3..11]
     }
 
     pub fn subcommand(&self) -> Subcommand {
-        Subcommand::from_byte(self.data[11])
+        Subcommand::from_byte(self.buf[11])
     }
 
     pub fn set_subcommand(&mut self, subcommand: Subcommand) -> ReportResult<()> {
         match subcommand.try_to_byte() {
             Some(byte) => {
-                self.data[11] = byte;
+                self.buf[11] = byte;
                 Ok(())
             }
             None => Err(ReportError::UnsupportedSubcommand),
@@ -110,7 +109,7 @@ impl OutputReport {
     }
 
     pub fn subcommand_data(&self) -> ReportResult<&[u8]> {
-        let Some(slice) = self.data.get(12..) else {
+        let Some(slice) = self.buf.get(12..) else {
             return Err(ReportError::NoData);
         };
         Ok(slice)
@@ -118,7 +117,7 @@ impl OutputReport {
 
     pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) {
         let data_r = data.as_ref();
-        self.data[12..12 + data_r.len()].copy_from_slice(data_r);
+        self.buf[12..12 + data_r.len()].copy_from_slice(data_r);
     }
 
     pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> ReportResult<()> {
@@ -130,14 +129,14 @@ impl OutputReport {
         self.set_subcommand(Subcommand::SpiFlashRead)?;
         let mut cur_offset = offset;
         for i in 12..12 + 4 {
-            self.data[i] = (cur_offset % 0x100) as u8;
+            self.buf[i] = (cur_offset % 0x100) as u8;
             cur_offset = cur_offset / 0x100;
         }
-        self.data[16] = size;
+        self.buf[16] = size;
         Ok(())
     }
 
-    pub fn bytes(&self) -> &[u8] {
-        &self.data.as_slice()
+    pub fn data(&self) -> &[u8] {
+        &self.buf.as_slice()
     }
 }
