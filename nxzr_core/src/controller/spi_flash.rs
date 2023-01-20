@@ -17,17 +17,15 @@ impl SpiFlash {
     }
 
     pub fn with_raw(buf: impl AsRef<[u8]>, size: Option<usize>, reset: bool) -> Option<Self> {
-        let buf_r = buf.as_ref();
+        let buf = buf.as_ref();
         let size_u = match size {
             Some(size) => size,
             None => 0x80000,
         };
-        if buf_r.len() != size_u {
+        if buf.len() != size_u {
             return None;
         }
-        let mut inst = Self {
-            buf: buf_r.to_vec(),
-        };
+        let mut inst = Self { buf: buf.to_vec() };
         if reset {
             inst.reset_stick_calibration_with_factory_default();
         }

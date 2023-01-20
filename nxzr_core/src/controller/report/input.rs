@@ -70,22 +70,20 @@ impl InputReport {
     }
 
     pub fn with_raw(buf: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf_r = buf.as_ref();
+        let buf = buf.as_ref();
         // Length of 50 is a standard input report size in format
         // See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
         let min_len = match report_size {
             Some(report_size) => std::cmp::max(report_size, 50),
             None => 50,
         };
-        if buf_r.len() < min_len {
+        if buf.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        if buf_r[0] != 0xA1 {
+        if buf[0] != 0xA1 {
             return Err(ReportError::Malformed);
         }
-        Ok(Self {
-            buf: buf_r.to_vec(),
-        })
+        Ok(Self { buf: buf.to_vec() })
     }
 
     pub fn clear_subcommand(&mut self) {
@@ -175,12 +173,12 @@ impl InputReport {
 
     // Returns `true` if the total data length matches 313
     pub fn set_ir_nfc_data(&mut self, data: impl AsRef<[u8]>) -> ReportResult<bool> {
-        let data_r = data.as_ref();
-        if data_r.len() > 313 {
+        let data = data.as_ref();
+        if data.len() > 313 {
             return Err(ReportError::OutOfBounds);
         }
-        self.buf[50..50 + data_r.len()].copy_from_slice(data_r);
-        Ok(data_r.len() == 313)
+        self.buf[50..50 + data.len()].copy_from_slice(data);
+        Ok(data.len() == 313)
     }
 
     pub fn reply_to_subcommand_id(&self) -> Subcommand {
@@ -226,8 +224,8 @@ impl InputReport {
         size: u8,
         data: impl AsRef<[u8]>,
     ) -> ReportResult<()> {
-        let data_r = data.as_ref();
-        if size > 0x1D || data_r.len() != size.into() {
+        let data = data.as_ref();
+        if size > 0x1D || data.len() != size.into() {
             return Err(ReportError::OutOfBounds);
         }
         // Creates input report data with spi flash read subcommand
@@ -239,7 +237,7 @@ impl InputReport {
             cur_offset = cur_offset / 0x100;
         }
         self.buf[20] = size;
-        self.buf[21..21 + data_r.len()].copy_from_slice(data_r);
+        self.buf[21..21 + data.len()].copy_from_slice(data);
         Ok(())
     }
 
@@ -247,14 +245,14 @@ impl InputReport {
         &mut self,
         commands: impl AsRef<[TriggerButtonsElapsedTimeCommand]>,
     ) -> ReportResult<()> {
-        let commands_r = commands.as_ref();
+        let commands = commands.as_ref();
         const MAX_MS: u32 = 10 * 0xFFFF;
         let mut set = |offset: usize, ms: u32| {
             let value = (ms / 10) as u16;
             self.buf[SUBCOMMAND_OFFSET + offset] = (value & 0xFF) as u8;
             self.buf[SUBCOMMAND_OFFSET + offset + 1] = ((value & 0xFF00) >> 8) as u8;
         };
-        for command in commands_r {
+        for command in commands {
             match *command {
                 TriggerButtonsElapsedTimeCommand::LeftTrigger(ms) => {
                     if ms > MAX_MS {

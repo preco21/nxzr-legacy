@@ -51,20 +51,18 @@ impl OutputReport {
     }
 
     pub fn with_raw(buf: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf_r = buf.as_ref();
+        let buf = buf.as_ref();
         let min_len = match report_size {
             Some(report_size) => std::cmp::max(report_size, 12),
             None => 12,
         };
-        if buf_r.len() < min_len {
+        if buf.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        if buf_r[0] != 0xA2 {
+        if buf[0] != 0xA2 {
             return Err(ReportError::Malformed);
         }
-        Ok(Self {
-            buf: buf_r.to_vec(),
-        })
+        Ok(Self { buf: buf.to_vec() })
     }
 
     pub fn output_report_id(&self) -> OutputReportId {
@@ -116,8 +114,8 @@ impl OutputReport {
     }
 
     pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) {
-        let data_r = data.as_ref();
-        self.buf[12..12 + data_r.len()].copy_from_slice(data_r);
+        let data = data.as_ref();
+        self.buf[12..12 + data.len()].copy_from_slice(data);
     }
 
     pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> ReportResult<()> {
