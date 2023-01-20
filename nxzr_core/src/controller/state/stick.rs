@@ -1,6 +1,37 @@
+#[derive(Clone, Debug)]
 pub struct StickState;
 
-impl StickState {}
+impl StickState {
+    pub fn new() {}
+
+    pub fn with_raw(raw_data: [u8; 3]) {}
+
+    pub fn horizontal() {}
+
+    pub fn set_horizontal(&mut self) {}
+
+    pub fn vertical() {}
+
+    pub fn set_vertical(&mut self) {}
+
+    pub fn is_center(&self) {}
+
+    pub fn reset_to_center(&mut self) {}
+
+    pub fn set_up(&mut self) {}
+
+    pub fn set_down(&mut self) {}
+
+    pub fn set_left(&mut self) {}
+
+    pub fn set_right(&mut self) {}
+
+    pub fn calibration(&self) {}
+
+    pub fn set_calibration(&mut self) {}
+
+    fn data() -> &[u8] {}
+}
 
 pub struct StickCalibration {
     pub h_center: u16,
