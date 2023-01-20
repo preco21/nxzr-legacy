@@ -118,8 +118,7 @@ impl OutputReport {
 
     pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) {
         let data_r = data.as_ref();
-        self.data
-            .splice(12..12 + data_r.len(), data_r.iter().cloned());
+        self.data[12..12 + data_r.len()].copy_from_slice(data_r);
     }
 
     pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> ReportResult<()> {

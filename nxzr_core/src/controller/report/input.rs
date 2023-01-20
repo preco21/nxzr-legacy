@@ -1,5 +1,8 @@
 use super::{subcommand::Subcommand, ReportError, ReportResult};
-use crate::controller::info::{ControllerType, CONTROLLER_INFO_MAP};
+use crate::controller::{
+    info::{ControllerType, CONTROLLER_INFO_MAP},
+    state::stick,
+};
 use strum::Display;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -126,7 +129,7 @@ impl InputReport {
     }
 
     pub fn set_button_status(&mut self, button_status: [u8; 3]) {
-        self.data.splice(4..7, button_status);
+        self.data[4..7].copy_from_slice(&button_status);
     }
 
     pub fn set_analog_stick(
@@ -145,11 +148,11 @@ impl InputReport {
     }
 
     pub fn set_left_analog_stick(&mut self, stick_status: [u8; 3]) {
-        self.data.splice(7..10, stick_status);
+        self.data[7..10].copy_from_slice(&stick_status);
     }
 
     pub fn set_right_analog_stick(&mut self, stick_status: [u8; 3]) {
-        self.data.splice(10..13, stick_status);
+        self.data[10..13].copy_from_slice(&stick_status);
     }
 
     pub fn set_vibrator_input(&mut self) {
@@ -177,8 +180,7 @@ impl InputReport {
         if data_r.len() > 313 {
             return Err(ReportError::OutOfBounds);
         }
-        self.data
-            .splice(50..50 + data_r.len(), data_r.iter().cloned());
+        self.data[50..50 + data_r.len()].copy_from_slice(data_r);
         Ok(data_r.len() == 313)
     }
 
@@ -210,12 +212,10 @@ impl InputReport {
             return Err(ReportError::Invariant);
         };
         self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo)?;
-        self.data
-            .splice(SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2, fm_version_u);
+        self.data[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version_u);
         self.data[SUBCOMMAND_OFFSET + 2] = controller_info.id;
         self.data[SUBCOMMAND_OFFSET + 3] = 0x02;
-        self.data
-            .splice(SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10, mac_addr);
+        self.data[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
         self.data[SUBCOMMAND_OFFSET + 10] = 0x01;
         self.data[SUBCOMMAND_OFFSET + 11] = 0x01;
         Ok(())
@@ -240,8 +240,7 @@ impl InputReport {
             cur_offset = cur_offset / 0x100;
         }
         self.data[20] = size;
-        self.data
-            .splice(21..21 + data_r.len(), data_r.iter().cloned());
+        self.data[21..21 + data_r.len()].copy_from_slice(data_r);
         Ok(())
     }
 
