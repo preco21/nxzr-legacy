@@ -1,38 +1,163 @@
+use super::{StateError, StateResult};
+
 #[derive(Clone, Debug)]
-pub struct StickState;
-
-impl StickState {
-    pub fn new() {}
-
-    pub fn with_raw(raw_data: [u8; 3]) {}
-
-    pub fn horizontal() {}
-
-    pub fn set_horizontal(&mut self) {}
-
-    pub fn vertical() {}
-
-    pub fn set_vertical(&mut self) {}
-
-    pub fn is_center(&self) {}
-
-    pub fn reset_to_center(&mut self) {}
-
-    pub fn set_up(&mut self) {}
-
-    pub fn set_down(&mut self) {}
-
-    pub fn set_left(&mut self) {}
-
-    pub fn set_right(&mut self) {}
-
-    pub fn calibration(&self) {}
-
-    pub fn set_calibration(&mut self) {}
-
-    fn data() -> &[u8] {}
+pub struct StickState {
+    h_stick: u16,
+    v_stick: u16,
+    stick_cal: Option<StickCalibration>,
 }
 
+impl StickState {
+    pub fn new() -> Self {
+        Self {
+            h_stick: 0,
+            v_stick: 0,
+            stick_cal: None,
+        }
+    }
+
+    pub fn with_options(
+        horizontal: Option<u16>,
+        vertical: Option<u16>,
+        calibration: Option<StickCalibration>,
+    ) -> StateResult<Self> {
+        let horizontal = match horizontal {
+            Some(horizontal) => {
+                if horizontal >= 0x1000 {
+                    return Err(StateError::InvalidRange);
+                } else {
+                    horizontal
+                }
+            }
+            None => 0,
+        };
+        let vertical = match vertical {
+            Some(vertical) => {
+                if vertical >= 0x1000 {
+                    return Err(StateError::InvalidRange);
+                } else {
+                    vertical
+                }
+            }
+            None => 0,
+        };
+        Ok(Self {
+            h_stick: horizontal,
+            v_stick: vertical,
+            stick_cal: calibration,
+        })
+    }
+
+    pub fn with_raw(bytes: [u8; 3], calibration: Option<StickCalibration>) -> StateResult<Self> {
+        let stick_h = (bytes[0] as u16) | (((bytes[1] & 0xF) as u16) << 8);
+        let stick_v = ((bytes[1] >> 4) as u16) | ((bytes[2] as u16) << 4);
+        Self::with_options(Some(stick_h), Some(stick_v), calibration)
+    }
+
+    pub fn horizontal(&self) -> u16 {
+        self.h_stick
+    }
+
+    pub fn set_horizontal(&mut self, horizontal: u16) -> StateResult<()> {
+        if horizontal >= 0x1000 {
+            return Err(StateError::InvalidRange);
+        }
+        self.h_stick = horizontal;
+        Ok(())
+    }
+
+    pub fn vertical(&self) -> u16 {
+        self.v_stick
+    }
+
+    pub fn set_vertical(&mut self, vertical: u16) -> StateResult<()> {
+        if vertical >= 0x1000 {
+            return Err(StateError::InvalidRange);
+        }
+        self.v_stick = vertical;
+        Ok(())
+    }
+
+    pub fn is_center(&self, radius: Option<u16>) -> StateResult<bool> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        let radius = match radius {
+            Some(radius) => radius,
+            None => 0,
+        };
+        Ok((stick_cal.h_center - radius <= self.h_stick)
+            && (self.h_stick <= stick_cal.h_center + radius)
+            && (stick_cal.v_center - radius <= self.v_stick)
+            && (self.v_stick <= stick_cal.v_center + radius))
+    }
+
+    pub fn reset_to_center(&mut self) -> StateResult<()> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        self.h_stick = stick_cal.h_center;
+        self.v_stick = stick_cal.v_center;
+        Ok(())
+    }
+
+    pub fn set_up(&mut self) -> StateResult<()> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        self.h_stick = stick_cal.h_center;
+        self.v_stick = stick_cal.v_center + stick_cal.v_max_above_center;
+        Ok(())
+    }
+
+    pub fn set_down(&mut self) -> StateResult<()> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        self.h_stick = stick_cal.h_center;
+        self.v_stick = stick_cal.v_center - stick_cal.v_max_above_center;
+        Ok(())
+    }
+
+    pub fn set_left(&mut self) -> StateResult<()> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        self.h_stick = stick_cal.h_center - stick_cal.h_max_below_center;
+        self.v_stick = stick_cal.v_center;
+        Ok(())
+    }
+
+    pub fn set_right(&mut self) -> StateResult<()> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        self.h_stick = stick_cal.h_center + stick_cal.h_max_above_center;
+        self.v_stick = stick_cal.v_center;
+        Ok(())
+    }
+
+    pub fn calibration(&self) -> StateResult<&StickCalibration> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        Ok(&stick_cal)
+    }
+
+    pub fn set_calibration(&mut self, calibration: StickCalibration) -> StateResult<()> {
+        self.stick_cal = Some(calibration);
+        Ok(())
+    }
+
+    pub fn data(&self) -> [u8; 3] {
+        let byte_1 = (self.h_stick & 0xFF) as u8;
+        let byte_2 = ((self.h_stick >> 8) as u8) | (((self.v_stick & 0xF) as u8) << 4);
+        let byte_3 = (self.v_stick >> 4) as u8;
+        [byte_1, byte_2, byte_3]
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct StickCalibration {
     pub h_center: u16,
     pub v_center: u16,
