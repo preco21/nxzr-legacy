@@ -1,5 +1,5 @@
 use super::{subcommand::Subcommand, ReportError, ReportResult};
-use crate::controller::info::{ControllerType, CONTROLLER_INFO_MAP};
+use crate::controller::info::ControllerType;
 use strum::Display;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -198,16 +198,16 @@ impl InputReport {
         fm_version: Option<[u8; 2]>,
         controller_type: ControllerType,
     ) -> ReportResult<()> {
+        let Some(controller_id) = controller_type.try_id() else {
+            return Err(ReportError::Invariant);
+        };
         let fm_version_u = match fm_version {
             Some(version) => version,
             None => [0x04, 0x00],
         };
-        let Some(controller_info) = CONTROLLER_INFO_MAP.get(&controller_type) else {
-            return Err(ReportError::Invariant);
-        };
         self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo)?;
         self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version_u);
-        self.buf[SUBCOMMAND_OFFSET + 2] = controller_info.id;
+        self.buf[SUBCOMMAND_OFFSET + 2] = controller_id;
         self.buf[SUBCOMMAND_OFFSET + 3] = 0x02;
         self.buf[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
         self.buf[SUBCOMMAND_OFFSET + 10] = 0x01;
