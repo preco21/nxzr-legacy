@@ -9,6 +9,8 @@ pub enum StateError {
     InvalidRange,
     // There is no calibration data available.
     NoCalibrationDataAvailable,
+    // The button is not available for the controller of choice.
+    ButtonNotAvailable,
     // Returned if any invariant violation happens.
     Invariant,
 }
