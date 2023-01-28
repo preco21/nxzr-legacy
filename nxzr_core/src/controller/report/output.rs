@@ -59,9 +59,9 @@ impl OutputReport {
         if buf.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        if buf[0] != 0xA2 {
+        let [0xA2, ..] = buf else {
             return Err(ReportError::Malformed);
-        }
+        };
         Ok(Self { buf: buf.to_vec() })
     }
 
