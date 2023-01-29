@@ -43,8 +43,6 @@ fn flip_bit(value: u8, n: usize) -> u8 {
     value ^ (1 << n)
 }
 
-// move this to main mod
-// put available keys in map?
 pub enum ButtonKey {
     Y,
     X,
