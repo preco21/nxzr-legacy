@@ -27,7 +27,7 @@ impl ButtonState {
     pub fn set_button(&self) {}
 
     pub fn available_buttons(&self) -> &'static [ButtonKey] {
-        ButtonKey::available_buttons_for(self.controller)
+        ButtonKey::available_buttons(self.controller)
     }
 
     pub fn clear(&self) {}
@@ -48,30 +48,73 @@ pub enum ButtonKey {
     X,
     B,
     A,
-    Sr,
+    L,
+    Zl,
     Sl,
     R,
     Zr,
+    Sr,
     Minus,
     Plus,
-    RStick,
     LStick,
+    RStick,
     Home,
     Capture,
-    Down,
     Up,
-    Right,
+    Down,
     Left,
-    L,
-    Zl,
+    Right,
 }
 
 impl ButtonKey {
-    pub fn available_buttons_for(controller: ControllerType) -> &'static [ButtonKey] {
+    pub fn available_buttons(controller: ControllerType) -> &'static [ButtonKey] {
         match controller {
-            ControllerType::JoyConL => &[ButtonKey::A],
-            ControllerType::JoyConR => &[ButtonKey::B],
-            ControllerType::ProController => &[ButtonKey::B],
+            ControllerType::ProController => &[
+                ButtonKey::Y,
+                ButtonKey::X,
+                ButtonKey::B,
+                ButtonKey::A,
+                ButtonKey::R,
+                ButtonKey::Zr,
+                ButtonKey::Minus,
+                ButtonKey::Plus,
+                ButtonKey::RStick,
+                ButtonKey::LStick,
+                ButtonKey::Home,
+                ButtonKey::Capture,
+                ButtonKey::Down,
+                ButtonKey::Up,
+                ButtonKey::Right,
+                ButtonKey::Left,
+                ButtonKey::L,
+                ButtonKey::Zl,
+            ],
+            ControllerType::JoyConR => &[
+                ButtonKey::Y,
+                ButtonKey::X,
+                ButtonKey::B,
+                ButtonKey::A,
+                ButtonKey::Sr,
+                ButtonKey::Sl,
+                ButtonKey::R,
+                ButtonKey::Zr,
+                ButtonKey::Plus,
+                ButtonKey::RStick,
+                ButtonKey::Home,
+            ],
+            ControllerType::JoyConL => &[
+                ButtonKey::Minus,
+                ButtonKey::LStick,
+                ButtonKey::Capture,
+                ButtonKey::Down,
+                ButtonKey::Up,
+                ButtonKey::Right,
+                ButtonKey::Left,
+                ButtonKey::Sr,
+                ButtonKey::Sl,
+                ButtonKey::L,
+                ButtonKey::Zl,
+            ],
             _ => panic!("Unable to get available buttons for unknown controller type."),
         }
     }
