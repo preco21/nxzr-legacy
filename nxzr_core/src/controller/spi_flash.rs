@@ -1,3 +1,10 @@
+#[derive(Clone, Debug, Default)]
+pub struct SpiFlashConfig {
+    pub buffer: Option<Vec<u8>>,
+    pub size: Option<usize>,
+    pub reset: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct SpiFlash {
     buf: Vec<u8>,
@@ -5,40 +12,39 @@ pub struct SpiFlash {
 
 impl SpiFlash {
     pub fn new() -> Self {
-        Self::with_size(0x80000)
+        Self::with_config(SpiFlashConfig::default()).unwrap()
     }
 
-    pub fn with_size(size: usize) -> Self {
-        let mut inst = Self {
-            buf: vec![0xFF; size],
-        };
-        inst.reset_stick_calibration_with_factory_default();
-        inst
-    }
-
-    pub fn with_raw(buf: impl AsRef<[u8]>, size: Option<usize>, reset: bool) -> Option<Self> {
-        let buf = buf.as_ref();
-        let size_u = match size {
-            Some(size) => size,
+    pub fn with_config(config: SpiFlashConfig) -> Option<Self> {
+        let size = match config.size {
+            Some(size) => std::cmp::max(size, 0x80000),
             None => 0x80000,
         };
-        if buf.len() != size_u {
-            return None;
+        let mut should_reset = false;
+        let mut buf = match config.buffer {
+            Some(buf) => {
+                if buf.len() != size {
+                    return None;
+                }
+                if config.reset {
+                    should_reset = true;
+                }
+                buf
+            }
+            None => {
+                should_reset = true;
+                vec![0xFF; size]
+            }
+        };
+        if should_reset {
+            // L-stick factory calibration
+            buf[0x603D..0x6046]
+                .copy_from_slice(&[0x00, 0x07, 0x70, 0x00, 0x08, 0x80, 0x00, 0x07, 0x70]);
+            // R-stick factory calibration
+            buf[0x6046..0x604F]
+                .copy_from_slice(&[0x00, 0x08, 0x80, 0x00, 0x07, 0x70, 0x00, 0x07, 0x70]);
         }
-        let mut inst = Self { buf: buf.to_vec() };
-        if reset {
-            inst.reset_stick_calibration_with_factory_default();
-        }
-        Some(inst)
-    }
-
-    pub fn reset_stick_calibration_with_factory_default(&mut self) {
-        // L-stick factory calibration
-        self.buf[0x603D..0x6046]
-            .copy_from_slice(&[0x00, 0x07, 0x70, 0x00, 0x08, 0x80, 0x00, 0x07, 0x70]);
-        // R-stick factory calibration
-        self.buf[0x6046..0x604F]
-            .copy_from_slice(&[0x00, 0x08, 0x80, 0x00, 0x07, 0x70, 0x00, 0x07, 0x70]);
+        Some(Self { buf })
     }
 
     pub fn factory_l_stick_calibration(&self) -> &[u8] {
