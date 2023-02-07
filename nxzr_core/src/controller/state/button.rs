@@ -157,6 +157,13 @@ impl ButtonState {
         }
     }
 
+    pub fn with_controller(controller: ControllerType) -> Self {
+        Self {
+            controller,
+            bytes: [0, 0, 0],
+        }
+    }
+
     pub fn is_button_set(&self, key: ButtonKey) -> bool {
         if !ButtonKey::can_use_button(self.controller, key) {
             return false;
@@ -252,6 +259,10 @@ impl ButtonState {
             ButtonKey::Zl => toggle(2, 7),
         }
         Ok(())
+    }
+
+    pub fn controller(&self) -> ControllerType {
+        self.controller
     }
 
     pub fn available_buttons(&self) -> &'static [ButtonKey] {
