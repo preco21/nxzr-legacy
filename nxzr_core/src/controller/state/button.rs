@@ -189,53 +189,67 @@ impl ButtonState {
             ButtonKey::Sr => match self.controller {
                 ControllerType::JoyConR => is_toggled(0, 4),
                 ControllerType::JoyConL => is_toggled(2, 4),
-                _ => false,
+                _ => unreachable!(),
             },
             ButtonKey::Sl => match self.controller {
                 ControllerType::JoyConR => is_toggled(0, 5),
                 ControllerType::JoyConL => is_toggled(2, 5),
-                _ => false,
+                _ => unreachable!(),
             },
             ButtonKey::L => is_toggled(2, 6),
             ButtonKey::Zl => is_toggled(2, 7),
         }
     }
 
-    pub fn set_button(&self, key: ButtonKey, flag: Option<bool>) -> StateResult<()> {
+    pub fn toggle_button(&mut self, key: ButtonKey) -> StateResult<()> {
+        self.set_button(key, !self.is_button_set(key))
+    }
+
+    pub fn set_button(&mut self, key: ButtonKey, flag: bool) -> StateResult<()> {
         if !ButtonKey::can_use_button(self.controller, key) {
             return Err(StateError::ButtonNotAvailable);
         }
-        let toggle_button = |idx: usize, bit: usize| match flag {
-            Some(flag) => {
+        let mut toggle = |idx: usize, bit: usize| {
+            if flag != check_bit(self.bytes[idx], bit) {
                 self.bytes[idx] = flip_bit(self.bytes[idx], bit);
             }
-            None => {
-                if self.is_button_set(key) {
-                    self.bytes[idx] = flip_bit(self.bytes[idx], bit);
-                }
-            }
         };
+        // This mapping relies on that the controller is filtered by above
+        // condition before going through the routine, which means it has no
+        // guarantee for that a key being checked may not be available to the
+        // controller if the condition is not accurate.
         match key {
-            ButtonKey::Y => {}
-            ButtonKey::X => {}
-            ButtonKey::B => {}
-            ButtonKey::A => {}
-            ButtonKey::R => {}
-            ButtonKey::Zr => {}
-            ButtonKey::Minus => {}
-            ButtonKey::Plus => {}
-            ButtonKey::RStick => {}
-            ButtonKey::LStick => {}
-            ButtonKey::Home => {}
-            ButtonKey::Capture => {}
-            ButtonKey::Down => {}
-            ButtonKey::Up => {}
-            ButtonKey::Right => {}
-            ButtonKey::Left => {}
-            ButtonKey::Sr => {}
-            ButtonKey::Sl => {}
-            ButtonKey::L => {}
-            ButtonKey::Zl => {}
+            // Byte group 1
+            ButtonKey::Y => toggle(0, 0),
+            ButtonKey::X => toggle(0, 1),
+            ButtonKey::B => toggle(0, 2),
+            ButtonKey::A => toggle(0, 3),
+            ButtonKey::R => toggle(0, 6),
+            ButtonKey::Zr => toggle(0, 7),
+            // Byte group 2
+            ButtonKey::Minus => toggle(1, 0),
+            ButtonKey::Plus => toggle(1, 1),
+            ButtonKey::RStick => toggle(1, 2),
+            ButtonKey::LStick => toggle(1, 3),
+            ButtonKey::Home => toggle(1, 4),
+            ButtonKey::Capture => toggle(1, 5),
+            // Byte group 3
+            ButtonKey::Down => toggle(2, 0),
+            ButtonKey::Up => toggle(2, 1),
+            ButtonKey::Right => toggle(2, 2),
+            ButtonKey::Left => toggle(2, 3),
+            ButtonKey::Sr => match self.controller {
+                ControllerType::JoyConR => toggle(0, 4),
+                ControllerType::JoyConL => toggle(2, 4),
+                _ => unreachable!(),
+            },
+            ButtonKey::Sl => match self.controller {
+                ControllerType::JoyConR => toggle(0, 5),
+                ControllerType::JoyConL => toggle(2, 5),
+                _ => unreachable!(),
+            },
+            ButtonKey::L => toggle(2, 6),
+            ButtonKey::Zl => toggle(2, 7),
         }
         Ok(())
     }
