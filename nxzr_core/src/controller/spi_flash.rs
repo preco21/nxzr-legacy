@@ -12,7 +12,7 @@ pub struct SpiFlash {
 
 impl SpiFlash {
     pub fn new() -> Self {
-        Self::with_config(SpiFlashConfig::default()).unwrap()
+        Self::with_config(Default::default()).unwrap()
     }
 
     pub fn with_config(config: SpiFlashConfig) -> Option<Self> {

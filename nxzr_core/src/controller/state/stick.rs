@@ -1,5 +1,12 @@
 use super::{StateError, StateResult};
 
+#[derive(Clone, Debug, Default)]
+pub struct StickStateConfig {
+    pub horizontal: Option<u16>,
+    pub vertical: Option<u16>,
+    pub calibration: Option<StickCalibration>,
+}
+
 #[derive(Clone, Debug)]
 pub struct StickState {
     h_stick: u16,
@@ -9,19 +16,11 @@ pub struct StickState {
 
 impl StickState {
     pub fn new() -> Self {
-        Self {
-            h_stick: 0,
-            v_stick: 0,
-            stick_cal: None,
-        }
+        Self::with_config(Default::default()).unwrap()
     }
 
-    pub fn with_options(
-        horizontal: Option<u16>,
-        vertical: Option<u16>,
-        calibration: Option<StickCalibration>,
-    ) -> StateResult<Self> {
-        let horizontal = match horizontal {
+    pub fn with_config(config: StickStateConfig) -> StateResult<Self> {
+        let horizontal = match config.horizontal {
             Some(horizontal) => {
                 if horizontal >= 0x1000 {
                     return Err(StateError::InvalidRange);
@@ -31,7 +30,7 @@ impl StickState {
             }
             None => 0,
         };
-        let vertical = match vertical {
+        let vertical = match config.vertical {
             Some(vertical) => {
                 if vertical >= 0x1000 {
                     return Err(StateError::InvalidRange);
@@ -44,14 +43,19 @@ impl StickState {
         Ok(Self {
             h_stick: horizontal,
             v_stick: vertical,
-            stick_cal: calibration,
+            stick_cal: config.calibration,
         })
     }
 
     pub fn with_raw(bytes: [u8; 3], calibration: Option<StickCalibration>) -> StateResult<Self> {
         let stick_h = (bytes[0] as u16) | (((bytes[1] & 0xF) as u16) << 8);
         let stick_v = ((bytes[1] >> 4) as u16) | ((bytes[2] as u16) << 4);
-        Self::with_options(Some(stick_h), Some(stick_v), calibration)
+        Self::with_config(StickStateConfig {
+            horizontal: Some(stick_h),
+            vertical: Some(stick_v),
+            calibration,
+            ..Default::default()
+        })
     }
 
     pub fn horizontal(&self) -> u16 {
