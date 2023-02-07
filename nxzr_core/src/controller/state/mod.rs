@@ -52,7 +52,7 @@ impl ControllerState {
         };
         match config.spi_flash {
             Some(spi_flash) => {
-                let Some(l_calibration_data) = StickCalibration::with_left_stick_bytes(
+                let Some(l_calibration) = StickCalibration::with_left_stick_bytes(
                     match spi_flash.user_l_stick_calibration() {
                         Some(calibration_data) => calibration_data,
                         None => spi_flash.factory_l_stick_calibration(),
@@ -60,7 +60,12 @@ impl ControllerState {
                 ) else {
                     return Err(StateError::NoCalibrationDataAvailable);
                 };
-                let Some(r_calibration_data) = StickCalibration::with_right_stick_bytes(
+                let mut l_stick_state = StickState::with_config(StickStateConfig {
+                    calibration: Some(l_calibration),
+                    ..Default::default()
+                })?;
+                l_stick_state.reset_to_center()?;
+                let Some(r_calibration) = StickCalibration::with_right_stick_bytes(
                     match spi_flash.user_r_stick_calibration() {
                         Some(calibration_data) => calibration_data,
                         None => spi_flash.factory_r_stick_calibration(),
@@ -68,17 +73,16 @@ impl ControllerState {
                 ) else {
                     return Err(StateError::NoCalibrationDataAvailable);
                 };
+                let mut r_stick_state = StickState::with_config(StickStateConfig {
+                    calibration: Some(r_calibration),
+                    ..Default::default()
+                })?;
+                r_stick_state.reset_to_center()?;
                 Ok(Self {
                     controller,
                     button_state: ButtonState::with_controller(controller),
-                    l_stick_state: StickState::with_config(StickStateConfig {
-                        calibration: Some(l_calibration_data),
-                        ..Default::default()
-                    })?,
-                    r_stick_state: StickState::with_config(StickStateConfig {
-                        calibration: Some(r_calibration_data),
-                        ..Default::default()
-                    })?,
+                    l_stick_state,
+                    r_stick_state,
                 })
             }
             None => Ok(Self {
