@@ -1,27 +1,29 @@
-use super::StateResult;
+use super::{StateError, StateResult};
 use crate::controller::ControllerType;
+use strum::Display;
 
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ButtonKey {
     Y,
     X,
     B,
     A,
-    L,
-    Zl,
-    Sl,
     R,
     Zr,
-    Sr,
     Minus,
     Plus,
-    LStick,
     RStick,
+    LStick,
     Home,
     Capture,
-    Up,
     Down,
-    Left,
+    Up,
     Right,
+    Left,
+    Sr,
+    Sl,
+    L,
+    Zl,
 }
 
 impl ButtonKey {
@@ -155,15 +157,86 @@ impl ButtonState {
         }
     }
 
-    pub fn is_button_set(&self, key: ButtonKey) {
-        // logic
+    pub fn is_button_set(&self, key: ButtonKey) -> bool {
+        if !ButtonKey::can_use_button(self.controller, key) {
+            return false;
+        }
+        let is_toggled = |idx: usize, bit: usize| check_bit(self.bytes[idx], bit);
+        // This mapping relies on that the controller is filtered by above
+        // condition before going through the routine, which means it has no
+        // guarantee for that a key being checked may not be available to the
+        // controller if the condition is not accurate.
+        match key {
+            // Byte group 1
+            ButtonKey::Y => is_toggled(0, 0),
+            ButtonKey::X => is_toggled(0, 1),
+            ButtonKey::B => is_toggled(0, 2),
+            ButtonKey::A => is_toggled(0, 3),
+            ButtonKey::R => is_toggled(0, 6),
+            ButtonKey::Zr => is_toggled(0, 7),
+            // Byte group 2
+            ButtonKey::Minus => is_toggled(1, 0),
+            ButtonKey::Plus => is_toggled(1, 1),
+            ButtonKey::RStick => is_toggled(1, 2),
+            ButtonKey::LStick => is_toggled(1, 3),
+            ButtonKey::Home => is_toggled(1, 4),
+            ButtonKey::Capture => is_toggled(1, 5),
+            // Byte group 3
+            ButtonKey::Down => is_toggled(2, 0),
+            ButtonKey::Up => is_toggled(2, 1),
+            ButtonKey::Right => is_toggled(2, 2),
+            ButtonKey::Left => is_toggled(2, 3),
+            ButtonKey::Sr => match self.controller {
+                ControllerType::JoyConR => is_toggled(0, 4),
+                ControllerType::JoyConL => is_toggled(2, 4),
+                _ => false,
+            },
+            ButtonKey::Sl => match self.controller {
+                ControllerType::JoyConR => is_toggled(0, 5),
+                ControllerType::JoyConL => is_toggled(2, 5),
+                _ => false,
+            },
+            ButtonKey::L => is_toggled(2, 6),
+            ButtonKey::Zl => is_toggled(2, 7),
+        }
     }
 
-    pub fn set_button(&self, key: ButtonKey) -> StateResult<()> {
+    pub fn set_button(&self, key: ButtonKey, flag: Option<bool>) -> StateResult<()> {
         if !ButtonKey::can_use_button(self.controller, key) {
-            return Err(super::StateError::ButtonNotAvailable);
+            return Err(StateError::ButtonNotAvailable);
         }
-        // logic
+        let toggle_button = |idx: usize, bit: usize| match flag {
+            Some(flag) => {
+                self.bytes[idx] = flip_bit(self.bytes[idx], bit);
+            }
+            None => {
+                if self.is_button_set(key) {
+                    self.bytes[idx] = flip_bit(self.bytes[idx], bit);
+                }
+            }
+        };
+        match key {
+            ButtonKey::Y => {}
+            ButtonKey::X => {}
+            ButtonKey::B => {}
+            ButtonKey::A => {}
+            ButtonKey::R => {}
+            ButtonKey::Zr => {}
+            ButtonKey::Minus => {}
+            ButtonKey::Plus => {}
+            ButtonKey::RStick => {}
+            ButtonKey::LStick => {}
+            ButtonKey::Home => {}
+            ButtonKey::Capture => {}
+            ButtonKey::Down => {}
+            ButtonKey::Up => {}
+            ButtonKey::Right => {}
+            ButtonKey::Left => {}
+            ButtonKey::Sr => {}
+            ButtonKey::Sl => {}
+            ButtonKey::L => {}
+            ButtonKey::Zl => {}
+        }
         Ok(())
     }
 
@@ -182,7 +255,7 @@ impl ButtonState {
     }
 }
 
-fn bit_on(value: u8, n: usize) -> bool {
+fn check_bit(value: u8, n: usize) -> bool {
     (value >> n & 1) != 0
 }
 
