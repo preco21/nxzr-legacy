@@ -86,6 +86,6 @@ impl SpiFlash {
     }
 
     pub fn data(&self) -> &[u8] {
-        &self.buf.as_slice()
+        &self.buf[..]
     }
 }
