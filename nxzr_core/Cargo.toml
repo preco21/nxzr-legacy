@@ -13,3 +13,4 @@ publish = false
 once_cell = "1.17.0"
 strum = { version = "0.24.1", features = ["derive"] }
 strum_macros = "0.24"
+tokio = "1.25.0"
