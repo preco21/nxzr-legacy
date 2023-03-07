@@ -11,20 +11,20 @@ pub enum OutputReportId {
 }
 
 impl OutputReportId {
-    pub fn from_byte(byte: u8) -> OutputReportId {
+    pub fn from_byte(byte: u8) -> Self {
         match byte {
-            0x01 => OutputReportId::SubCommand,
-            0x10 => OutputReportId::RumbleOnly,
-            0x11 => OutputReportId::RequestIrNfcMcu,
-            _ => OutputReportId::Unknown,
+            0x01 => Self::SubCommand,
+            0x10 => Self::RumbleOnly,
+            0x11 => Self::RequestIrNfcMcu,
+            _ => Self::Unknown,
         }
     }
 
     pub fn to_byte(&self) -> u8 {
         match self {
-            OutputReportId::SubCommand => 0x01,
-            OutputReportId::RumbleOnly => 0x10,
-            OutputReportId::RequestIrNfcMcu => 0x11,
+            Self::SubCommand => 0x01,
+            Self::RumbleOnly => 0x10,
+            Self::RequestIrNfcMcu => 0x11,
             _ => panic!("Unknown output report id cannot be converted to a byte."),
         }
     }
