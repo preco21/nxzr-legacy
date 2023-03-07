@@ -5,6 +5,8 @@ use strum::Display;
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputReportId {
     Unknown,
+    // 0x3F Default input report for sending input packets to the host
+    Default,
     // 0x21 Standard input reports used for subcommand replies
     Standard,
     // 0x30 Full input reports with IMU data instead of subcommand replies
@@ -14,20 +16,21 @@ pub enum InputReportId {
 }
 
 impl InputReportId {
-    pub fn from_byte(byte: u8) -> InputReportId {
+    pub fn from_byte(byte: u8) -> Self {
         match byte {
-            0x21 => InputReportId::Standard,
-            0x30 => InputReportId::Imu,
-            0x31 => InputReportId::ImuWithNfcIrData,
-            _ => InputReportId::Unknown,
+            0x3F => Self::Default,
+            0x21 => Self::Standard,
+            0x30 => Self::Imu,
+            0x31 => Self::ImuWithNfcIrData,
+            _ => Self::Unknown,
         }
     }
 
     pub fn to_byte(&self) -> u8 {
         match self {
-            InputReportId::Standard => 0x21,
-            InputReportId::Imu => 0x30,
-            InputReportId::ImuWithNfcIrData => 0x31,
+            Self::Standard => 0x21,
+            Self::Imu => 0x30,
+            Self::ImuWithNfcIrData => 0x31,
             _ => panic!("Unknown input report id cannot be converted to a byte."),
         }
     }
