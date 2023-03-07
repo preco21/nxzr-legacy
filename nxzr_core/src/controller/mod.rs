@@ -1,3 +1,4 @@
+use self::state::button::ButtonKey;
 use strum::{Display, EnumString};
 
 pub mod protocol;
@@ -72,5 +73,37 @@ impl ControllerType {
             return None;
         }
         Some(self.connection_info())
+    }
+
+    pub fn close_pairing_masks(&self) -> u32 {
+        match self {
+            Self::JoyConL => u32::from_be_bytes([0x00, 0x02 | 0x08, 0x10, 0x00]),
+            Self::JoyConR => u32::from_be_bytes([0x00, 0x00, 0x00, 0x01 | 0x08]),
+            Self::ProController => u32::from_be_bytes([0x00, 0x04 | 0x08, 0x10, 0x00]),
+            _ => panic!("Unknown controller type cannot refer its `close_pairing_masks`."),
+        }
+    }
+
+    pub fn try_close_pairing_masks(&self) -> Option<u32> {
+        if let Self::Unknown = self {
+            return None;
+        }
+        Some(self.close_pairing_masks())
+    }
+
+    pub fn close_pairing_menu_seq(&self) -> &[ButtonKey] {
+        match self {
+            Self::JoyConL => &[ButtonKey::X, ButtonKey::A, ButtonKey::Home],
+            Self::JoyConR => &[ButtonKey::Down, ButtonKey::Left],
+            Self::ProController => &[ButtonKey::A, ButtonKey::B, ButtonKey::Home],
+            _ => panic!("Unknown controller type cannot refer its `close_paring_menu_seq`."),
+        }
+    }
+
+    pub fn try_close_pairing_menu_seq(&self) -> Option<&[ButtonKey]> {
+        if let Self::Unknown = self {
+            return None;
+        }
+        Some(self.close_pairing_menu_seq())
     }
 }
