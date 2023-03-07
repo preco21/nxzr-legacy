@@ -9,11 +9,11 @@ pub mod state;
     Clone, Copy, Default, Debug, Eq, PartialEq, PartialOrd, Ord, Hash, Display, EnumString,
 )]
 pub enum ControllerType {
+    Unknown,
     JoyConL,
     JoyConR,
     #[default]
     ProController,
-    Unknown,
 }
 
 impl ControllerType {
