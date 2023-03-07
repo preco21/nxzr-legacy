@@ -28,6 +28,7 @@ impl InputReportId {
 
     pub fn to_byte(&self) -> u8 {
         match self {
+            Self::Default => 0x3F,
             Self::Standard => 0x21,
             Self::Imu => 0x30,
             Self::ImuWithNfcIrData => 0x31,
