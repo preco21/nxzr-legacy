@@ -1,7 +1,7 @@
 [package]
 name = "nxzr_gui"
 version.workspace = true
-description = "The NXZR project: the gui application"
+description = "NXZR project: gui application"
 readme = "README.md"
 authors.workspace = true
 repository.workspace = true
