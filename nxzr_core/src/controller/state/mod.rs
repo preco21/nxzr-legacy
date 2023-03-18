@@ -1,8 +1,6 @@
-use self::{
-    button::ButtonState,
-    stick::{StickCalibration, StickState, StickStateConfig},
-};
 use super::{spi_flash::SpiFlash, ControllerType};
+use button::ButtonState;
+use stick::{StickCalibration, StickState, StickStateConfig};
 use strum::{Display, IntoStaticStr};
 
 pub mod button;

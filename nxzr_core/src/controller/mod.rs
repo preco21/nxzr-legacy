@@ -1,4 +1,4 @@
-use self::state::button::ButtonKey;
+use state::button::ButtonKey;
 use strum::{Display, EnumString};
 
 pub mod protocol;
