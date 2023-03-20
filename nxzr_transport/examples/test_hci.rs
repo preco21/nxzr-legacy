@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use nxzr_transport::sock::{
-    hci::{HciSocket, Socket, SocketAddr, StreamListener},
+    hci::{Socket, SocketAddr, StreamListener},
     sys::hci_filter,
 };
 use tokio::{
