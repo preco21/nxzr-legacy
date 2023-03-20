@@ -1,7 +1,5 @@
 pub mod sock;
 
-pub mod hci;
-
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }

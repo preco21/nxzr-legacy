@@ -309,5 +309,5 @@ impl AsyncWrite for Stream {
 }
 
 #[allow(clippy::duplicate_mod)]
-#[path = "sock/stream_util.rs"]
+#[path = "stream_util.rs"]
 pub mod stream;

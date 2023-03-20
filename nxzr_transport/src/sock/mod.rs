@@ -11,6 +11,7 @@ use std::{
 };
 use tokio::io::ReadBuf;
 
+pub mod hci;
 pub mod sys;
 
 /// File descriptor that is closed on drop.
