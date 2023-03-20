@@ -13,3 +13,10 @@ publish = false
 futures = "0.3.27"
 libc = "0.2.140"
 tokio = { version = "1.25.0", features = ["net", "io-util"] }
+
+[dev-dependencies]
+tokio = { version = "1.25.0", features = [
+    "io-std",
+    "io-util",
+    "rt-multi-thread",
+] }
