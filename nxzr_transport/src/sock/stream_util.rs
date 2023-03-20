@@ -16,7 +16,8 @@ use std::{
 };
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-pub mod stream_util;
+use super::Stream;
+use crate::sock;
 
 /// Borrowed read half of [Stream], created by [Stream::split].
 #[derive(Debug)]

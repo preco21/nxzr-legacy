@@ -4,11 +4,14 @@
 
 use libc::{c_int, sockaddr, socklen_t, Ioctl, SOCK_CLOEXEC, SOCK_NONBLOCK};
 use std::{
+    fmt::Debug,
     io::{Error, ErrorKind, Result},
     mem::{size_of, MaybeUninit},
     os::unix::io::{AsRawFd, IntoRawFd, RawFd},
 };
 use tokio::io::ReadBuf;
+
+pub mod sys;
 
 /// File descriptor that is closed on drop.
 #[derive(Debug)]
@@ -578,3 +581,5 @@ macro_rules! sock_priv {
         }
     };
 }
+
+pub(crate) use sock_priv;

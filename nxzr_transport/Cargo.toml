@@ -10,7 +10,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
+futures = "0.3.27"
 libc = "0.2.140"
-strum = { version = "0.24.1", features = ["derive"] }
-strum_macros = "0.24"
-tokio = "1.25.0"
+tokio = { version = "1.25.0", features = ["net", "io-util"] }
