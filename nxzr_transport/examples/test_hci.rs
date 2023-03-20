@@ -1,8 +1,11 @@
 use std::time::Duration;
 
-use nxzr_transport::sock::hci::{SocketAddr, StreamListener};
+use nxzr_transport::sock::{
+    hci::{HciSocket, Socket, SocketAddr, StreamListener},
+    sys::hci_filter,
+};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncReadExt, BufReader},
     time::sleep,
 };
 
@@ -12,6 +15,12 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 async fn main() -> Result<()> {
     let local_sa = SocketAddr::new(0);
     let listener = StreamListener::bind(local_sa).await?;
+    listener.as_ref().set_filter(hci_filter {
+        type_mask: 1 << 0x04,
+        event_mask: [1 << 0x13, 0],
+        opcode: 0,
+    })?;
+
     println!("Listening on local... Press enter to quit.");
     let stdin = BufReader::new(tokio::io::stdin());
     let mut lines = stdin.lines();

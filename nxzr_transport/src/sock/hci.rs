@@ -1,3 +1,4 @@
+use super::sys::{hci_filter, HCI_FILTER, SOL_HCI};
 use crate::sock::{
     self, sock_priv,
     sys::{sockaddr_hci, BTPROTO_HCI},
@@ -88,6 +89,10 @@ impl<Type> Socket<Type> {
 
     fn peer_addr_priv(&self) -> Result<SocketAddr> {
         sock::getpeername(self.fd.get_ref())
+    }
+
+    pub fn set_filter(&self, filter: hci_filter) -> Result<()> {
+        sock::setsockopt(self.fd.get_ref(), SOL_HCI, HCI_FILTER, &filter)
     }
 
     pub fn recv_buffer(&self) -> Result<i32> {
