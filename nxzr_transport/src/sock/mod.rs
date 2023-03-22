@@ -514,32 +514,6 @@ macro_rules! sock_priv {
             }
         }
 
-        async fn peek_priv(&self, buf: &mut [u8]) -> Result<usize> {
-            let mut buf = ReadBuf::new(buf);
-            loop {
-                let mut guard = self.fd.readable().await?;
-                match guard.try_io(|inner| sock::recv(inner.get_ref(), &mut buf, MSG_PEEK)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn poll_peek_priv(&self, cx: &mut Context, buf: &mut ReadBuf) -> Poll<Result<usize>> {
-            loop {
-                let mut guard = ready!(self.fd.poll_read_ready(cx))?;
-                match guard.try_io(|inner| sock::recv(inner.get_ref(), buf, MSG_PEEK)) {
-                    Ok(result) => return Poll::Ready(result),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn poll_flush_priv(&self, _cx: &mut Context) -> Poll<Result<()>> {
-            // Flush is a no-op.
-            Poll::Ready(Ok(()))
-        }
-
         fn shutdown_priv(&self, how: Shutdown) -> Result<()> {
             let how = match how {
                 Shutdown::Read => SHUT_RD,
