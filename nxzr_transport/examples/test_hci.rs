@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use nxzr_transport::sock::{
-    hci::{Socket, SocketAddr, StreamListener},
+    hci::{Datagram, Socket, SocketAddr},
     sys::hci_filter,
 };
 use tokio::{
@@ -14,7 +14,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let local_sa = SocketAddr::new(0);
-    let listener = StreamListener::bind(local_sa).await?;
+    let listener = Datagram::bind(local_sa).await?;
     listener.as_ref().set_filter(hci_filter {
         type_mask: 1 << 0x04,
         event_mask: [1 << 0x13, 0],

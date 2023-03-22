@@ -6,14 +6,12 @@ use crate::sock::{
 };
 use futures::ready;
 use libc::{
-    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_RAW,
-    SOL_BLUETOOTH, SOL_SOCKET, SO_ERROR, SO_RCVBUF, TIOCINQ, TIOCOUTQ,
+    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_RAW, SOL_SOCKET,
+    SO_ERROR, SO_RCVBUF, TIOCINQ, TIOCOUTQ,
 };
 use std::{
-    convert::TryInto,
     fmt,
     io::{Error, ErrorKind, Result},
-    marker::PhantomData,
     mem::ManuallyDrop,
     net::Shutdown,
     os::{
@@ -65,12 +63,11 @@ impl sock::SysSockAddr for SocketAddr {
     }
 }
 
-pub struct Socket<Type> {
+pub struct Socket {
     fd: AsyncFd<OwnedFd>,
-    _type: PhantomData<Type>,
 }
 
-impl<Type> fmt::Debug for Socket<Type> {
+impl fmt::Debug for Socket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Socket")
             .field("fd", &self.fd.as_raw_fd())
@@ -78,7 +75,22 @@ impl<Type> fmt::Debug for Socket<Type> {
     }
 }
 
-impl<Type> Socket<Type> {
+impl Socket {
+    pub fn new() -> Result<Socket> {
+        Ok(Self {
+            fd: AsyncFd::new(sock::socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)?)?,
+        })
+    }
+
+    pub fn into_listener(self) -> Datagram {
+        Datagram { socket: self }
+    }
+
+    pub async fn connect(self, sa: SocketAddr) -> Result<Stream> {
+        self.connect_priv(sa).await?;
+        Stream::from_socket(self)
+    }
+
     pub fn bind(&self, sa: SocketAddr) -> Result<()> {
         sock::bind(self.fd.get_ref(), sa)
     }
@@ -116,82 +128,44 @@ impl<Type> Socket<Type> {
     pub unsafe fn from_raw_fd(fd: RawFd) -> Result<Self> {
         Ok(Self {
             fd: AsyncFd::new(OwnedFd::new(fd))?,
-            _type: PhantomData,
-        })
-    }
-
-    fn from_owned_fd(fd: OwnedFd) -> Result<Self> {
-        Ok(Self {
-            fd: AsyncFd::new(fd)?,
-            _type: PhantomData,
         })
     }
 
     sock_priv!();
 }
 
-impl<Type> AsRawFd for Socket<Type> {
+impl AsRawFd for Socket {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
     }
 }
 
-impl<Type> IntoRawFd for Socket<Type> {
+impl IntoRawFd for Socket {
     fn into_raw_fd(self) -> RawFd {
         self.fd.into_inner().into_raw_fd()
     }
 }
 
-impl<Type> FromRawFd for Socket<Type> {
+impl FromRawFd for Socket {
     unsafe fn from_raw_fd(fd: RawFd) -> Self {
         Self::from_raw_fd(fd).expect("from_raw_fd failed")
     }
 }
 
-impl Socket<Stream> {
-    pub fn new_stream() -> Result<Socket<Stream>> {
-        Ok(Self {
-            fd: AsyncFd::new(sock::socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)?)?,
-            _type: PhantomData,
-        })
-    }
-
-    pub fn listen(self, backlog: u32) -> Result<StreamListener> {
-        sock::listen(
-            self.fd.get_ref(),
-            backlog
-                .try_into()
-                .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid backlog"))?,
-        )?;
-        Ok(StreamListener { socket: self })
-    }
-
-    pub async fn connect(self, sa: SocketAddr) -> Result<Stream> {
-        self.connect_priv(sa).await?;
-        Stream::from_socket(self)
-    }
-}
-
 #[derive(Debug)]
-pub struct StreamListener {
-    socket: Socket<Stream>,
+pub struct Datagram {
+    socket: Socket,
 }
 
-impl StreamListener {
+impl Datagram {
     pub async fn bind(sa: SocketAddr) -> Result<Self> {
-        let socket = Socket::<Stream>::new_stream()?;
+        let socket = Socket::new()?;
         socket.bind(sa)?;
-        socket.listen(1)
+        Ok(socket.into_listener())
     }
 
-    pub async fn accept(&self) -> Result<(Stream, SocketAddr)> {
-        let (socket, sa) = self.socket.accept_priv().await?;
-        Ok((Stream::from_socket(socket)?, sa))
-    }
-
-    pub fn poll_accept(&self, cx: &mut Context) -> Poll<Result<(Stream, SocketAddr)>> {
-        let (socket, sa) = ready!(self.socket.poll_accept_priv(cx))?;
-        Poll::Ready(Ok((Stream::from_socket(socket)?, sa)))
+    pub async fn connect(&self, sa: SocketAddr) -> Result<()> {
+        self.socket.connect_priv(sa).await
     }
 
     pub unsafe fn from_raw_fd(fd: RawFd) -> Result<Self> {
@@ -201,19 +175,19 @@ impl StreamListener {
     }
 }
 
-impl AsRef<Socket<Stream>> for StreamListener {
-    fn as_ref(&self) -> &Socket<Stream> {
+impl AsRef<Socket> for Datagram {
+    fn as_ref(&self) -> &Socket {
         &self.socket
     }
 }
 
-impl AsRawFd for StreamListener {
+impl AsRawFd for Datagram {
     fn as_raw_fd(&self) -> RawFd {
         self.socket.as_raw_fd()
     }
 }
 
-impl FromRawFd for StreamListener {
+impl FromRawFd for Datagram {
     unsafe fn from_raw_fd(fd: RawFd) -> Self {
         Self::from_raw_fd(fd).expect("from_raw_fd failed")
     }
@@ -221,16 +195,16 @@ impl FromRawFd for StreamListener {
 
 #[derive(Debug)]
 pub struct Stream {
-    socket: Socket<Stream>,
+    socket: Socket,
 }
 
 impl Stream {
-    fn from_socket(socket: Socket<Stream>) -> Result<Self> {
+    fn from_socket(socket: Socket) -> Result<Self> {
         Ok(Self { socket })
     }
 
     pub async fn connect(addr: SocketAddr) -> Result<Self> {
-        let socket = Socket::<Stream>::new_stream()?;
+        let socket = Socket::new()?;
         socket.bind(SocketAddr::any_raw())?;
         socket.connect(addr).await
     }
@@ -275,8 +249,8 @@ impl Stream {
     }
 }
 
-impl AsRef<Socket<Stream>> for Stream {
-    fn as_ref(&self) -> &Socket<Stream> {
+impl AsRef<Socket> for Stream {
+    fn as_ref(&self) -> &Socket {
         &self.socket
     }
 }

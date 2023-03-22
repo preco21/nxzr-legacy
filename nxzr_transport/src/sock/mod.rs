@@ -389,32 +389,6 @@ pub fn ioctl_write<T>(socket: &OwnedFd, request: Ioctl, value: &T) -> Result<c_i
 /// Private socket implementation functions.
 macro_rules! sock_priv {
     () => {
-        async fn accept_priv(&self) -> Result<(Self, SocketAddr)> {
-            let (fd, sa) = loop {
-                let mut guard = self.fd.readable().await?;
-                match guard.try_io(|inner| sock::accept(inner.get_ref())) {
-                    Ok(result) => break result,
-                    Err(_would_block) => continue,
-                }
-            }?;
-
-            let socket = Self::from_owned_fd(fd)?;
-            Ok((socket, sa))
-        }
-
-        fn poll_accept_priv(&self, cx: &mut Context) -> Poll<Result<(Self, SocketAddr)>> {
-            let (fd, sa) = loop {
-                let mut guard = ready!(self.fd.poll_read_ready(cx))?;
-                match guard.try_io(|inner| sock::accept(inner.get_ref())) {
-                    Ok(result) => break result,
-                    Err(_would_block) => continue,
-                }
-            }?;
-
-            let socket = Self::from_owned_fd(fd)?;
-            Poll::Ready(Ok((socket, sa)))
-        }
-
         async fn connect_priv(&self, sa: SocketAddr) -> Result<()> {
             match sock::connect(self.fd.get_ref(), sa) {
                 Ok(()) => Ok(()),
