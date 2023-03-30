@@ -1,79 +1,117 @@
 use crate::sock::hci::{Datagram, SocketAddr};
-use std::{
-    pin::Pin,
-    sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+use futures::Future;
+use std::{sync::Arc, time::Duration};
+use tokio::{
+    join,
+    sync::{mpsc, watch},
+    time::sleep,
 };
-use tokio::{sync::watch, time::sleep};
 
 pub enum TransportResult {}
 
 #[derive(Debug)]
 pub struct NxzrTransport {
-    sig_reading: watch::Sender<bool>,
-    sig_writing: watch::Sender<bool>,
-    is_closing: AtomicBool,
-    sig_closed: watch::Sender<bool>,
     write_window_dg: Datagram,
     write_lock_dg: Datagram,
+    reading_tx: watch::Sender<bool>,
+    closed_tx: mpsc::Sender<()>,
 }
 
 impl NxzrTransport {
-    pub async fn new(sa: SocketAddr) -> Self {
-        Self {
-            sig_reading: watch::channel(false).0,
-            sig_writing: watch::channel(false).0,
-            sig_closed: watch::channel(false).0,
-            is_closing: AtomicBool::new(false),
-            write_window_dg: Datagram::bind(sa).await.unwrap(),
-            write_lock_dg: Datagram::bind(sa).await.unwrap(),
-        }
+    pub async fn register() -> (Arc<Self>, NxzrTransportHandle) {
+        let (close_tx, close_rx) = mpsc::channel(1);
+        let (closed_tx, closed_rx) = mpsc::channel(1);
+        let s = Self {
+            write_window_dg: Datagram::bind(SocketAddr { dev_id: 0 }).await.unwrap(),
+            write_lock_dg: Datagram::bind(SocketAddr { dev_id: 0 }).await.unwrap(),
+            reading_tx: watch::channel(false).0,
+            closed_tx,
+        };
+        let s = Arc::new(s);
+        let s1 = s.clone();
+        let sc1 = close_tx.clone();
+        let h1 = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = s1.monitor_window() => {},
+                    _ = sc1.closed() => break,
+                }
+            }
+        });
+        let s2 = s.clone();
+        let sc2 = close_tx.clone();
+        let h2 = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = s2.monitor_lock() => {},
+                    _ = sc2.closed() => break,
+                }
+            }
+        });
+        tokio::spawn(async move {
+            let _ = join!(h1, h2);
+            drop(closed_rx);
+        });
+        (
+            s,
+            NxzrTransportHandle {
+                _close_rx: close_rx,
+            },
+        )
+    }
+
+    async fn monitor_window(&self) {
+        sleep(Duration::from_millis(1000)).await;
+        println!("monitor window");
+    }
+
+    async fn monitor_lock(&self) {
+        sleep(Duration::from_millis(500)).await;
+        println!("monitor lock");
     }
 
     // todo: add shutdown signal and use tokio select to cooperate with rx?
-    async fn reading(&self) {
-        let mut rx = self.sig_reading.subscribe();
-        while !*rx.borrow() {
-            rx.changed().await.unwrap();
-        }
-    }
+    // async fn reading(&self) {
+    //     let mut rx = self.sig_reading.subscribe();
+    //     while !*rx.borrow() {
+    //         rx.changed().await.unwrap();
+    //     }
+    // }
 
-    fn pause_read(&self) {
-        self.sig_reading.send(false).unwrap();
-    }
+    // fn pause_read(&self) {
+    //     self.sig_reading.send(false).unwrap();
+    // }
 
-    fn resume_read(&self) {
-        self.sig_reading.send(true).unwrap();
-    }
+    // fn resume_read(&self) {
+    //     self.sig_reading.send(true).unwrap();
+    // }
 
-    pub async fn read(self: Pin<&Self>) -> &[u8] {
-        self.reading().await;
-        // read data from socket
-    }
+    // pub async fn read(&self) -> &[u8] {
+    //     self.reading().await;
+    //     // read data from socket
+    // }
 
-    pub fn write(self: Pin<&Self>, buf: impl AsRef<[u8]>) {
-        let buf = buf.as_ref();
-    }
+    // pub fn write(&self, buf: impl AsRef<[u8]>) {
+    //     let buf = buf.as_ref();
+    // }
 
-    pub fn is_closed(&self) -> bool {
-        let mut rx = self.sig_closed.subscribe();
-        *rx.borrow()
-    }
+    // pub fn is_closed(&self) -> bool {
+    //     let mut rx = self.sig_closed.subscribe();
+    //     *rx.borrow()
+    // }
 
-    pub async fn closed(self: Pin<&Self>) {
-        let mut rx = self.sig_closed.subscribe();
-        while !*rx.borrow() {
-            rx.changed().await.unwrap();
-        }
+    pub fn closed(&self) -> impl Future<Output = ()> {
+        let closed_tx = self.closed_tx.clone();
+        async move { closed_tx.closed().await }
     }
+}
 
-    pub async fn close(self: Pin<&Self>) {
-        if self.is_closing.load(Ordering::Acquire) {
-            return;
-        }
-        self.is_closing.store(true, Ordering::Release);
-        self.pause_read();
-        sleep(Duration::from_millis(1000)).await;
-        self.sig_closed.send(true).unwrap();
+pub struct NxzrTransportHandle {
+    _close_rx: mpsc::Receiver<()>,
+}
+
+impl Drop for NxzrTransportHandle {
+    fn drop(&mut self) {
+        // Required for drop order
     }
 }
