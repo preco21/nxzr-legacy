@@ -430,7 +430,7 @@ macro_rules! sock_priv {
 
         fn poll_send_priv(&self, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>> {
             loop {
-                let mut guard = ready!(self.fd.poll_write_ready(cx))?;
+                let mut guard = std::task::ready!(self.fd.poll_write_ready(cx))?;
                 match guard.try_io(|inner| sock::send(inner.get_ref(), buf, 0)) {
                     Ok(result) => return Poll::Ready(result),
                     Err(_would_block) => continue,
@@ -457,7 +457,7 @@ macro_rules! sock_priv {
             target: SocketAddr,
         ) -> Poll<Result<usize>> {
             loop {
-                let mut guard = ready!(self.fd.poll_write_ready(cx))?;
+                let mut guard = std::task::ready!(self.fd.poll_write_ready(cx))?;
                 match guard.try_io(|inner| sock::sendto(inner.get_ref(), buf, 0, target)) {
                     Ok(result) => return Poll::Ready(result),
                     Err(_would_block) => continue,
@@ -479,7 +479,7 @@ macro_rules! sock_priv {
 
         fn poll_recv_priv(&self, cx: &mut Context, buf: &mut ReadBuf) -> Poll<Result<()>> {
             loop {
-                let mut guard = ready!(self.fd.poll_read_ready(cx))?;
+                let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
                 match guard.try_io(|inner| sock::recv(inner.get_ref(), buf, 0)) {
                     Ok(result) => return Poll::Ready(result.map(|_| ())),
                     Err(_would_block) => continue,
@@ -506,7 +506,7 @@ macro_rules! sock_priv {
             buf: &mut ReadBuf,
         ) -> Poll<Result<SocketAddr>> {
             loop {
-                let mut guard = ready!(self.fd.poll_read_ready(cx))?;
+                let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
                 match guard.try_io(|inner| sock::recvfrom(inner.get_ref(), buf, 0)) {
                     Ok(result) => return Poll::Ready(result.map(|(_n, sa)| sa)),
                     Err(_would_block) => continue,

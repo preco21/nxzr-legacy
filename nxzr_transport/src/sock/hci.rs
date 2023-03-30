@@ -4,7 +4,6 @@ use crate::sock::{
     sys::{sockaddr_hci, BTPROTO_HCI},
     OwnedFd,
 };
-use futures::ready;
 use libc::{
     AF_BLUETOOTH, EAGAIN, EINPROGRESS, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_RAW, SOL_SOCKET, SO_ERROR,
     SO_RCVBUF, TIOCINQ, TIOCOUTQ,

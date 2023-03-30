@@ -10,12 +10,12 @@ edition = "2021"
 publish = false
 
 [dependencies]
-futures = "0.3.27"
 libc = "0.2.140"
-tokio = { version = "1.25.0", features = ["net", "io-util"] }
+tokio = { version = "1.25.0", features = ["sync", "net", "io-util"] }
 
 [dev-dependencies]
 tokio = { version = "1.25.0", features = [
+    "sync",
     "io-std",
     "io-util",
     "rt-multi-thread",
