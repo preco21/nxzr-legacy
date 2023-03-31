@@ -1,17 +1,52 @@
 pub mod sock;
 pub mod transport;
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+use strum::Display;
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Error {
+    pub kind: ErrorKind,
+    pub message: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum ErrorKind {
+    Internal(InternalErrorKind),
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum InternalErrorKind {
+    Io(std::io::ErrorKind),
+}
+
+impl Error {
+    pub(crate) fn new(kind: ErrorKind) -> Self {
+        Self {
+            kind,
+            message: String::new(),
+        }
     }
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if self.message.is_empty() {
+            write!(f, "{}", &self.kind)
+        } else {
+            write!(f, "{}: {}", &self.kind, &self.message)
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Self {
+            kind: ErrorKind::Internal(InternalErrorKind::Io(err.kind())),
+            message: err.to_string(),
+        }
+    }
+}
+
+pub type Result<T> = std::result::Result<T, Error>;

@@ -1,90 +1,120 @@
-use crate::sock::hci::{Datagram, SocketAddr};
-use futures::Future;
-use std::{sync::Arc, time::Duration};
-use tokio::{
-    join,
-    sync::{mpsc, watch},
-    time::sleep,
-};
+use crate::sock::hci;
+use crate::Result;
+use std::future::Future;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::join;
+use tokio::sync::{mpsc, watch, Semaphore};
+use tokio::time::sleep;
 
-pub enum TransportResult {}
+const MAX_FLOW_CONTROL: usize = 4;
 
-#[derive(Debug)]
-pub struct NxzrTransport {
-    write_window_dg: Datagram,
-    write_lock_dg: Datagram,
-    reading_tx: watch::Sender<bool>,
+pub struct TransportConfig {
     closed_tx: mpsc::Sender<()>,
 }
 
-impl NxzrTransport {
-    pub async fn register() -> (Arc<Self>, NxzrTransportHandle) {
+#[derive(Debug)]
+pub struct Transport {
+    write_window: hci::Datagram,
+    write_lock: hci::Datagram,
+    reading_tx: watch::Sender<bool>,
+    closed_tx: mpsc::Sender<()>,
+    flow_control: Semaphore
+}
+
+impl Transport {
+    pub async fn new(config: TransportConfig) -> Result<Self> {
+        // Device ids must be targeting to the local machine
+        let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
+        write_window.as_ref().set_filter(hci::Filter {
+            type_mask: 1 << 0x04,
+            event_mask: [1 << 0x13, 0],
+            opcode: 0,
+        })?;
+        let write_lock = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
+        write_lock.as_ref().set_filter(hci::Filter {
+            type_mask: 1 << 0x04,
+            event_mask: [1 << 0x1b, 0],
+            opcode: 0,
+        })?;
+        Ok(Self {
+            write_window,
+            write_lock,
+            reading_tx: watch::channel(true).0,
+            closed_tx: config.closed_tx,
+            flow_control: Semaphore::new(MAX_FLOW_CONTROL)
+        })
+    }
+
+    pub async fn register() -> Result<(Arc<Self>, NxzrTransportHandle)> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let s = Self {
-            write_window_dg: Datagram::bind(SocketAddr { dev_id: 0 }).await.unwrap(),
-            write_lock_dg: Datagram::bind(SocketAddr { dev_id: 0 }).await.unwrap(),
-            reading_tx: watch::channel(false).0,
-            closed_tx,
-        };
-        let s = Arc::new(s);
-        let s1 = s.clone();
-        let sc1 = close_tx.clone();
-        let h1 = tokio::spawn(async move {
+        let s = Arc::new(Self::new(TransportConfig { closed_tx }).await?);
+        let s_for_window = s.clone();
+        let close_tx_for_window = close_tx.clone();
+        let window_handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = s1.monitor_window() => {},
-                    _ = sc1.closed() => break,
+                    _ = s_for_window.monitor_window() => {},
+                    _ = close_tx_for_window.closed() => break,
                 }
             }
         });
-        let s2 = s.clone();
-        let sc2 = close_tx.clone();
-        let h2 = tokio::spawn(async move {
+        let s_for_lock = s.clone();
+        let close_tx_for_lock = close_tx.clone();
+        let lock_handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = s2.monitor_lock() => {},
-                    _ = sc2.closed() => break,
+                    _ = s_for_lock.monitor_lock() => {},
+                    _ = close_tx_for_lock.closed() => break,
                 }
             }
         });
         tokio::spawn(async move {
-            let _ = join!(h1, h2);
+            let _ = join!(window_handle, lock_handle);
             drop(closed_rx);
         });
-        (
+        Ok((
             s,
             NxzrTransportHandle {
                 _close_rx: close_rx,
             },
-        )
+        ))
     }
 
-    async fn monitor_window(&self) {
-        sleep(Duration::from_millis(1000)).await;
-        println!("monitor window");
+    async fn monitor_window(&self) -> Result<()> {
+        let mut buf = vec![0; 10 as _];
+        self.write_window.recv(&mut buf).await?;
+        self.write_window
+        Ok(())
     }
 
-    async fn monitor_lock(&self) {
-        sleep(Duration::from_millis(500)).await;
-        println!("monitor lock");
+    async fn monitor_lock(&self) -> Result<()> {
+        let mut buf = vec![0; 10 as _];
+        self.write_lock.recv(&mut buf).await?;
+        if buf[5] < 5 {
+            self.pause_read();
+            sleep(Duration::from_millis(1000)).await;
+            self.resume_read();
+        }
+        Ok(())
     }
 
     // todo: add shutdown signal and use tokio select to cooperate with rx?
-    // async fn reading(&self) {
-    //     let mut rx = self.sig_reading.subscribe();
-    //     while !*rx.borrow() {
-    //         rx.changed().await.unwrap();
-    //     }
-    // }
+    async fn reading(&self) {
+        let mut rx = self.reading_tx.subscribe();
+        while !*rx.borrow() {
+            rx.changed().await.unwrap();
+        }
+    }
 
-    // fn pause_read(&self) {
-    //     self.sig_reading.send(false).unwrap();
-    // }
+    fn pause_read(&self) {
+        self.reading_tx.send(false).unwrap();
+    }
 
-    // fn resume_read(&self) {
-    //     self.sig_reading.send(true).unwrap();
-    // }
+    fn resume_read(&self) {
+        self.reading_tx.send(true).unwrap();
+    }
 
     // pub async fn read(&self) -> &[u8] {
     //     self.reading().await;

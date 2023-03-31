@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 libc = "0.2.140"
+strum = "0.24.1"
 tokio = { version = "1.25.0", features = ["sync", "net", "io-util"] }
 
 [dev-dependencies]
