@@ -1,4 +1,5 @@
 use strum::Display;
+use tokio::sync::AcquireError;
 
 pub mod semaphore;
 pub mod sock;
@@ -18,6 +19,7 @@ pub enum ErrorKind {
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
+    AcquireError,
 }
 
 impl Error {
@@ -46,6 +48,15 @@ impl From<std::io::Error> for Error {
         Self {
             kind: ErrorKind::Internal(InternalErrorKind::Io(err.kind())),
             message: err.to_string(),
+        }
+    }
+}
+
+impl From<AcquireError> for Error {
+    fn from(_: AcquireError) -> Self {
+        Self {
+            kind: ErrorKind::Internal(InternalErrorKind::AcquireError),
+            message: "Semaphore closed.".to_owned(),
         }
     }
 }
