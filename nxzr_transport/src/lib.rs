@@ -1,7 +1,8 @@
+use strum::Display;
+
+pub mod semaphore;
 pub mod sock;
 pub mod transport;
-
-use strum::Display;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Error {
