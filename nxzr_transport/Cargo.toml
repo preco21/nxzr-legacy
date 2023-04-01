@@ -11,13 +11,5 @@ publish = false
 
 [dependencies]
 libc = "0.2.140"
-strum = "0.24.1"
-tokio = { version = "1.25.0", features = ["sync", "net", "io-util"] }
-
-[dev-dependencies]
-tokio = { version = "1.25.0", features = [
-    "sync",
-    "io-std",
-    "io-util",
-    "rt-multi-thread",
-] }
+strum = { version = "0.24.1", features = ["derive"] }
+tokio = { version = "1.25.0", features = ["full"] }
