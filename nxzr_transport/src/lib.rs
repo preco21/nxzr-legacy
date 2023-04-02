@@ -1,5 +1,6 @@
-use strum::Display;
+use strum::{Display, IntoStaticStr};
 use tokio::sync::AcquireError;
+use transport::TransportErrorKind;
 
 pub mod semaphore;
 pub mod sock;
@@ -11,13 +12,13 @@ pub struct Error {
     pub message: String,
 }
 
-#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ErrorKind {
-    Terminated,
+    Transport(TransportErrorKind),
     Internal(InternalErrorKind),
 }
 
-#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
     AcquireError,

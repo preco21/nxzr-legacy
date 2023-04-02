@@ -5,11 +5,17 @@ use futures::future::join_all;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
+use strum::{Display, IntoStaticStr};
 use tokio::sync::{mpsc, watch};
 use tokio::time::sleep;
 
 const DEFAULT_FLOW_CONTROL: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
+
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+pub enum TransportErrorKind {
+    Terminated,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct TransportConfig {
@@ -189,7 +195,9 @@ impl TransportInner {
 
     pub async fn read(&self) -> Result<&[u8]> {
         if self.term_tx.is_closed() {
-            return Err(Error::new(ErrorKind::Terminated));
+            return Err(Error::new(ErrorKind::Transport(
+                TransportErrorKind::Terminated,
+            )));
         }
         // TODO: ITR read
         Ok(&[])
@@ -197,7 +205,9 @@ impl TransportInner {
 
     pub async fn write(&self, buf: &[u8]) -> Result<()> {
         if self.term_tx.is_closed() {
-            return Err(Error::new(ErrorKind::Terminated));
+            return Err(Error::new(ErrorKind::Transport(
+                TransportErrorKind::Terminated,
+            )));
         }
         self.writing().await;
         let buf = buf.as_ref();
