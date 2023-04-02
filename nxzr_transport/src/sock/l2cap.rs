@@ -1,10 +1,9 @@
+use bluer::l2cap::{SeqPacket, Socket, SocketAddr};
 use std::{
     io::Result,
     os::fd::{AsRawFd, FromRawFd, RawFd},
     task::{Context, Poll},
 };
-
-use bluer::l2cap::{SeqPacket, Socket, SocketAddr};
 
 #[derive(Debug)]
 pub struct LazySeqPacketListener {
