@@ -13,6 +13,7 @@ pub struct Error {
 
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ErrorKind {
+    Terminated,
     Internal(InternalErrorKind),
 }
 
