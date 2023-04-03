@@ -4,6 +4,7 @@ const HID_PATH: &str = "/bluez/nxzr/controller";
 #[derive(Debug)]
 pub struct ControllerDevice;
 
+// TODO: implement
 impl ControllerDevice {
     pub fn new() {}
 

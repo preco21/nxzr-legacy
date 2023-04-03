@@ -52,4 +52,6 @@ impl Session {
     }
 
     pub fn bind() -> Result<()> {}
+
+    pub fn listen() -> Result<()> {}
 }
