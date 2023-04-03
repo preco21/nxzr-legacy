@@ -1,12 +1,12 @@
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::hci;
-use crate::{Error, ErrorKind, Result};
+use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use futures::future::join_all;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use strum::{Display, IntoStaticStr};
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio::time::sleep;
 
 const DEFAULT_FLOW_CONTROL: usize = 4;
@@ -27,17 +27,26 @@ pub struct TransportConfig {
 pub struct Transport {
     inner: Arc<TransportInner>,
     closed_tx: mpsc::Sender<()>,
+    event_tx: broadcast::Sender<Event>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    MonitorLockError { err: Error },
+    MonitorWindowError { err: Error },
 }
 
 impl Transport {
     pub async fn register(config: TransportConfig) -> Result<(Self, TransportHandle)> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
+        let (event_tx, _event_rx) = broadcast::channel(1);
         let inner = Arc::new(TransportInner::new(config, close_tx).await?);
         let mut handles = vec![];
         {
             // Handles writer lock timing.
             let inner = inner.clone();
+            let event_tx = event_tx.clone();
             handles.push(tokio::spawn(async move {
                 loop {
                     tokio::select! {
@@ -45,8 +54,9 @@ impl Transport {
                         res = inner.monitor_lock() => {
                             match res {
                                 Ok(()) => {},
-                                // TODO: Revisit for better error handling
-                                Err(err) => println!("Error: {}", err),
+                                Err(err) => {
+                                    let _ = event_tx.send(Event::MonitorLockError { err });
+                                },
                             }
                         },
                     }
@@ -56,6 +66,7 @@ impl Transport {
         {
             // Handles writer window timing.
             let inner = inner.clone();
+            let event_tx = event_tx.clone();
             handles.push(tokio::spawn(async move {
                 loop {
                     tokio::select! {
@@ -63,8 +74,9 @@ impl Transport {
                         res = inner.monitor_window() => {
                             match res {
                                 Ok(()) => {},
-                                // TODO: Revisit for better error handling
-                                Err(err) => println!("Error: {}", err),
+                                Err(err) => {
+                                    let _ = event_tx.send(Event::MonitorWindowError { err });
+                                },
                             }
                         },
                     }
@@ -76,7 +88,11 @@ impl Transport {
             drop(closed_rx);
         });
         Ok((
-            Self { inner, closed_tx },
+            Self {
+                inner,
+                closed_tx,
+                event_tx,
+            },
             TransportHandle {
                 _close_rx: close_rx,
             },
@@ -90,6 +106,10 @@ impl Transport {
     pub async fn write(&self, buf: impl AsRef<[u8]>) -> Result<()> {
         let buf = buf.as_ref();
         self.inner.write(&buf).await
+    }
+
+    pub fn events(&self) -> broadcast::Receiver<Event> {
+        self.event_tx.subscribe()
     }
 
     pub fn closed(&self) -> impl Future<Output = ()> {
