@@ -10,6 +10,8 @@ edition = "2021"
 publish = false
 
 [dependencies]
+bluer = { version = "0.15.7", features = ["full"] }
+dbus = { version = "0.9.7", features = ["vendored"] }
 futures = "0.3.28"
 libc = "0.2.140"
 strum = { version = "0.24.1", features = ["derive"] }
