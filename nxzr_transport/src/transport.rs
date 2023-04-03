@@ -1,12 +1,12 @@
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::hci;
-use crate::{Error, ErrorKind, InternalErrorKind, Result};
+use crate::{Error, ErrorKind, Result};
 use futures::future::join_all;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use strum::{Display, IntoStaticStr};
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::sleep;
 
 const DEFAULT_FLOW_CONTROL: usize = 4;
