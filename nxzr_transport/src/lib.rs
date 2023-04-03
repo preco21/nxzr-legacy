@@ -3,6 +3,7 @@ use tokio::sync::AcquireError;
 use transport::TransportErrorKind;
 
 pub mod semaphore;
+pub mod session;
 pub mod sock;
 pub mod transport;
 
