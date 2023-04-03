@@ -2,7 +2,7 @@ use crate::sock;
 use bluer::l2cap::{SeqPacket, Socket, SocketAddr};
 use libc::{SOL_SOCKET, SO_REUSEADDR};
 use std::{
-    io::Result,
+    io::{Error, ErrorKind, Result},
     os::fd::{AsRawFd, FromRawFd, RawFd},
     task::{Context, Poll},
 };
@@ -26,8 +26,7 @@ impl LazySeqPacketListener {
     }
 
     pub fn set_reuse_addr(&self) -> Result<()> {
-        let fd = self.as_owned_fd();
-        sock::setsockopt(&fd, SOL_SOCKET, SO_REUSEADDR, &1)
+        sock::setsockopt(&self.as_owned_fd(), SOL_SOCKET, SO_REUSEADDR, &1)
     }
 
     pub async fn bind(&self, sa: SocketAddr) -> Result<()> {
@@ -40,6 +39,15 @@ impl LazySeqPacketListener {
 
     pub fn poll_accept(&self, cx: &mut Context) -> Poll<Result<(SeqPacket, SocketAddr)>> {
         self.listener.poll_accept(cx)
+    }
+
+    pub async fn listen(&self, backlog: u32) -> Result<()> {
+        sock::listen(
+            &self.as_owned_fd(),
+            backlog
+                .try_into()
+                .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid backlog"))?,
+        )
     }
 
     pub unsafe fn from_raw_fd(fd: RawFd) -> Result<Self> {
