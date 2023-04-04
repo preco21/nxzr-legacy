@@ -27,7 +27,7 @@ pub struct TransportConfig {
 pub struct Transport {
     inner: Arc<TransportInner>,
     closed_tx: mpsc::Sender<()>,
-    sub_tx: mpsc::Sender<SubscriptionReq>,
+    event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
 
 impl Transport {
@@ -36,8 +36,8 @@ impl Transport {
         let (closed_tx, closed_rx) = mpsc::channel(1);
         let inner = Arc::new(TransportInner::new(config, close_tx).await?);
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
-        let (sub_tx, sub_rx) = mpsc::channel(1);
-        Event::handle_events(msg_rx, sub_rx)?;
+        let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
+        Event::handle_events(msg_rx, event_sub_rx)?;
         let mut handles = vec![];
         {
             // Handles writer lock timing.
@@ -87,7 +87,7 @@ impl Transport {
             Self {
                 inner,
                 closed_tx,
-                sub_tx,
+                event_sub_tx,
             },
             TransportHandle {
                 _close_rx: close_rx,
@@ -105,7 +105,7 @@ impl Transport {
     }
 
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
-        Event::subscribe(&mut self.sub_tx.clone()).await
+        Event::subscribe(&mut self.event_sub_tx.clone()).await
     }
 
     pub fn closed(&self) -> impl Future<Output = ()> {
