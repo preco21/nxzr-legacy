@@ -1,5 +1,6 @@
 use strum::Display;
 
+// FIXME: remove unknown command
 #[derive(Clone, Copy, Debug, Default, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Subcommand {
     #[default]

@@ -7,6 +7,7 @@ pub mod report;
 pub mod spi_flash;
 pub mod state;
 
+// FIXME: remove unknown type
 #[derive(
     Clone, Copy, Default, Debug, Eq, PartialEq, PartialOrd, Ord, Hash, Display, EnumString,
 )]
