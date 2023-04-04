@@ -1,12 +1,12 @@
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::hci;
-use crate::{Error, ErrorKind, Result};
+use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use futures::future::join_all;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use strum::{Display, IntoStaticStr};
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::sleep;
 
 const DEFAULT_FLOW_CONTROL: usize = 4;
@@ -27,26 +27,22 @@ pub struct TransportConfig {
 pub struct Transport {
     inner: Arc<TransportInner>,
     closed_tx: mpsc::Sender<()>,
-    event_tx: broadcast::Sender<Event>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Event {
-    MonitorLockError(Error),
-    MonitorWindowError(Error),
+    sub_tx: mpsc::Sender<SubscriptionReq>,
 }
 
 impl Transport {
     pub async fn register(config: TransportConfig) -> Result<(Self, TransportHandle)> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let (event_tx, _event_rx) = broadcast::channel(1);
         let inner = Arc::new(TransportInner::new(config, close_tx).await?);
+        let (msg_tx, msg_rx) = mpsc::unbounded_channel();
+        let (sub_tx, sub_rx) = mpsc::channel(1);
+        Event::handle_events(msg_rx, sub_rx)?;
         let mut handles = vec![];
         {
             // Handles writer lock timing.
             let inner = inner.clone();
-            let event_tx = event_tx.clone();
+            let msg_tx = msg_tx.clone();
             handles.push(tokio::spawn(async move {
                 loop {
                     tokio::select! {
@@ -55,7 +51,7 @@ impl Transport {
                             match res {
                                 Ok(()) => {},
                                 Err(err) => {
-                                    let _ = event_tx.send(Event::MonitorLockError(err));
+                                    let _ = msg_tx.send(Event::MonitorLockError(err));
                                 },
                             }
                         },
@@ -66,7 +62,7 @@ impl Transport {
         {
             // Handles writer window timing.
             let inner = inner.clone();
-            let event_tx = event_tx.clone();
+            let msg_tx = msg_tx.clone();
             handles.push(tokio::spawn(async move {
                 loop {
                     tokio::select! {
@@ -75,7 +71,7 @@ impl Transport {
                             match res {
                                 Ok(()) => {},
                                 Err(err) => {
-                                    let _ = event_tx.send(Event::MonitorWindowError(err));
+                                    let _ = msg_tx.send(Event::MonitorWindowError(err));
                                 },
                             }
                         },
@@ -91,7 +87,7 @@ impl Transport {
             Self {
                 inner,
                 closed_tx,
-                event_tx,
+                sub_tx,
             },
             TransportHandle {
                 _close_rx: close_rx,
@@ -108,8 +104,8 @@ impl Transport {
         self.inner.write(&buf).await
     }
 
-    pub fn events(&self) -> broadcast::Receiver<Event> {
-        self.event_tx.subscribe()
+    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
+        Event::subscribe(&mut self.sub_tx.clone()).await
     }
 
     pub fn closed(&self) -> impl Future<Output = ()> {
@@ -237,5 +233,68 @@ impl TransportInner {
     pub fn terminated(&self) -> impl Future<Output = ()> {
         let term_tx = self.term_tx.clone();
         async move { term_tx.closed().await }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    MonitorLockError(Error),
+    MonitorWindowError(Error),
+}
+
+#[derive(Debug)]
+pub struct SubscriptionReq {
+    tx: mpsc::UnboundedSender<Event>,
+    ready_tx: oneshot::Sender<()>,
+}
+
+impl Event {
+    pub fn handle_events(
+        mut msg_rx: mpsc::UnboundedReceiver<Event>,
+        mut sub_rx: mpsc::Receiver<SubscriptionReq>,
+    ) -> Result<()> {
+        tokio::spawn(async move {
+            struct Subscription {
+                tx: mpsc::UnboundedSender<Event>,
+            }
+            let mut subs: Vec<Subscription> = vec![];
+            loop {
+                tokio::select! {
+                    msg = msg_rx.recv(), if subs.len() > 0 => {
+                        match msg {
+                            Some(evt) => {
+                                subs.retain(|sub| sub.tx.send(evt.clone()).is_ok());
+                            }
+                            None => break,
+                        }
+                    },
+                    sub_opts = sub_rx.recv() => {
+                        match sub_opts {
+                            Some(SubscriptionReq { tx, ready_tx }) => {
+                                let _ = ready_tx.send(());
+                                subs.push(Subscription { tx });
+                            }
+                            None => break,
+                        };
+                    },
+                }
+            }
+        });
+        Ok(())
+    }
+
+    pub async fn subscribe(
+        sub_tx: &mut mpsc::Sender<SubscriptionReq>,
+    ) -> Result<mpsc::UnboundedReceiver<Event>> {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let (ready_tx, ready_rx) = oneshot::channel();
+        sub_tx
+            .send(SubscriptionReq { tx, ready_tx })
+            .await
+            .map_err(|_| Error::new(ErrorKind::Internal(InternalErrorKind::EventSubFailed)))?;
+        ready_rx
+            .await
+            .map_err(|_| Error::new(ErrorKind::Internal(InternalErrorKind::EventSubFailed)))?;
+        Ok(rx)
     }
 }
