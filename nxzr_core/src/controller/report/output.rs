@@ -2,21 +2,21 @@ use super::subcommand::Subcommand;
 use super::{ReportError, ReportResult};
 use strum::Display;
 
+// Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#output-reports
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum OutputReportId {
-    Unknown,
     SubCommand,
     RumbleOnly,
     RequestIrNfcMcu,
 }
 
 impl OutputReportId {
-    pub fn from_byte(byte: u8) -> Self {
+    pub fn from_byte(byte: u8) -> Option<Self> {
         match byte {
-            0x01 => Self::SubCommand,
-            0x10 => Self::RumbleOnly,
-            0x11 => Self::RequestIrNfcMcu,
-            _ => Self::Unknown,
+            0x01 => Some(Self::SubCommand),
+            0x10 => Some(Self::RumbleOnly),
+            0x11 => Some(Self::RequestIrNfcMcu),
+            _ => None,
         }
     }
 
@@ -25,19 +25,11 @@ impl OutputReportId {
             Self::SubCommand => 0x01,
             Self::RumbleOnly => 0x10,
             Self::RequestIrNfcMcu => 0x11,
-            _ => panic!("Unknown output report id cannot be converted to a byte."),
         }
-    }
-
-    pub fn try_to_byte(&self) -> Option<u8> {
-        if let Self::Unknown = self {
-            return None;
-        }
-        Some(self.to_byte())
     }
 }
 
-// Processes incoming messages from the host(Nintendo Switch).
+// Processes incoming messages from the host (Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct OutputReport {
     buf: Vec<u8>,
@@ -65,18 +57,12 @@ impl OutputReport {
         Ok(Self { buf: buf.to_vec() })
     }
 
-    pub fn output_report_id(&self) -> OutputReportId {
+    pub fn output_report_id(&self) -> Option<OutputReportId> {
         OutputReportId::from_byte(self.buf[1])
     }
 
-    pub fn set_output_report_id(&mut self, id: OutputReportId) -> ReportResult<()> {
-        match id.try_to_byte() {
-            Some(byte) => {
-                self.buf[1] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedReportId),
-        }
+    pub fn set_output_report_id(&mut self, id: OutputReportId) {
+        self.buf[1] = id.to_byte();
     }
 
     pub fn timer(&self) -> u8 {
@@ -123,7 +109,7 @@ impl OutputReport {
             return Err(ReportError::OutOfBounds);
         }
         // Creates output report data with spi flash read subcommand
-        self.set_output_report_id(OutputReportId::SubCommand)?;
+        self.set_output_report_id(OutputReportId::SubCommand);
         self.set_subcommand(Subcommand::SpiFlashRead)?;
         let mut cur_offset = offset;
         for i in 12..12 + 4 {

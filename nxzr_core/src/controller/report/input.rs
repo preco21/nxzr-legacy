@@ -2,45 +2,46 @@ use super::{subcommand::Subcommand, ReportError, ReportResult};
 use crate::controller::ControllerType;
 use strum::Display;
 
+// Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputReportId {
-    Unknown,
-    // 0x3F Default input report for sending input packets to the host
-    Default,
+    // 0x3F Default input report for sending input packets to the host in "normal controller" interface manner
+    Normal,
     // 0x21 Standard input reports used for subcommand replies
     Standard,
-    // 0x30 Full input reports with IMU data instead of subcommand replies
+    // 0x30 Standard full mode - input reports with IMU data instead of subcommand replies
     Imu,
-    // 0x31 Full input reports with NFC/IR data plus to IMU data
-    ImuWithNfcIrData,
+    // 0x31 Standard full mode - input reports with NFC/IR data plus to IMU data
+    NfcIrMcu,
 }
 
 impl InputReportId {
-    pub fn from_byte(byte: u8) -> Self {
+    pub fn from_byte(byte: u8) -> Option<Self> {
         match byte {
-            0x3F => Self::Default,
-            0x21 => Self::Standard,
-            0x30 => Self::Imu,
-            0x31 => Self::ImuWithNfcIrData,
-            _ => Self::Unknown,
+            0x3F => Some(Self::Normal),
+            0x21 => Some(Self::Standard),
+            0x30 => Some(Self::Imu),
+            0x31 => Some(Self::NfcIrMcu),
+            _ => None,
         }
     }
 
-    pub fn to_byte(&self) -> u8 {
+    pub fn to_raw_byte(&self) -> u8 {
         match self {
-            Self::Default => 0x3F,
+            Self::Normal => 0x3F,
             Self::Standard => 0x21,
             Self::Imu => 0x30,
-            Self::ImuWithNfcIrData => 0x31,
-            _ => panic!("Unknown input report id cannot be converted to a byte."),
+            Self::NfcIrMcu => 0x31,
         }
     }
 
-    pub fn try_to_byte(&self) -> Option<u8> {
-        if let Self::Unknown = self {
-            return None;
+    pub fn to_supported_byte(&self) -> Option<u8> {
+        match self {
+            Self::Standard => Some(0x21),
+            Self::Imu => Some(0x30),
+            Self::NfcIrMcu => Some(0x31),
+            _ => None,
         }
-        Some(self.to_byte())
     }
 }
 
@@ -102,12 +103,12 @@ impl InputReport {
         &self.buf[16..51]
     }
 
-    pub fn input_report_id(&self) -> InputReportId {
+    pub fn input_report_id(&self) -> Option<InputReportId> {
         InputReportId::from_byte(self.buf[1])
     }
 
     pub fn set_input_report_id(&mut self, id: InputReportId) -> ReportResult<()> {
-        match id.try_to_byte() {
+        match id.to_supported_byte() {
             Some(byte) => {
                 self.buf[1] = byte;
                 Ok(())
@@ -303,11 +304,14 @@ impl InputReport {
     }
 
     pub fn data(&self) -> &[u8] {
-        match self.input_report_id() {
+        let Some(id) = self.input_report_id() else {
+            return &self.buf[..51];
+        };
+        match id {
+            InputReportId::Normal => &self.buf[..51],
             InputReportId::Standard => &self.buf[..51],
             InputReportId::Imu => &self.buf[..50],
-            InputReportId::ImuWithNfcIrData => &self.buf[..363],
-            _ => &self.buf[..51],
+            InputReportId::NfcIrMcu => &self.buf[..363],
         }
     }
 }
