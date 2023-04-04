@@ -32,8 +32,8 @@ pub struct Transport {
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    MonitorLockError { err: Error },
-    MonitorWindowError { err: Error },
+    MonitorLockError(Error),
+    MonitorWindowError(Error),
 }
 
 impl Transport {
@@ -55,7 +55,7 @@ impl Transport {
                             match res {
                                 Ok(()) => {},
                                 Err(err) => {
-                                    let _ = event_tx.send(Event::MonitorLockError { err });
+                                    let _ = event_tx.send(Event::MonitorLockError(err));
                                 },
                             }
                         },
@@ -75,7 +75,7 @@ impl Transport {
                             match res {
                                 Ok(()) => {},
                                 Err(err) => {
-                                    let _ = event_tx.send(Event::MonitorWindowError { err });
+                                    let _ = event_tx.send(Event::MonitorWindowError(err));
                                 },
                             }
                         },
