@@ -1,6 +1,7 @@
 use state::button::ButtonKey;
 use strum::{Display, EnumString};
 
+pub mod etc;
 pub mod protocol;
 pub mod report;
 pub mod spi_flash;
