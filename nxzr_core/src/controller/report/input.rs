@@ -5,8 +5,6 @@ use strum::Display;
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputReportId {
-    // 0x3F Default input report for sending input packets to the host in "normal controller" interface manner
-    Normal,
     // 0x21 Standard input reports used for subcommand replies
     Standard,
     // 0x30 Standard full mode - input reports with IMU data instead of subcommand replies
@@ -18,7 +16,6 @@ pub enum InputReportId {
 impl InputReportId {
     pub fn from_byte(byte: u8) -> Option<Self> {
         match byte {
-            0x3F => Some(Self::Normal),
             0x21 => Some(Self::Standard),
             0x30 => Some(Self::Imu),
             0x31 => Some(Self::NfcIrMcu),
@@ -26,21 +23,11 @@ impl InputReportId {
         }
     }
 
-    pub fn to_raw_byte(&self) -> u8 {
+    pub fn to_byte(&self) -> u8 {
         match self {
-            Self::Normal => 0x3F,
             Self::Standard => 0x21,
             Self::Imu => 0x30,
             Self::NfcIrMcu => 0x31,
-        }
-    }
-
-    pub fn to_supported_byte(&self) -> Option<u8> {
-        match self {
-            Self::Standard => Some(0x21),
-            Self::Imu => Some(0x30),
-            Self::NfcIrMcu => Some(0x31),
-            _ => None,
         }
     }
 }
@@ -107,14 +94,8 @@ impl InputReport {
         InputReportId::from_byte(self.buf[1])
     }
 
-    pub fn set_input_report_id(&mut self, id: InputReportId) -> ReportResult<()> {
-        match id.to_supported_byte() {
-            Some(byte) => {
-                self.buf[1] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedReportId),
-        }
+    pub fn set_input_report_id(&mut self, id: InputReportId) {
+        self.buf[1] = id.to_byte();
     }
 
     pub fn set_timer(&mut self, timer: u64) {
@@ -308,7 +289,6 @@ impl InputReport {
             return &self.buf[..51];
         };
         match id {
-            InputReportId::Normal => &self.buf[..51],
             InputReportId::Standard => &self.buf[..51],
             InputReportId::Imu => &self.buf[..50],
             InputReportId::NfcIrMcu => &self.buf[..363],
