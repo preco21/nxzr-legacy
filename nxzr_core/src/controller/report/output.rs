@@ -78,18 +78,12 @@ impl OutputReport {
         &self.buf[3..11]
     }
 
-    pub fn subcommand(&self) -> Subcommand {
+    pub fn subcommand(&self) -> Option<Subcommand> {
         Subcommand::from_byte(self.buf[11])
     }
 
-    pub fn set_subcommand(&mut self, subcommand: Subcommand) -> ReportResult<()> {
-        match subcommand.try_to_byte() {
-            Some(byte) => {
-                self.buf[11] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedSubcommand),
-        }
+    pub fn set_subcommand(&mut self, subcommand: Subcommand) {
+        self.buf[11] = subcommand.to_byte();
     }
 
     pub fn subcommand_data(&self) -> ReportResult<&[u8]> {
@@ -110,7 +104,7 @@ impl OutputReport {
         }
         // Creates output report data with spi flash read subcommand
         self.set_output_report_id(OutputReportId::SubCommand);
-        self.set_subcommand(Subcommand::SpiFlashRead)?;
+        self.set_subcommand(Subcommand::SpiFlashRead);
         let mut cur_offset = offset;
         for i in 12..12 + 4 {
             self.buf[i] = (cur_offset % 0x100) as u8;

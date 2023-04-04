@@ -5,6 +5,8 @@ use strum::Display;
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputReportId {
+    // 0x3F Default input report
+    Default,
     // 0x21 Standard input reports used for subcommand replies
     Standard,
     // 0x30 Standard full mode - input reports with IMU data instead of subcommand replies
@@ -16,6 +18,7 @@ pub enum InputReportId {
 impl InputReportId {
     pub fn from_byte(byte: u8) -> Option<Self> {
         match byte {
+            0x3F => Some(Self::Default),
             0x21 => Some(Self::Standard),
             0x30 => Some(Self::Imu),
             0x31 => Some(Self::NfcIrMcu),
@@ -25,6 +28,7 @@ impl InputReportId {
 
     pub fn to_byte(&self) -> u8 {
         match self {
+            Self::Default => 0x3F,
             Self::Standard => 0x21,
             Self::Imu => 0x30,
             Self::NfcIrMcu => 0x31,
@@ -73,6 +77,19 @@ impl InputReport {
             return Err(ReportError::Malformed);
         };
         Ok(Self { buf: buf.to_vec() })
+    }
+
+    pub fn fill_default_report(&mut self, controller_type: ControllerType) {
+        // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-0x3f
+        self.buf[1..3].copy_from_slice(&[0x28, 0xCA, 0x08]);
+        match controller_type {
+            ControllerType::JoyConL | ControllerType::JoyConR => {
+                self.buf[4..11].copy_from_slice(&[0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80]);
+            }
+            ControllerType::ProController => {
+                self.buf[4..11].copy_from_slice(&[0x40, 0x8A, 0x4F, 0x8A, 0xD0, 0x7E, 0xDF, 0x7F]);
+            }
+        }
     }
 
     pub fn clear_subcommand(&mut self) {
@@ -164,18 +181,12 @@ impl InputReport {
         Ok(data.len() == 313)
     }
 
-    pub fn reply_to_subcommand_id(&self) -> Subcommand {
+    pub fn reply_to_subcommand_id(&self) -> Option<Subcommand> {
         Subcommand::from_byte(self.buf[15])
     }
 
-    pub fn set_reply_to_subcommand_id(&mut self, id: Subcommand) -> ReportResult<()> {
-        match id.try_to_byte() {
-            Some(byte) => {
-                self.buf[15] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedSubcommand),
-        }
+    pub fn set_reply_to_subcommand_id(&mut self, id: Subcommand) {
+        self.buf[15] = id.to_byte();
     }
 
     pub fn sub_0x02_device_info(
@@ -184,16 +195,13 @@ impl InputReport {
         fm_version: Option<[u8; 2]>,
         controller_type: ControllerType,
     ) -> ReportResult<()> {
-        let Some(controller_id) = controller_type.try_id() else {
-            return Err(ReportError::Invariant);
-        };
         let fm_version_u = match fm_version {
             Some(version) => version,
             None => [0x04, 0x00],
         };
-        self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo)?;
+        self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo);
         self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version_u);
-        self.buf[SUBCOMMAND_OFFSET + 2] = controller_id;
+        self.buf[SUBCOMMAND_OFFSET + 2] = controller_type.id();
         self.buf[SUBCOMMAND_OFFSET + 3] = 0x02;
         self.buf[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
         self.buf[SUBCOMMAND_OFFSET + 10] = 0x01;
@@ -212,7 +220,7 @@ impl InputReport {
             return Err(ReportError::OutOfBounds);
         }
         // Creates input report data with spi flash read subcommand
-        self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead)?;
+        self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead);
         let mut cur_offset = offset;
         // Write offset to data
         for i in SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 4 {
@@ -289,6 +297,7 @@ impl InputReport {
             return &self.buf[..51];
         };
         match id {
+            InputReportId::Default => &self.buf[..51],
             InputReportId::Standard => &self.buf[..51],
             InputReportId::Imu => &self.buf[..50],
             InputReportId::NfcIrMcu => &self.buf[..363],
