@@ -27,6 +27,10 @@ impl Error {
             message: String::new(),
         }
     }
+
+    pub(crate) fn with_message(kind: ErrorKind, message: String) -> Self {
+        Self { kind, message }
+    }
 }
 
 impl std::fmt::Display for Error {
