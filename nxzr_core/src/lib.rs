@@ -16,6 +16,8 @@ pub enum ErrorKind {
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
+    EventSubFailed,
+    ProtocolError,
 }
 
 impl Error {
