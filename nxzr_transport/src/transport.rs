@@ -104,6 +104,16 @@ impl Transport {
         self.inner.write(&buf).await
     }
 
+    pub async fn pause(&self) {
+        self.inner.pause_reading();
+        self.inner.pause_writing();
+    }
+
+    pub async fn resume(&self) {
+        self.inner.resume_reading();
+        self.inner.resume_writing();
+    }
+
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
         Event::subscribe(&mut self.event_sub_tx.clone()).await
     }
@@ -134,6 +144,7 @@ impl Drop for TransportHandle {
 pub(crate) struct TransportInner {
     write_window: hci::Datagram,
     write_lock: hci::Datagram,
+    reading_tx: watch::Sender<bool>,
     writing_tx: watch::Sender<bool>,
     flow_control: Arc<BoundedSemaphore>,
     read_buf_size: usize,
@@ -168,6 +179,7 @@ impl TransportInner {
         Ok(Self {
             write_window,
             write_lock,
+            reading_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
             term_tx,
             flow_control: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
@@ -194,33 +206,49 @@ impl TransportInner {
         Ok(())
     }
 
-    pub async fn writing(&self) {
-        let mut rx = self.writing_tx.subscribe();
+    pub async fn reading(&self) -> Result<()> {
+        let mut rx = self.reading_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await.unwrap();
         }
     }
 
+    pub fn pause_reading(&self) {
+        self.reading_tx.send_replace(false);
+    }
+
+    pub fn resume_reading(&self) {
+        self.reading_tx.send_replace(true);
+    }
+
+    pub async fn writing(&self) -> Result<()> {
+        let mut rx = self.writing_tx.subscribe();
+        while !*rx.borrow() {
+            rx.changed().await?;
+        }
+    }
+
     pub fn pause_writing(&self) {
-        self.writing_tx.send(false).unwrap();
+        self.writing_tx.send_replace(false);
     }
 
     pub fn resume_writing(&self) {
-        self.writing_tx.send(true).unwrap();
+        self.writing_tx.send_replace(true);
     }
 
     pub async fn read(&self) -> Result<&[u8]> {
-        if self.term_tx.is_closed() {
+        if self.is_terminated() {
             return Err(Error::new(ErrorKind::Transport(
                 TransportErrorKind::Terminated,
             )));
         }
+        self.reading().await;
         // TODO: ITR read
         Ok(&[])
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<()> {
-        if self.term_tx.is_closed() {
+        if self.is_terminated() {
             return Err(Error::new(ErrorKind::Transport(
                 TransportErrorKind::Terminated,
             )));
@@ -228,6 +256,10 @@ impl TransportInner {
         self.writing().await;
         let buf = buf.as_ref();
         Ok(())
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.term_tx.is_closed()
     }
 
     pub fn terminated(&self) -> impl Future<Output = ()> {
