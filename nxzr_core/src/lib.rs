@@ -21,6 +21,7 @@ pub enum InternalErrorKind {
     EventSubFailed,
     ProtocolError,
     InputReportCreationFailed,
+    NotImplemented,
 }
 
 impl Error {

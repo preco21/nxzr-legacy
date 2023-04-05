@@ -308,3 +308,9 @@ impl InputReport {
         }
     }
 }
+
+impl AsMut<[u8]> for InputReport {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.buf
+    }
+}
