@@ -62,21 +62,20 @@ impl InputReport {
         Self { buf }
     }
 
-    pub fn with_raw(data: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf = data.as_ref();
+    pub fn with_raw(data: &[u8], report_size: Option<usize>) -> ReportResult<Self> {
         // Length of 50 is a standard input report size in format
         // See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
         let min_len = match report_size {
             Some(report_size) => std::cmp::max(report_size, 50),
             None => 50,
         };
-        if buf.len() < min_len {
+        if data.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        let [0xA1, ..] = buf else {
+        let [0xA1, ..] = data else {
             return Err(ReportError::Malformed);
         };
-        Ok(Self { buf: buf.to_vec() })
+        Ok(Self { buf: data.to_vec() })
     }
 
     pub fn fill_default_report(&mut self, controller_type: ControllerType) {
@@ -125,8 +124,8 @@ impl InputReport {
         self.buf[3] = 0x8E;
     }
 
-    pub fn set_button_status(&mut self, button_status: [u8; 3]) {
-        self.buf[4..7].copy_from_slice(&button_status);
+    pub fn set_button_status(&mut self, button_status: &[u8; 3]) {
+        self.buf[4..7].copy_from_slice(button_status);
     }
 
     pub fn set_analog_stick(
@@ -172,8 +171,7 @@ impl InputReport {
     }
 
     // Returns `true` if the total data length matches 313
-    pub fn set_ir_nfc_data(&mut self, data: impl AsRef<[u8]>) -> ReportResult<bool> {
-        let data = data.as_ref();
+    pub fn set_ir_nfc_data(&mut self, data: &[u8]) -> ReportResult<bool> {
         if data.len() > 313 {
             return Err(ReportError::OutOfBounds);
         }
@@ -213,9 +211,8 @@ impl InputReport {
         &mut self,
         offset: u32,
         size: u8,
-        data: impl AsRef<[u8]>,
+        data: &[u8],
     ) -> ReportResult<()> {
-        let data = data.as_ref();
         if size > 0x1D || data.len() != size.into() {
             return Err(ReportError::OutOfBounds);
         }
@@ -234,9 +231,8 @@ impl InputReport {
 
     pub fn sub_0x04_trigger_buttons_elapsed_time(
         &mut self,
-        commands: impl AsRef<[TriggerButtonsElapsedTimeCommand]>,
+        commands: &[TriggerButtonsElapsedTimeCommand],
     ) -> ReportResult<()> {
-        let commands = commands.as_ref();
         const MAX_MS: u32 = 10 * 0xFFFF;
         let mut set = |offset: usize, ms: u32| {
             let value = (ms / 10) as u16;

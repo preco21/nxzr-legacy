@@ -18,6 +18,7 @@ pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
     EventSubFailed,
     ProtocolError,
+    InputReportCreationFailed,
 }
 
 impl Error {

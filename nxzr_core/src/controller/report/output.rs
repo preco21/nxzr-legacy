@@ -42,19 +42,18 @@ impl OutputReport {
         Self { buf }
     }
 
-    pub fn with_raw(data: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf = data.as_ref();
+    pub fn with_raw(data: &[u8], report_size: Option<usize>) -> ReportResult<Self> {
         let min_len = match report_size {
             Some(report_size) => std::cmp::max(report_size, 12),
             None => 12,
         };
-        if buf.len() < min_len {
+        if data.len() < min_len {
             return Err(ReportError::TooShort);
         }
-        let [0xA2, ..] = buf else {
+        let [0xA2, ..] = data else {
             return Err(ReportError::Malformed);
         };
-        Ok(Self { buf: buf.to_vec() })
+        Ok(Self { buf: data.to_vec() })
     }
 
     pub fn output_report_id(&self) -> Option<OutputReportId> {
@@ -93,8 +92,7 @@ impl OutputReport {
         Ok(slice)
     }
 
-    pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) {
-        let data = data.as_ref();
+    pub fn set_subcommand_data(&mut self, data: &[u8]) {
         self.buf[12..12 + data.len()].copy_from_slice(data);
     }
 

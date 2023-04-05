@@ -99,9 +99,8 @@ impl Transport {
         self.inner.read().await
     }
 
-    pub async fn write(&self, buf: impl AsRef<[u8]>) -> Result<()> {
-        let buf = buf.as_ref();
-        self.inner.write(&buf).await
+    pub async fn write(&self, buf: &[u8]) -> Result<()> {
+        self.inner.write(buf).await
     }
 
     pub async fn pause(&self) {
@@ -254,7 +253,6 @@ impl TransportInner {
             )));
         }
         self.writing().await;
-        let buf = buf.as_ref();
         Ok(())
     }
 

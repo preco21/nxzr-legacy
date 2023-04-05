@@ -190,7 +190,7 @@ impl StickCalibration {
         }
     }
 
-    pub fn with_left_stick_bytes(bytes: impl AsRef<[u8]>) -> Option<Self> {
+    pub fn with_left_stick_bytes(bytes: &[u8]) -> Option<Self> {
         let bytes_padded = to_u16_bytes(bytes);
         if bytes_padded.len() < 9 {
             return None;
@@ -211,7 +211,7 @@ impl StickCalibration {
         ))
     }
 
-    pub fn with_right_stick_bytes(bytes: impl AsRef<[u8]>) -> Option<Self> {
+    pub fn with_right_stick_bytes(bytes: &[u8]) -> Option<Self> {
         let bytes_padded = to_u16_bytes(bytes);
         if bytes_padded.len() < 9 {
             return None;
@@ -233,9 +233,8 @@ impl StickCalibration {
     }
 }
 
-fn to_u16_bytes(bytes: impl AsRef<[u8]>) -> Vec<u16> {
+fn to_u16_bytes(bytes: &[u8]) -> Vec<u16> {
     bytes
-        .as_ref()
         .iter()
         .cloned()
         .map(|e| u16::from(e))
