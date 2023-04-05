@@ -16,6 +16,8 @@ pub enum ErrorKind {
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
+    ControllerReportError(controller::report::ReportError),
+    ControllerStateError(controller::state::StateError),
     EventSubFailed,
     ProtocolError,
     InputReportCreationFailed,
@@ -51,6 +53,24 @@ impl From<std::io::Error> for Error {
         Self {
             kind: ErrorKind::Internal(InternalErrorKind::Io(err.kind())),
             message: err.to_string(),
+        }
+    }
+}
+
+impl From<controller::report::ReportError> for Error {
+    fn from(err: controller::report::ReportError) -> Self {
+        Self {
+            kind: ErrorKind::Internal(InternalErrorKind::ControllerReportError(err)),
+            message: String::new(),
+        }
+    }
+}
+
+impl From<controller::state::StateError> for Error {
+    fn from(err: controller::state::StateError) -> Self {
+        Self {
+            kind: ErrorKind::Internal(InternalErrorKind::ControllerStateError(err)),
+            message: String::new(),
         }
     }
 }
