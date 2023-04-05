@@ -5,7 +5,7 @@ use strum::Display;
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputReportId {
-    // 0x3F Default input report
+    // 0x3F Default input reports
     Default,
     // 0x21 Standard input reports used for subcommand replies
     Standard,
@@ -13,6 +13,9 @@ pub enum InputReportId {
     Imu,
     // 0x31 Standard full mode - input reports with NFC/IR data plus to IMU data
     NfcIrMcu,
+    // 0x32, 0x33 Unknown ids - treats as standard input reports
+    Unknown1,
+    Unknown2,
 }
 
 impl InputReportId {
@@ -22,6 +25,8 @@ impl InputReportId {
             0x21 => Some(Self::Standard),
             0x30 => Some(Self::Imu),
             0x31 => Some(Self::NfcIrMcu),
+            0x32 => Some(Self::Unknown1),
+            0x33 => Some(Self::Unknown2),
             _ => None,
         }
     }
@@ -32,6 +37,8 @@ impl InputReportId {
             Self::Standard => 0x21,
             Self::Imu => 0x30,
             Self::NfcIrMcu => 0x31,
+            Self::Unknown1 => 0x32,
+            Self::Unknown2 => 0x33,
         }
     }
 }
@@ -124,7 +131,7 @@ impl InputReport {
         self.buf[3] = 0x8E;
     }
 
-    pub fn set_button_status(&mut self, button_status: &[u8; 3]) {
+    pub fn set_button(&mut self, button_status: &[u8; 3]) {
         self.buf[4..7].copy_from_slice(button_status);
     }
 
@@ -293,10 +300,11 @@ impl InputReport {
             return &self.buf[..51];
         };
         match id {
-            InputReportId::Default => &self.buf[..51],
-            InputReportId::Standard => &self.buf[..51],
+            InputReportId::Default | InputReportId::Standard => &self.buf[..51],
             InputReportId::Imu => &self.buf[..50],
-            InputReportId::NfcIrMcu => &self.buf[..363],
+            InputReportId::NfcIrMcu | InputReportId::Unknown1 | InputReportId::Unknown2 => {
+                &self.buf[..363]
+            }
         }
     }
 }
