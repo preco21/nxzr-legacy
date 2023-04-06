@@ -4,6 +4,7 @@ use super::{
         input::{self, InputReport, InputReportId, TriggerButtonsElapsedTimeCommand},
         subcommand::Subcommand,
     },
+    spi_flash::SpiFlash,
     state::ControllerState,
     ControllerType,
 };
@@ -48,6 +49,7 @@ struct State {
     pub send_delay: f64,
     pub report_mode: Option<u8>,
     pub controller_state: ControllerState,
+    pub spi_flash: Option<SpiFlash>,
 }
 
 impl Shared {
@@ -59,6 +61,7 @@ impl Shared {
                 report_mode: None,
                 // FIXME: revisit to accept controller, spi_flash
                 controller_state: ControllerState::new(),
+                spi_flash: None,
             }),
         }
     }
@@ -275,7 +278,33 @@ where
         input_report.set_reply_to_subcommand_id(Subcommand::SetShipmentState);
     }
 
-    fn command_spi_flash_read() {}
+    fn command_spi_flash_read(
+        &self,
+        input_report: &mut InputReport,
+        subcommand_reply_data: &[u8],
+    ) -> Result<()> {
+        input_report.set_ack(0x90);
+        let mut offset: u32 = 0;
+        let mut place: u32 = 1;
+        for i in 0..4 {
+            offset += subcommand_reply_data[i] as u32 * place;
+            place *= 0x100;
+        }
+        let size = subcommand_reply_data[4];
+        let state = self.shared.get();
+        match state.spi_flash {
+            Some(spi_flash) => {
+                let spi_flash_data =
+                    &spi_flash.data()[(offset as usize)..(offset + size as u32) as usize];
+                input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
+            }
+            None => {
+                let spi_flash_data = vec![0x00; size as usize];
+                input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
+            }
+        }
+        Ok(())
+    }
 
     fn command_set_input_report_mode(
         &self,
