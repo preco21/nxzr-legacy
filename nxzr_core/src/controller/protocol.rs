@@ -269,9 +269,16 @@ where
 
     fn wait_for_output_report() {}
 
-    fn controller_state() {}
-
-    fn command_request_device_info() {}
+    fn command_request_device_info(&self, input_report: &mut InputReport) -> Result<()> {
+        // FIXME: implement
+        // address = self.transport.get_extra_info('sockname')
+        // assert address is not None
+        // bd_address = list(map(lambda x: int(x, 16), address[0].split(':')))
+        input_report.set_ack(0x82);
+        // FIXME: update
+        input_report.sub_0x02_device_info([0xFFu8; 6], None, self.controller_type)?;
+        Ok(())
+    }
 
     fn command_set_shipment_state(&self, input_report: &mut InputReport) {
         input_report.set_ack(0x80);
