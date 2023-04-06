@@ -104,13 +104,11 @@ impl Transport {
     }
 
     pub async fn pause(&self) {
-        self.inner.pause_reading();
-        self.inner.pause_writing();
+        self.inner.pause();
     }
 
     pub async fn resume(&self) {
-        self.inner.resume_reading();
-        self.inner.resume_writing();
+        self.inner.resume();
     }
 
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
@@ -143,7 +141,7 @@ impl Drop for TransportHandle {
 pub(crate) struct TransportInner {
     write_window: hci::Datagram,
     write_lock: hci::Datagram,
-    reading_tx: watch::Sender<bool>,
+    active_tx: watch::Sender<bool>,
     writing_tx: watch::Sender<bool>,
     flow_control: Arc<BoundedSemaphore>,
     read_buf_size: usize,
@@ -178,7 +176,7 @@ impl TransportInner {
         Ok(Self {
             write_window,
             write_lock,
-            reading_tx: watch::channel(true).0,
+            active_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
             term_tx,
             flow_control: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
@@ -198,40 +196,40 @@ impl TransportInner {
         let mut buf = vec![0; 10 as _];
         self.write_lock.recv(&mut buf).await?;
         if buf[5] < 5 {
-            self.pause_writing();
+            self.pause_write();
             sleep(Duration::from_millis(1000)).await;
-            self.resume_writing();
+            self.resume_write();
         }
         Ok(())
     }
 
-    pub async fn reading(&self) -> Result<()> {
-        let mut rx = self.reading_tx.subscribe();
+    pub async fn active(&self) -> Result<()> {
+        let mut rx = self.active_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await.unwrap();
         }
     }
 
-    pub fn pause_reading(&self) {
-        self.reading_tx.send_replace(false);
+    pub fn pause(&self) {
+        self.active_tx.send_replace(false);
     }
 
-    pub fn resume_reading(&self) {
-        self.reading_tx.send_replace(true);
+    pub fn resume(&self) {
+        self.active_tx.send_replace(true);
     }
 
-    pub async fn writing(&self) -> Result<()> {
+    pub async fn writable(&self) -> Result<()> {
         let mut rx = self.writing_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await?;
         }
     }
 
-    pub fn pause_writing(&self) {
+    pub fn pause_write(&self) {
         self.writing_tx.send_replace(false);
     }
 
-    pub fn resume_writing(&self) {
+    pub fn resume_write(&self) {
         self.writing_tx.send_replace(true);
     }
 
@@ -241,7 +239,7 @@ impl TransportInner {
                 TransportErrorKind::Terminated,
             )));
         }
-        self.reading().await;
+        self.active().await;
         // TODO: ITR read
         Ok(&[])
     }
@@ -252,7 +250,8 @@ impl TransportInner {
                 TransportErrorKind::Terminated,
             )));
         }
-        self.writing().await;
+        self.active().await;
+        self.writable().await;
         Ok(())
     }
 

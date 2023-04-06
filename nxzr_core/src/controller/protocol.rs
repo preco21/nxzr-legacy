@@ -120,7 +120,7 @@ where
         })
     }
 
-    pub fn set_report_mode(&self, mode: Option<u8>) {
+    pub fn set_report_mode(&self, mode: Option<u8>, is_pairing: Option<bool>) {
         if let Some(mode) = mode {
             if mode == 0x21 {
                 let err = Error::with_message(
@@ -130,7 +130,7 @@ where
                 self.dispatch_event(Event::Error(err));
             }
         }
-        self.set_mode(mode);
+        self.set_mode(mode, is_pairing);
         // TODO: sig input ready, start writer
         // if let Some(mode) = mode {
         //     match mode {
@@ -143,10 +143,14 @@ where
         self.notify_input_report_wake.notify_waiters();
     }
 
-    fn set_mode(&self, mode: Option<u8>) {
+    fn set_mode(&self, mode: Option<u8>, is_pairing: Option<bool>) {
         self.shared.set(|state| {
             state.report_mode = mode;
-            if state.is_pairing {
+            let is_pairing = match is_pairing {
+                Some(flag) => flag,
+                None => state.is_pairing,
+            };
+            if is_pairing {
                 state.send_delay = 1.0 / 15.0;
             } else {
                 let delay = SendDelay::new(mode).to_byte();
@@ -175,8 +179,7 @@ where
         let state = self.shared.get();
         if state.is_pairing && (u32::from_be_bytes(pairing_bytes) & close_pairing_mask) != 0 {
             self.dispatch_event(Event::Log(LogType::PairingSuccess));
-            self.shared.set_is_pairing(false);
-            self.set_report_mode(state.report_mode);
+            self.set_report_mode(state.report_mode, Some(false));
         }
         if self.is_paused() {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
@@ -269,7 +272,7 @@ where
                 self.dispatch_event(Event::Log(LogType::RedundantSetOfInputReportMode));
             }
         }
-        self.set_report_mode(Some(command));
+        self.set_report_mode(Some(command), None);
         input_report.set_ack(0x80);
         input_report.set_reply_to_subcommand_id(Subcommand::SetInputReportMode);
     }
