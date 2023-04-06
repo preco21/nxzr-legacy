@@ -93,10 +93,9 @@ where
     shared: Shared,
     transport: Arc<T>,
     controller_type: ControllerType,
-
-    paused_tx: watch::Sender<bool>,
     notify_input_report_wake: Notify,
     notify_controller_state_send: Notify,
+    paused_tx: watch::Sender<bool>,
     msg_tx: mpsc::UnboundedSender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
@@ -113,11 +112,11 @@ where
             shared: Shared::new(),
             transport,
             controller_type: controller,
-            paused_tx: watch::channel(false).0,
             notify_input_report_wake: Notify::new(),
             notify_controller_state_send: Notify::new(),
-            event_sub_tx,
+            paused_tx: watch::channel(false).0,
             msg_tx,
+            event_sub_tx,
         })
     }
 
@@ -234,14 +233,19 @@ where
     }
 
     fn run_writer_loop() {}
+
     fn reply_to_subcommand() {}
 
     fn set_connection() {}
+
     fn lost_connection() {}
+
     fn receive_report() {}
 
     fn send_controller_state() {}
+
     fn wait_for_output_report() {}
+
     fn controller_state() {}
 
     fn command_request_device_info() {}
