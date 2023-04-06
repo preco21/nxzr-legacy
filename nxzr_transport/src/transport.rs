@@ -330,10 +330,16 @@ impl Event {
         sub_tx
             .send(SubscriptionReq { tx, ready_tx })
             .await
-            .map_err(|_| Error::new(ErrorKind::Internal(InternalErrorKind::EventSubFailed)))?;
-        ready_rx
-            .await
-            .map_err(|_| Error::new(ErrorKind::Internal(InternalErrorKind::EventSubFailed)))?;
+            .map_err(|_| {
+                Error::new(ErrorKind::Internal(
+                    InternalErrorKind::EventSubscriptionFailed,
+                ))
+            })?;
+        ready_rx.await.map_err(|_| {
+            Error::new(ErrorKind::Internal(
+                InternalErrorKind::EventSubscriptionFailed,
+            ))
+        })?;
         Ok(rx)
     }
 }

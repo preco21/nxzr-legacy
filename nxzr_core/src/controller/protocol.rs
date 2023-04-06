@@ -21,6 +21,13 @@ pub trait ProtocolTransport {
     fn resume();
 }
 
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+pub enum ProtocolErrorKind {
+    UnexpectedBehavior,
+    ReportCreationFailed,
+    NotImplemented,
+}
+
 pub struct ProtocolControl<T>
 where
     T: ProtocolTransport,
@@ -124,8 +131,10 @@ where
         if let Some(mode) = mode {
             if mode == 0x21 {
                 let err = Error::with_message(
-                    ErrorKind::Internal(InternalErrorKind::ProtocolError),
-                    "Standard input report is not meant to go through subcommand mode.".to_owned(),
+                    ErrorKind::Internal(InternalErrorKind::ProtocolError(
+                        ProtocolErrorKind::UnexpectedBehavior,
+                    )),
+                    "Unexpectedly setting report mode for standard input reports.".to_owned(),
                 );
                 self.dispatch_event(Event::Error(err));
             }
@@ -158,7 +167,9 @@ where
                     Some(delay) => state.send_delay = delay,
                     None => {
                         let err = Error::with_message(
-                            ErrorKind::Internal(InternalErrorKind::ProtocolError),
+                            ErrorKind::Internal(InternalErrorKind::ProtocolError(
+                                ProtocolErrorKind::UnexpectedBehavior,
+                            )),
                             format!(
                                 "Unknown delay for report mode {:?}, assuming it as 1/15.",
                                 mode
@@ -196,11 +207,17 @@ where
             None => state.report_mode,
         };
         let Some(mode) = mode else {
-            return Err(Error::new(ErrorKind::Internal(InternalErrorKind::InputReportCreationFailed)));
+            return Err(Error::with_message(
+                ErrorKind::Internal(InternalErrorKind::ProtocolError(ProtocolErrorKind::ReportCreationFailed)),
+                "No input report mode is supplied.".to_owned()
+            ));
         };
         let mut input_report = InputReport::new();
         let Some(id) = InputReportId::from_byte(mode) else {
-            return Err(Error::new(ErrorKind::Internal(InternalErrorKind::InputReportCreationFailed)));
+            return Err(Error::with_message(
+                ErrorKind::Internal(InternalErrorKind::ProtocolError(ProtocolErrorKind::ReportCreationFailed)),
+                "Unknown report mode is used for generating input report.".to_owned()
+            ));
         };
         input_report.set_input_report_id(id);
         match id {
@@ -333,7 +350,9 @@ where
             }
             _ => {
                 let err = Error::with_message(
-                    ErrorKind::Internal(InternalErrorKind::NotImplemented),
+                    ErrorKind::Internal(InternalErrorKind::ProtocolError(
+                        ProtocolErrorKind::NotImplemented,
+                    )),
                     format!(
                         "Command {} for Subcommand NFC IR is not implemented.",
                         command
@@ -390,7 +409,6 @@ pub enum LogType {
 #[derive(Debug, Clone)]
 pub enum Event {
     Log(LogType),
-    // FIXME: Create separate error type for protocol [ProtocolErrorKind]
     Error(Error),
 }
 
@@ -443,10 +461,16 @@ impl Event {
         sub_tx
             .send(SubscriptionReq { tx, ready_tx })
             .await
-            .map_err(|_| Error::new(ErrorKind::Internal(InternalErrorKind::EventSubFailed)))?;
-        ready_rx
-            .await
-            .map_err(|_| Error::new(ErrorKind::Internal(InternalErrorKind::EventSubFailed)))?;
+            .map_err(|_| {
+                Error::new(ErrorKind::Internal(
+                    InternalErrorKind::EventSubscriptionFailed,
+                ))
+            })?;
+        ready_rx.await.map_err(|_| {
+            Error::new(ErrorKind::Internal(
+                InternalErrorKind::EventSubscriptionFailed,
+            ))
+        })?;
         Ok(rx)
     }
 }

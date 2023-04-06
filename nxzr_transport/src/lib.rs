@@ -23,7 +23,7 @@ pub enum ErrorKind {
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
     AcquireError,
-    EventSubFailed,
+    EventSubscriptionFailed,
 }
 
 impl Error {

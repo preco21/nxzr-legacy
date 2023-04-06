@@ -16,12 +16,10 @@ pub enum ErrorKind {
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
+    EventSubscriptionFailed,
     ControllerReportError(controller::report::ReportError),
     ControllerStateError(controller::state::StateError),
-    EventSubFailed,
-    ProtocolError,
-    InputReportCreationFailed,
-    NotImplemented,
+    ProtocolError(controller::protocol::ProtocolErrorKind),
 }
 
 impl Error {
