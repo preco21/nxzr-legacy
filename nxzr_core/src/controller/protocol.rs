@@ -18,8 +18,6 @@ use tokio::sync::{mpsc, oneshot, watch, Notify};
 pub trait ProtocolTransport {
     async fn read(&self) -> std::io::Result<&[u8]>;
     async fn write(&self, buf: &[u8]) -> std::io::Result<()>;
-    fn pause();
-    fn resume();
 }
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
@@ -103,6 +101,7 @@ where
     shared: Shared,
     transport: Arc<T>,
     controller_type: ControllerType,
+    notify_data_received: Notify,
     notify_input_report_wake: Notify,
     notify_controller_state_send: Notify,
     paused_tx: watch::Sender<bool>,
@@ -122,6 +121,7 @@ where
             shared: Shared::new(),
             transport,
             controller_type: controller,
+            notify_data_received: Notify::new(),
             notify_input_report_wake: Notify::new(),
             notify_controller_state_send: Notify::new(),
             paused_tx: watch::channel(false).0,
@@ -267,7 +267,9 @@ where
 
     fn send_controller_state() {}
 
-    fn wait_for_output_report() {}
+    pub async fn wait_for_response(&self) {
+        self.notify_data_received.notified().await;
+    }
 
     fn command_request_device_info(&self, input_report: &mut InputReport) -> Result<()> {
         // FIXME: implement
@@ -412,6 +414,7 @@ where
     }
 
     pub async fn paused(&self) {
+        // self.transport.paused
         let mut rx = self.paused_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await.unwrap();
