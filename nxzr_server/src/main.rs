@@ -1,48 +1,38 @@
 #[macro_use]
 extern crate log;
 
-use bluer::adv::Advertisement;
+use nxzr_core::controller::protocol::ControllerProtocol;
 use std::time::Duration;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     time::sleep,
 };
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> bluer::Result<()> {
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    info!("Hello, world!");
+    let session = Session::new();
+    let (transport, transport_handle) = Transport::register(session); // accepted 이후에 생성 필요
+                                                                      // incoming messages are automatically read and write with protocol + transport.
+    let (control, protocol_handle, close_rx) = ProtocolControl::new(transport).await?;
+    // ㄴ run loop polling read, accept commands, fire writes to transport.
+    // ㄴ detect connection lost,
 
-    let session = bluer::Session::new().await?;
-    let adapter = session.default_adapter().await?;
-    adapter.set_powered(true).await?;
+    tokio::spawn(async move {
+        loop {
+            // shutdown signal ->
+            // close_rx ->
+            control.process_cmd(cmd);
+            // when shutdown signal accepted
+            // break;
+        }
+        drop(protocol_handle); // protocol control loop를 terminate 하는 역할, 내부에서 transport thread pause 함께?
+        drop(transport_handle); // transport 내 이벤트 루프를 terminate 하는 역할
+    });
 
-    println!(
-        "Advertising on Bluetooth adapter {} with address {}",
-        adapter.name(),
-        adapter.address().await?
-    );
-    let le_advertisement = Advertisement {
-        advertisement_type: bluer::adv::Type::Peripheral,
-        service_uuids: vec!["123e4567-e89b-12d3-a456-426614174000".parse().unwrap()]
-            .into_iter()
-            .collect(),
-        discoverable: Some(true),
-        local_name: Some("le_advertise".to_string()),
-        ..Default::default()
-    };
-    println!("{:?}", &le_advertisement);
-    let handle = adapter.advertise(le_advertisement).await?;
-
-    println!("Press enter to quit");
-    let stdin = BufReader::new(tokio::io::stdin());
-    let mut lines = stdin.lines();
-    let _ = lines.next_line().await;
-
-    println!("Removing advertisement");
-    drop(handle);
-    sleep(Duration::from_secs(1)).await;
+    control.closed().await;
+    transport.closed().await;
 
     Ok(())
 }
