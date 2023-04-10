@@ -44,6 +44,12 @@ impl ProtocolControl {
         let (transport, transport_handle) = Transport::register();
         let protocol = Protocol::new();
 
+        let handle_error = async || {
+            transport.pause();
+            // log error
+            // shutdown_rx
+        };
+
         let read_loop_handle = tokio::spawn(async move {
             // maybe wait_for_response?
             protocol.connected().await;
@@ -58,7 +64,6 @@ impl ProtocolControl {
             protocol.connected().await;
             loop {
                 select! {
-                    // Determine write timing
                     _ = protocol.process_write() => {},
                     _ = shutdown_tx.closed() => break,
                 }
@@ -84,11 +89,25 @@ impl ProtocolControl {
             protocol.wait_for_connection();
         });
 
-        join!(run_loop_handle, write_loop_handle, connection_handle);
+        // 메인 shutdown
+        shutdown_fut.await;
+        // 받으면 일단 transport pause
+        transport.pause();
 
-        transport.pause().await;
+        // then initiate close sequence by sending shutdown signal to each thread
+        drop(shutdown_rx);
+        // 또는 .send(())
+
+        // wait for all thread to exit
+        // 이건 어째든 필요한데...
+        join_all([run_loop_handle, write_loop_handle, connection_handle]).await;
+
+        // finally drop transport
         drop(transport_handle);
 
+        // wait for transport to close
         self.transport.closed().await;
+
+        // after this, protocol, transport will drop
     }
 }
