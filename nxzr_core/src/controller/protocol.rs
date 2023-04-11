@@ -10,14 +10,18 @@ use super::{
 };
 use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use async_trait::async_trait;
-use std::sync::{Arc, Mutex};
+use std::{
+    future::Future,
+    sync::{Arc, Mutex},
+};
 use strum::{Display, IntoStaticStr};
 use tokio::sync::{mpsc, oneshot, watch, Notify};
 
 #[async_trait]
 pub trait ProtocolTransport {
-    async fn read(&self) -> std::io::Result<&[u8]>;
-    async fn write(&self, buf: &[u8]) -> std::io::Result<()>;
+    async fn read(&self) -> Result<&[u8]>;
+    async fn write(&self, buf: &[u8]) -> Result<()>;
+    fn pause();
 }
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
@@ -27,14 +31,70 @@ pub enum ProtocolErrorKind {
     NotImplemented,
 }
 
-pub struct ProtocolControl<T>
+#[derive(Clone, Debug, Default)]
+pub struct ProtocolConfig<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Clone,
 {
-    inner: ControllerProtocol<T>,
+    controller: ControllerType,
+    transport: T,
 }
 
-impl<T> ProtocolControl<T> where T: ProtocolTransport {}
+#[derive(Debug, Clone)]
+pub struct Protocol<T>
+where
+    T: ProtocolTransport + Clone,
+{
+    inner: Arc<ProtocolInner<T>>,
+}
+
+impl<T> Protocol<T>
+where
+    T: ProtocolTransport + Clone,
+{
+    pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
+        // closed handle 받기?
+        Ok(Self {
+            inner: Arc::new(ProtocolInner::new(config)?),
+        })
+    }
+
+    pub async fn run(&self) -> Result<()> {
+        let (close_tx, close_rx) = mpsc::channel(1);
+        let (closed_tx, closed_rx) = mpsc::channel(1);
+
+        let mut handles = vec![];
+        {
+            let inner = self.inner.clone();
+            let msg
+            handles.push(tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+
+                    }
+                }
+            }));
+        }
+
+        // ^^^ 애초에 이 spawn 로직을 new로 옮기고, started_tx로 이걸 처리할까?
+
+
+        // graceful shutdown 처리
+        // 1. transport.pause 처리 여기에서 해야 함 (handle 날릴때, 내부 에러 발생시 둘 다)
+        // 2. 내부 에러 발생시 handle 자동으로 날리게 해야 하나 고민이네...
+        // 3. 외부에다가 signal 주고 받고 하는거 너무 좀 플로우가...
+        // 애초에 handle이 필요한지 모르겠어
+
+        // check for join errors then if there's an error return Err()
+        //
+        Ok(())
+    }
+
+    pub fn process_cmd() -> Result<()> {}
+
+    // 어차피 강제로 closed되는 경우는 shutdown 뿐이라 굳이 run의 result를 볼 필요가 없음...
+    pub fn closed() -> impl Future<Output = ()> {}
+}
 
 #[derive(Debug)]
 struct Shared {
@@ -94,12 +154,13 @@ impl Shared {
     }
 }
 
-pub struct ControllerProtocol<T>
+#[derive(Debug)]
+pub struct ProtocolInner<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Clone,
 {
     shared: Shared,
-    transport: Arc<T>,
+    transport: T,
     controller_type: ControllerType,
     notify_data_received: Notify,
     notify_input_report_wake: Notify,
@@ -109,18 +170,18 @@ where
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
 
-impl<T> ControllerProtocol<T>
+impl<T> ProtocolInner<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Clone,
 {
-    pub fn new(controller: ControllerType, transport: Arc<T>) -> Result<Self> {
+    pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
             shared: Shared::new(),
-            transport,
-            controller_type: controller,
+            transport: config.transport,
+            controller_type: config.controller,
             notify_data_received: Notify::new(),
             notify_input_report_wake: Notify::new(),
             notify_controller_state_send: Notify::new(),
@@ -255,15 +316,20 @@ where
         Ok(input_report)
     }
 
-    fn run_writer_loop() {}
+    // TODO: fn receive_report() {} ->
+    pub async fn process_read() {}
+
+    pub async fn process_write() {}
 
     fn reply_to_subcommand() {}
 
+    // protocol이 생성될 때 처리해도 됨 -> transport가 null일 수 없음
     fn set_connection() {}
 
+    // connection이 풀린 경우는... 애초에 에러가 발생한 경우라서...
+    // 흠... read/write에서 에러를 뿜으면, main에서 -> connection lost 로그 찍고 -> transport close 하도록 처리하면 될 듯
+    // controller state sender는 중간에 터지도록 설계?
     fn lost_connection() {}
-
-    fn receive_report() {}
 
     fn send_controller_state() {}
 
@@ -408,13 +474,11 @@ where
         // FIXME: Send sig_input_ready channel signal
     }
 
-    // FIXME: replace paused with transport one?
     pub fn is_paused(&self) -> bool {
         *self.paused_tx.borrow()
     }
 
     pub async fn paused(&self) {
-        // self.transport.paused
         let mut rx = self.paused_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await.unwrap();
