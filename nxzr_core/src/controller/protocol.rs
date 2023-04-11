@@ -34,7 +34,7 @@ pub enum ProtocolErrorKind {
 #[derive(Clone, Debug, Default)]
 pub struct ProtocolConfig<T>
 where
-    T: ProtocolTransport + Clone,
+    T: ProtocolTransport,
 {
     controller: ControllerType,
     transport: T,
@@ -43,14 +43,14 @@ where
 #[derive(Debug, Clone)]
 pub struct Protocol<T>
 where
-    T: ProtocolTransport + Clone,
+    T: ProtocolTransport,
 {
     inner: Arc<ProtocolInner<T>>,
 }
 
 impl<T> Protocol<T>
 where
-    T: ProtocolTransport + Clone,
+    T: ProtocolTransport,
 {
     pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
         // closed handle 받기?
@@ -157,7 +157,7 @@ impl Shared {
 #[derive(Debug)]
 pub struct ProtocolInner<T>
 where
-    T: ProtocolTransport + Clone,
+    T: ProtocolTransport,
 {
     shared: Shared,
     transport: T,
@@ -172,7 +172,7 @@ where
 
 impl<T> ProtocolInner<T>
 where
-    T: ProtocolTransport + Clone,
+    T: ProtocolTransport,
 {
     pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
