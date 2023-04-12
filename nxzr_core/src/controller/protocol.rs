@@ -11,46 +11,55 @@ use super::{
 use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use async_trait::async_trait;
 use std::{
-    future::Future,
-    sync::{Arc, Mutex},
+    ops::Deref,
+    sync::{Arc, Mutex, RwLock},
 };
 use strum::{Display, IntoStaticStr};
 use tokio::sync::{mpsc, oneshot, watch, Notify};
 
 #[async_trait]
 pub trait ProtocolTransport {
-    async fn read(&self) -> Result<&[u8]>;
-    async fn write(&self, buf: &[u8]) -> Result<()>;
-    fn pause();
+    async fn read(&self) -> std::io::Result<&[u8]>;
+    async fn write(&self, buf: &[u8]) -> std::io::Result<()>;
+    fn pause(&self);
 }
 
+pub struct ProtocolTransportShared<T>
+where
+    T: ProtocolTransport + Send + Sync,
+{
+    transport: Option<T>,
+}
+
+// FIXME: ErrorKind 앞에 Protocol 때기
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ProtocolErrorKind {
     UnexpectedBehavior,
     ReportCreationFailed,
     NotImplemented,
+    NotRegistered,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct ProtocolConfig<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Send + Sync,
 {
     controller: ControllerType,
-    transport: T,
+    transport: Option<T>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Protocol<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Send + Sync,
 {
     inner: Arc<ProtocolInner<T>>,
 }
 
 impl<T> Protocol<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Send + Sync,
 {
     pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
         // closed handle 받기?
@@ -59,25 +68,80 @@ where
         })
     }
 
-    pub async fn run(&self) -> Result<()> {
+    // 기본적으로 얘가 Err, Ok 같은거 다뤄 줘야 함 + 그럼에도, shutdown 시그널에 의해
+    // spawn 여기에서 하는 것도 ok
+    // handle return도 ok
+    // 만약 에러 발생하면 여기서 터쳐야
+    // 에러 발생했을 때는 transport pause 순서 중요하지 않음...
+    // 터지면 transport pause 후 날려버려야
+
+    // 얘는 transport만 없으면 여러번 호출될 수 있음, 근데 있으면 터짐
+    pub async fn run(&self) -> Result<ProtocolHandle> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
 
+        let (will_close_tx, will_close_rx) = mpsc::channel(1);
+
+        // halt -> 일단 멈춤
+        // closed -> closed 상태 표기?
+
+        // ^^^ 일단 이 상태가 휘발성 이어야 함
+        // must sync with absence of transport
+        // should really we store this in inner state...?
+
+        // 애초에 루프에서 while transport.alive() 같은 느낌으로... 처리하면 될 것 같은데
+
+        // TODO: 이 함수가 background task를 spawn도 하면서, shutdown 시그널도 받고, shutdown 할 수 있는 handle도 반환하고, shutdown 시그널을 내보낼 수도 있어야 함
+
+        // Here we've used terminal channels for shutdown-handling because it's
+        // more versatile and reliable than just polling `None` transport with
+        // something like, e.g. `while let Some(t) = inner.transport() {}`.
+        //
+        // This is more plausible since just polling the `None` variant will not
+        // break the running task handle while tasks in tokio::select! are still
+        // running.
+        //
+        // Also, we don't directly use transport's closing signals (e.g.
+        // `t.closing()`, `t.closed()`) as we need to decouple the logic in
+        // different contexts and streamline shutdown signal handling.
         let mut handles = vec![];
         {
             let inner = self.inner.clone();
-            let msg
             handles.push(tokio::spawn(async move {
                 loop {
                     tokio::select! {
-
+                        res = inner.process_read() => {
+                            // inner.close_transport() when errored
+                            // this will call will_close_tx?
+                        },
+                        // will close? 는 여기서 처리하고 close_tx는 따로 spawn한 스레드에서 처리하는게 나을 것 같은데
+                        _ = close_tx.closed() => {
+                            let _ = will_close_tx.send(());
+                        }
                     }
                 }
             }));
         }
+        {
+            // Handles shutdown sequence.
+            let inner = self.inner.clone();
+            handles.push(tokio::spawn(async move {
+                tokio::select! {
+                    // _ = inner.transport().closed() => {
+
+                    // }
+                    _ = close_tx.closed() => {}
+
+                }
+
+                // TODO: call will close to shutdown all the handles
+
+                // ㄴ No, put halt_tx in inner, call close_connection() to set it.
+                // to streamline
+            }));
+        }
 
         // ^^^ 애초에 이 spawn 로직을 new로 옮기고, started_tx로 이걸 처리할까?
-
 
         // graceful shutdown 처리
         // 1. transport.pause 처리 여기에서 해야 함 (handle 날릴때, 내부 에러 발생시 둘 다)
@@ -87,13 +151,32 @@ where
 
         // check for join errors then if there's an error return Err()
         //
-        Ok(())
+        Ok(ProtocolHandle {
+            // will_close_rx:
+            _close_rx: close_rx,
+        })
     }
+}
 
-    pub fn process_cmd() -> Result<()> {}
+pub struct ProtocolHandle {
+    _close_rx: mpsc::Receiver<()>,
+}
 
-    // 어차피 강제로 closed되는 경우는 shutdown 뿐이라 굳이 run의 result를 볼 필요가 없음...
-    pub fn closed() -> impl Future<Output = ()> {}
+impl Drop for ProtocolHandle {
+    fn drop(&mut self) {
+        // Required for drop order
+    }
+}
+
+struct TransportShared<T>(RwLock<Option<T>>)
+where
+    T: ProtocolTransport + Send + Sync;
+
+impl<T> TransportShared<T>
+where
+    T: ProtocolTransport + Send + Sync,
+{
+    // pub fn transport()
 }
 
 #[derive(Debug)]
@@ -123,7 +206,6 @@ impl Shared {
             }),
         }
     }
-
     pub(crate) fn get(&self) -> State {
         self.state.lock().unwrap().clone()
     }
@@ -157,22 +239,25 @@ impl Shared {
 #[derive(Debug)]
 pub struct ProtocolInner<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Send + Sync,
 {
     shared: Shared,
-    transport: T,
+    // FIXME: watch + transport로 register, unregister 가능하게, service_control_handle in bluer 참조
+    // 이거 optional로 받아서 register 여부 확인
+    transport_tx: watch::Sender<Option<T>>,
     controller_type: ControllerType,
     notify_data_received: Notify,
     notify_input_report_wake: Notify,
     notify_controller_state_send: Notify,
     paused_tx: watch::Sender<bool>,
+    halt_tx: watch::Sender<bool>,
     msg_tx: mpsc::UnboundedSender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
 
 impl<T> ProtocolInner<T>
 where
-    T: ProtocolTransport,
+    T: ProtocolTransport + Send + Sync,
 {
     pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
@@ -180,15 +265,65 @@ where
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
             shared: Shared::new(),
-            transport: config.transport,
+            transport_tx: watch::channel(config.transport).0,
             controller_type: config.controller,
             notify_data_received: Notify::new(),
             notify_input_report_wake: Notify::new(),
             notify_controller_state_send: Notify::new(),
             paused_tx: watch::channel(false).0,
+            halt_tx: watch::channel(false).0,
             msg_tx,
             event_sub_tx,
         })
+    }
+
+    // FIXME: transport를 항상 clone 할 수밖에 없는데...
+    // borrow를 하더라도 await 할 수 있는 그게 가능할지...
+    // Fn 같은걸 쓰면?
+    // borrow는 어차피 여러 번 되어도 무방함. read/write는 freely하게 동시에 할 수 있음
+    fn transport(&self) -> Result<T> {
+        match *self.transport_tx.borrow() {
+            Some(transport) => Ok(transport),
+            None => Err(Error::new(ErrorKind::Internal(
+                InternalErrorKind::ProtocolError(ProtocolErrorKind::NotRegistered),
+            ))),
+        }
+    }
+
+    pub fn register_transport(&self, transport: Option<T>) {
+        let _ = self.transport_tx.send_replace(transport);
+    }
+
+    // FIXME:
+    // 1. transport unregister를 기다리게 하기 -> term_tx 대체 가능
+    // 2. term_tx를 따로 두기
+    // unregister_transport()를 호출하는 조건 중, transport.closed()를 기다릴 이유는 없다?
+    // 애초에 이런 상황이 나올 수 있는지 궁금하긴 하네.
+    // transport가 날아갔는데 이게 가능해?
+    // transport가 close되면 read/write도 에러 터짐 -> 자연스럽게 unregister 호출
+    // 근데 이거에 의존하는 것도 이상하긴 한데...
+    // 에러가 터져도, transport closed되어도, shutdown 되어도 unregister
+
+    // FIXME: 이걸 atomic하게 수행하는 방법은 없나?
+    // RwLock을 직접 구현하는게 맞을 것 같음...
+    pub fn unregister_transport(&self) -> Result<()> {
+        match *self.transport_tx.borrow() {
+            Some(ref transport) => transport.pause(),
+            None => {
+                return Err(Error::new(ErrorKind::Internal(
+                    InternalErrorKind::ProtocolError(ProtocolErrorKind::NotRegistered),
+                )));
+            }
+        }
+        let _ = self.transport_tx.send_replace(None);
+        Ok(())
+    }
+
+    pub async fn transport_unregistered(&self) -> Result<()> {
+        let mut rx = self.transport_tx.subscribe();
+        while !*rx.borrow() {
+            rx.changed().await.unwrap();
+        }
     }
 
     pub fn set_report_mode(&self, mode: Option<u8>, is_pairing: Option<bool>) {
@@ -259,7 +394,7 @@ where
         if self.is_paused() {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
         }
-        self.transport.write(input_report.data()).await?;
+        self.transport()?.write(input_report.data()).await?;
         self.notify_controller_state_send.notify_waiters();
         Ok(())
     }
@@ -317,9 +452,9 @@ where
     }
 
     // TODO: fn receive_report() {} ->
-    pub async fn process_read() {}
+    pub async fn process_read(&self) {}
 
-    pub async fn process_write() {}
+    pub async fn process_write(&self) {}
 
     fn reply_to_subcommand() {}
 
@@ -486,11 +621,26 @@ where
     }
 
     pub fn pause(&self) {
-        let _ = self.paused_tx.send(false);
+        let _ = self.paused_tx.send_replace(false);
     }
 
     pub fn unpause(&self) {
-        let _ = self.paused_tx.send(true);
+        let _ = self.paused_tx.send_replace(true);
+    }
+
+    pub fn is_halted(&self) -> bool {
+        *self.halt_tx.borrow()
+    }
+
+    pub async fn halted(&self) {
+        let mut rx = self.halt_tx.subscribe();
+        while !*rx.borrow() {
+            rx.changed().await.unwrap();
+        }
+    }
+
+    pub fn halt(&self) {
+        let _ = self.halt_tx.send_replace(true);
     }
 
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
