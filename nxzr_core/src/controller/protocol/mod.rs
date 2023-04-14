@@ -1,3 +1,5 @@
+use self::shared::TransportShared;
+
 use super::{
     helper::SendDelay,
     report::{
@@ -17,6 +19,8 @@ use std::{
 use strum::{Display, IntoStaticStr};
 use tokio::sync::{mpsc, oneshot, watch, Notify};
 
+mod shared;
+
 #[async_trait]
 pub trait ProtocolTransport {
     async fn read(&self) -> std::io::Result<&[u8]>;
@@ -26,7 +30,7 @@ pub trait ProtocolTransport {
 
 pub struct ProtocolTransportShared<T>
 where
-    T: ProtocolTransport + Send + Sync,
+    T: ProtocolTransport + Send + Sync + 'static,
 {
     transport: Option<T>,
 }
@@ -43,23 +47,23 @@ pub enum ProtocolErrorKind {
 #[derive(Clone, Debug, Default)]
 pub struct ProtocolConfig<T>
 where
-    T: ProtocolTransport + Send + Sync,
+    T: ProtocolTransport + Send + Sync + 'static,
 {
     controller: ControllerType,
     transport: Option<T>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Protocol<T>
 where
-    T: ProtocolTransport + Send + Sync,
+    T: ProtocolTransport + Send + Sync + 'static,
 {
     inner: Arc<ProtocolInner<T>>,
 }
 
 impl<T> Protocol<T>
 where
-    T: ProtocolTransport + Send + Sync,
+    T: ProtocolTransport + Send + Sync + 'static,
 {
     pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
         // closed handle 받기?
@@ -69,7 +73,7 @@ where
     }
 
     // 기본적으로 얘가 Err, Ok 같은거 다뤄 줘야 함 + 그럼에도, shutdown 시그널에 의해
-    // spawn 여기에서 하는 것도 ok
+    // spawn 여기에서 하는 것도 okz
     // handle return도 ok
     // 만약 에러 발생하면 여기서 터쳐야
     // 에러 발생했을 때는 transport pause 순서 중요하지 않음...
@@ -78,7 +82,7 @@ where
     // 얘는 transport만 없으면 여러번 호출될 수 있음, 근데 있으면 터짐
     pub async fn run(&self) -> Result<ProtocolHandle> {
         let (close_tx, close_rx) = mpsc::channel(1);
-        let (closed_tx, closed_rx) = mpsc::channel(1);
+        // let (closed_tx, closed_rx) = mpsc::channel(1);
 
         let (will_close_tx, will_close_rx) = mpsc::channel(1);
 
@@ -122,24 +126,24 @@ where
                 }
             }));
         }
-        {
-            // Handles shutdown sequence.
-            let inner = self.inner.clone();
-            handles.push(tokio::spawn(async move {
-                tokio::select! {
-                    // _ = inner.transport().closed() => {
+        // {
+        //     // Handles shutdown sequence.
+        //     let inner = self.inner.clone();
+        //     handles.push(tokio::spawn(async move {
+        //         tokio::select! {
+        //             // _ = inner.transport().closed() => {
 
-                    // }
-                    _ = close_tx.closed() => {}
+        //             // }
+        //             _ = close_tx.closed() => {}
 
-                }
+        //         }
 
-                // TODO: call will close to shutdown all the handles
+        //         // TODO: call will close to shutdown all the handles
 
-                // ㄴ No, put halt_tx in inner, call close_connection() to set it.
-                // to streamline
-            }));
-        }
+        //         // ㄴ No, put halt_tx in inner, call close_connection() to set it.
+        //         // to streamline
+        //     }));
+        // }
 
         // ^^^ 애초에 이 spawn 로직을 new로 옮기고, started_tx로 이걸 처리할까?
 
@@ -168,83 +172,16 @@ impl Drop for ProtocolHandle {
     }
 }
 
-struct TransportShared<T>(RwLock<Option<T>>)
-where
-    T: ProtocolTransport + Send + Sync;
-
-impl<T> TransportShared<T>
-where
-    T: ProtocolTransport + Send + Sync,
-{
-    // pub fn transport()
-}
-
-#[derive(Debug)]
-struct Shared {
-    state: Mutex<State>,
-}
-
-#[derive(Debug, Clone)]
-struct State {
-    pub is_pairing: bool,
-    pub send_delay: f64,
-    pub report_mode: Option<u8>,
-    pub controller_state: ControllerState,
-    pub spi_flash: Option<SpiFlash>,
-}
-
-impl Shared {
-    pub(crate) fn new() -> Self {
-        Self {
-            state: Mutex::new(State {
-                is_pairing: false,
-                send_delay: 1.0 / 15.0,
-                report_mode: None,
-                // FIXME: revisit to accept controller, spi_flash
-                controller_state: ControllerState::new(),
-                spi_flash: None,
-            }),
-        }
-    }
-    pub(crate) fn get(&self) -> State {
-        self.state.lock().unwrap().clone()
-    }
-
-    pub(crate) fn replace(&self, state: &State) {
-        let mut state = self.state.lock().unwrap();
-        *state = state.clone();
-    }
-
-    pub fn set<R>(&self, mut f: impl FnMut(&mut State) -> R) -> R {
-        let mut write_lock = self.state.lock().unwrap();
-        f(&mut write_lock)
-    }
-
-    pub(crate) fn set_is_pairing(&self, flag: bool) {
-        let mut state = self.state.lock().unwrap().clone();
-        state.is_pairing = flag;
-    }
-
-    pub(crate) fn set_send_delay(&self, delay: f64) {
-        let mut state = self.state.lock().unwrap().clone();
-        state.send_delay = delay;
-    }
-
-    pub(crate) fn set_report_mode(&self, mode: Option<u8>) {
-        let mut state = self.state.lock().unwrap().clone();
-        state.report_mode = mode;
-    }
-}
-
 #[derive(Debug)]
 pub struct ProtocolInner<T>
 where
-    T: ProtocolTransport + Send + Sync,
+    T: ProtocolTransport + Send + Sync + 'static,
 {
-    shared: Shared,
+    shared: shared::Shared,
     // FIXME: watch + transport로 register, unregister 가능하게, service_control_handle in bluer 참조
     // 이거 optional로 받아서 register 여부 확인
-    transport_tx: watch::Sender<Option<T>>,
+    transport_shared: TransportShared<T>,
+    // transport_tx: watch::Sender<Option<T>>,
     controller_type: ControllerType,
     notify_data_received: Notify,
     notify_input_report_wake: Notify,
@@ -257,15 +194,16 @@ where
 
 impl<T> ProtocolInner<T>
 where
-    T: ProtocolTransport + Send + Sync,
+    T: ProtocolTransport + Send + Sync + 'static,
 {
     pub fn new(config: ProtocolConfig<T>) -> Result<Self> {
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
-            shared: Shared::new(),
-            transport_tx: watch::channel(config.transport).0,
+            shared: shared::Shared::new(),
+            transport_shared: TransportShared::new(),
+            // transport_tx: watch::channel(config.transport).0,
             controller_type: config.controller,
             notify_data_received: Notify::new(),
             notify_input_report_wake: Notify::new(),
@@ -281,18 +219,18 @@ where
     // borrow를 하더라도 await 할 수 있는 그게 가능할지...
     // Fn 같은걸 쓰면?
     // borrow는 어차피 여러 번 되어도 무방함. read/write는 freely하게 동시에 할 수 있음
-    fn transport(&self) -> Result<T> {
-        match *self.transport_tx.borrow() {
-            Some(transport) => Ok(transport),
-            None => Err(Error::new(ErrorKind::Internal(
-                InternalErrorKind::ProtocolError(ProtocolErrorKind::NotRegistered),
-            ))),
-        }
-    }
+    // fn transport(&self) -> Result<T> {
+    //     match *self.transport_tx.borrow() {
+    //         Some(transport) => Ok(transport),
+    //         None => Err(Error::new(ErrorKind::Internal(
+    //             InternalErrorKind::ProtocolError(ProtocolErrorKind::NotRegistered),
+    //         ))),
+    //     }
+    // }
 
-    pub fn register_transport(&self, transport: Option<T>) {
-        let _ = self.transport_tx.send_replace(transport);
-    }
+    // pub fn register_transport(&self, transport: Option<T>) {
+    //     let _ = self.transport_tx.send_replace(transport);
+    // }
 
     // FIXME:
     // 1. transport unregister를 기다리게 하기 -> term_tx 대체 가능
@@ -306,25 +244,25 @@ where
 
     // FIXME: 이걸 atomic하게 수행하는 방법은 없나?
     // RwLock을 직접 구현하는게 맞을 것 같음...
-    pub fn unregister_transport(&self) -> Result<()> {
-        match *self.transport_tx.borrow() {
-            Some(ref transport) => transport.pause(),
-            None => {
-                return Err(Error::new(ErrorKind::Internal(
-                    InternalErrorKind::ProtocolError(ProtocolErrorKind::NotRegistered),
-                )));
-            }
-        }
-        let _ = self.transport_tx.send_replace(None);
-        Ok(())
-    }
+    // pub fn unregister_transport(&self) -> Result<()> {
+    //     match *self.transport_tx.borrow() {
+    //         Some(ref transport) => transport.pause(),
+    //         None => {
+    //             return Err(Error::new(ErrorKind::Internal(
+    //                 InternalErrorKind::ProtocolError(ProtocolErrorKind::NotRegistered),
+    //             )));
+    //         }
+    //     }
+    //     let _ = self.transport_tx.send_replace(None);
+    //     Ok(())
+    // }
 
-    pub async fn transport_unregistered(&self) -> Result<()> {
-        let mut rx = self.transport_tx.subscribe();
-        while !*rx.borrow() {
-            rx.changed().await.unwrap();
-        }
-    }
+    // pub async fn transport_unregistered(&self) -> Result<()> {
+    //     let mut rx = self.transport_tx.subscribe();
+    //     while !*rx.borrow() {
+    //         rx.changed().await.unwrap();
+    //     }
+    // }
 
     pub fn set_report_mode(&self, mode: Option<u8>, is_pairing: Option<bool>) {
         if let Some(mode) = mode {

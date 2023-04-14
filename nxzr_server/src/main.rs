@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use nxzr_core::controller::protocol::Protocol;
+use nxzr_core::controller::protocol::ProtocolInner;
 use std::time::Duration;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
@@ -42,7 +42,7 @@ struct ProtocolControl {}
 impl ProtocolControl {
     async fn run(&self) {
         let (transport, transport_handle) = Transport::register();
-        let protocol = Protocol::new();
+        let protocol = ProtocolInner::new();
 
         let handle_error = async || {
             transport.pause();
@@ -89,6 +89,12 @@ impl ProtocolControl {
             protocol.wait_for_connection();
         });
 
+        // 위에 로직 다 감싸서 Listener::run() 함수로 만들고 여기선 shutdown_fut + run select 돌리고
+        // 여기선 shutdown_rx 날린 후, shutdown_complete_rx(closed 함수로 대체 가능?) await 하게 하는 방법도 있을 듯
+
+        // transport.pause 해야 하는 부분은 cleanup 함수를 받도록 하거나 shutdown_rx 날리면 그때 함께 처리하는 식으로...
+        // join_all 부분은 각 스레드에 shutdown_complete_* 를 주거나,
+
         // 메인 shutdown
         shutdown_fut.await;
         // 받으면 일단 transport pause
@@ -104,7 +110,6 @@ impl ProtocolControl {
 
         // finally drop transport
         drop(transport_handle);
-
         // wait for transport to close
         self.transport.closed().await;
 
