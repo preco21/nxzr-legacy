@@ -14,7 +14,7 @@ pub enum SessionErrorKind {
     Unknown,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct SessionConfig {
     control_psm: Option<u32>,
     interrupt_psm: Option<u32>,

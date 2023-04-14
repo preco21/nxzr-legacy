@@ -1,6 +1,6 @@
 use super::{StateError, StateResult};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct StickStateConfig {
     pub horizontal: Option<u16>,
     pub vertical: Option<u16>,

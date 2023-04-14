@@ -44,7 +44,7 @@ pub enum ProtocolErrorKind {
     NotRegistered,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct ProtocolConfig<T>
 where
     T: ProtocolTransport + Send + Sync + 'static,

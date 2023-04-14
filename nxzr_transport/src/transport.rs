@@ -17,7 +17,7 @@ pub enum TransportErrorKind {
     BeingClosed,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct TransportConfig {
     num_flow_control: Option<usize>,
     read_buf_size: Option<usize>,

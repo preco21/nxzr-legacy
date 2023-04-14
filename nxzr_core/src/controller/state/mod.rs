@@ -24,7 +24,7 @@ impl std::error::Error for StateError {}
 
 pub type StateResult<T> = Result<T, StateError>;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct ControllerStateConfig {
     pub controller: Option<ControllerType>,
     pub spi_flash: Option<SpiFlash>,
