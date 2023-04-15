@@ -145,6 +145,7 @@ impl ButtonKey {
  */
 #[derive(Clone, Debug, Default)]
 pub struct ButtonState {
+    // FIXME: pass from caller
     controller: ControllerType,
     bytes: [u8; 3],
 }

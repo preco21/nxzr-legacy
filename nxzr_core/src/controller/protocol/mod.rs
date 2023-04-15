@@ -135,10 +135,12 @@ impl Protocol {
         self.state.set_connected_at(Some(time::Instant::now()));
     }
 
+    // FIXME:  Add same function with mutable replacer fn receiver.
     // Updates the controller state by replacing current one.
     pub async fn update_controller_state(&self, controller_state: ControllerState) -> Result<()> {
         self.wait_for_continue().await;
         self.state.set_controller_state(controller_state);
+        // FIXME: here
         // self.notify_controller_state
         Ok(())
     }
@@ -440,7 +442,7 @@ impl Protocol {
         // assert address is not None
         // bd_address = list(map(lambda x: int(x, 16), address[0].split(':')))
         input_report.set_ack(0x82);
-        // FIXME: update
+        // FIXME: update VVV
         input_report.sub_0x02_device_info([0xFFu8; 6], None, self.controller_type)?;
         Ok(())
     }

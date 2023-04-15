@@ -32,6 +32,7 @@ pub struct ControllerStateConfig {
 
 #[derive(Clone, Debug, Default)]
 pub struct ControllerState {
+    // TODO: pass from caller
     controller: ControllerType,
     button_state: ButtonState,
     l_stick_state: StickState,
