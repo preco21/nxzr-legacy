@@ -75,7 +75,7 @@ impl Shared {
         self.state.lock().unwrap().clone()
     }
 
-    pub fn set<R>(&self, mut f: impl FnMut(&mut State) -> R) -> R {
+    pub fn modify<R>(&self, mut f: impl FnMut(&mut State) -> R) -> R {
         let mut write_lock = self.state.lock().unwrap();
         f(&mut write_lock)
     }
@@ -88,6 +88,11 @@ impl Shared {
     pub fn set_controller_state(&self, controller_state: ControllerState) {
         let mut state = self.state.lock().unwrap().clone();
         state.controller_state = controller_state;
+    }
+
+    pub fn modify_controller_state(&self, mut f: impl FnMut(&mut ControllerState)) {
+        let mut write_lock = self.state.lock().unwrap();
+        f(&mut write_lock.controller_state)
     }
 }
 
@@ -135,11 +140,19 @@ impl Protocol {
         self.state.set_connected_at(Some(time::Instant::now()));
     }
 
-    // FIXME:  Add same function with mutable replacer fn receiver.
-    // Updates the controller state by replacing current one.
-    pub async fn update_controller_state(&self, controller_state: ControllerState) -> Result<()> {
+    // Updates the controller state by replacing the current one.
+    pub async fn set_controller_state(&self, controller_state: ControllerState) -> Result<()> {
         self.wait_for_continue().await;
         self.state.set_controller_state(controller_state);
+        // FIXME: here
+        // self.notify_controller_state
+        Ok(())
+    }
+
+    // Modifies the controller state in-place.
+    pub async fn modify_controller_state(&self, f: impl FnMut(&mut ControllerState)) -> Result<()> {
+        self.wait_for_continue().await;
+        self.state.modify_controller_state(f);
         // FIXME: here
         // self.notify_controller_state
         Ok(())
@@ -244,7 +257,7 @@ impl Protocol {
                 self.dispatch_event(Event::Error(err));
             }
         }
-        self.state.set(|state| {
+        self.state.modify(|state| {
             state.report_mode = mode;
             let is_pairing = match is_pairing {
                 Some(flag) => flag,
