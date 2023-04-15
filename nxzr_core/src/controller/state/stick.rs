@@ -7,7 +7,7 @@ pub struct StickStateConfig {
     pub calibration: Option<StickCalibration>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct StickState {
     h_stick: u16,
     v_stick: u16,

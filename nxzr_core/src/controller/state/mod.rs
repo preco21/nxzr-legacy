@@ -30,7 +30,7 @@ pub struct ControllerStateConfig {
     pub spi_flash: Option<SpiFlash>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ControllerState {
     controller: ControllerType,
     button_state: ButtonState,

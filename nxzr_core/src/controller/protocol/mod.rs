@@ -59,15 +59,14 @@ struct State {
 }
 
 impl Shared {
-    pub fn new() -> Self {
+    pub fn new(controller_state: ControllerState) -> Self {
         Self {
             state: Mutex::new(State {
                 is_pairing: false,
                 send_delay: 1.0 / 15.0,
                 report_mode: None,
                 connected_at: None,
-                // FIXME: revisit to accept controller, spi_flash
-                controller_state: ControllerState::new(),
+                controller_state,
                 spi_flash: None,
             }),
         }
@@ -85,11 +84,17 @@ impl Shared {
         let mut state = self.state.lock().unwrap().clone();
         state.connected_at = connected_at;
     }
+
+    pub fn set_controller_state(&self, controller_state: ControllerState) {
+        let mut state = self.state.lock().unwrap().clone();
+        state.controller_state = controller_state;
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct ProtocolConfig {
     controller: ControllerType,
+    controller_state: ControllerState,
 }
 
 #[derive(Debug)]
@@ -98,10 +103,12 @@ pub struct Protocol {
     controller_type: ControllerType,
     notify_data_received: Notify,
     notify_writer_wake: Notify,
+    // FIXME: sig_is_send
+    // Replace this with mpsc + oneshot req/res pattern
     notify_controller_state_send: Notify,
     paused_tx: watch::Sender<bool>,
-    msg_tx: mpsc::UnboundedSender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
+    msg_tx: mpsc::UnboundedSender<Event>,
 }
 
 impl Protocol {
@@ -110,28 +117,32 @@ impl Protocol {
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
-            state: Shared::new(),
+            state: Shared::new(config.controller_state),
             controller_type: config.controller,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
             notify_controller_state_send: Notify::new(),
             paused_tx: watch::channel(false).0,
-            msg_tx,
             event_sub_tx,
+            msg_tx,
         })
     }
 
-    // Marks when the connection is established.
+    // Marks a certain point when the connection is established.
     pub fn establish_connection(&self) {
         self.state.set_connected_at(Some(time::Instant::now()));
     }
 
-    // connection이 풀린 경우는... 애초에 에러가 발생한 경우라서...
-    // 흠... read/write에서 에러를 뿜으면, main에서 -> connection lost 로그 찍고 -> transport close 하도록 처리하면 될 듯
-    // controller state sender는 중간에 터지도록 설계?
-    fn lost_connection() {}
-
-    fn send_controller_state() {}
+    // Updates the controller state by replacing current one.
+    pub async fn update_controller_state(
+        &self,
+        transport_w: &impl TransportWrite,
+        controller_state: ControllerState,
+    ) -> Result<()> {
+        self.wait_for_continue().await;
+        self.state.set_controller_state(controller_state);
+        self.notify_controller_state_send.Ok(())
+    }
 
     // Resolved when the first response is received by the reader.
     pub async fn wait_for_response(&self) {
@@ -332,7 +343,7 @@ impl Protocol {
                     Some(state.controller_state.r_stick_state().data()),
                 );
                 input_report.set_vibrator_input();
-                // NOTE: Subcommand is set outside
+                // NOTE: Subcommand is set from caller
                 match id {
                     InputReportId::NfcIrMcu => {
                         input_report.set_6axis_data();

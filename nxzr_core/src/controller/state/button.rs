@@ -143,7 +143,7 @@ impl ButtonKey {
  * 2        Minus 	Plus 	R Stick L Stick Home 	Capture
  * 3        Down 	Up 	    Right 	Left 	SR 	    SL 	    L 	    ZL
  */
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ButtonState {
     controller: ControllerType,
     bytes: [u8; 3],
