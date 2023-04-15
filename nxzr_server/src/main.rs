@@ -105,7 +105,7 @@ impl ProtocolControl {
         // 또는 .send(())
 
         // wait for all thread to exit
-        // 이건 어째든 필요한데...
+        // 이건 어째든 필요한데... shutdown_fut랑 함께 select 되어야 함
         join_all([run_loop_handle, write_loop_handle, connection_handle]).await;
 
         // finally drop transport

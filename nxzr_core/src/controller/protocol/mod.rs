@@ -320,7 +320,11 @@ where
         })
     }
 
-    pub async fn write(&mut self, input_report: InputReport) -> Result<()> {
+    pub async fn write(
+        &mut self,
+        transport: &impl ProtocolTransport,
+        input_report: InputReport,
+    ) -> Result<()> {
         let mut pairing_bytes: [u8; 4] = [0x00; 4];
         pairing_bytes[1..4].copy_from_slice(&input_report.data()[4..7]);
         let close_pairing_mask = self.controller_type.close_pairing_masks();
@@ -332,7 +336,7 @@ where
         if self.is_paused() {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
         }
-        self.transport()?.write(input_report.data()).await?;
+        transport.write(input_report.data()).await?;
         self.notify_controller_state_send.notify_waiters();
         Ok(())
     }

@@ -8,7 +8,7 @@ pub(crate) struct Shared {
 }
 
 #[derive(Debug, Clone)]
-struct State {
+pub(crate) struct State {
     pub is_pairing: bool,
     pub send_delay: f64,
     pub report_mode: Option<u8>,
