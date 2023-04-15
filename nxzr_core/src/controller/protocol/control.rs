@@ -71,6 +71,7 @@ impl ProtocolControl {
                 }
             }));
         }
+        // FIXME: protocol.process_read(), protocol.process_write() 시 error 처리하기
         // {
         //     // Handles shutdown sequence.
         //     let inner = self.inner.clone();

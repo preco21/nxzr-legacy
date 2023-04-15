@@ -106,6 +106,7 @@ pub struct Protocol {
     // FIXME: sig_is_send
     // Replace this with mpsc + oneshot req/res pattern
     notify_controller_state_send: Notify,
+    ready_for_write_tx: watch::Sender<bool>,
     paused_tx: watch::Sender<bool>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
     msg_tx: mpsc::UnboundedSender<Event>,
@@ -122,6 +123,7 @@ impl Protocol {
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
             notify_controller_state_send: Notify::new(),
+            ready_for_write_tx: watch::channel(false).0,
             paused_tx: watch::channel(false).0,
             event_sub_tx,
             msg_tx,
@@ -134,14 +136,11 @@ impl Protocol {
     }
 
     // Updates the controller state by replacing current one.
-    pub async fn update_controller_state(
-        &self,
-        transport_w: &impl TransportWrite,
-        controller_state: ControllerState,
-    ) -> Result<()> {
+    pub async fn update_controller_state(&self, controller_state: ControllerState) -> Result<()> {
         self.wait_for_continue().await;
         self.state.set_controller_state(controller_state);
-        self.notify_controller_state_send.Ok(())
+        // self.notify_controller_state
+        Ok(())
     }
 
     // Resolved when the first response is received by the reader.
@@ -202,7 +201,6 @@ impl Protocol {
         self.wait_for_continue().await;
         let now = time::Instant::now();
         let input_report = self.generate_input_report(None)?;
-        // FIXME: handle break when error occurred
         self.handle_write(transport, &input_report).await?;
         let state = self.state.get();
         if state.send_delay == f64::INFINITY {
@@ -570,7 +568,24 @@ impl Protocol {
         input_report.set_ack(0x80);
         input_report.set_reply_to_subcommand_id(Subcommand::SetPlayerLights);
         // FIXME: Ping to start writer thread
-        // FIXME: Send sig_input_ready channel signal
+        self.set_ready_for_write();
+    }
+
+    pub async fn ready_for_write(&self) {
+        let mut rx = self.ready_for_write_tx.subscribe();
+        while !*rx.borrow() {
+            rx.changed().await.unwrap();
+        }
+    }
+
+    // Mark the protocol in paused state.
+    pub fn pause(&self) {
+        let _ = self.paused_tx.send_replace(false);
+    }
+
+    // Mark the protocol in unpaused state.
+    pub fn unpause(&self) {
+        let _ = self.paused_tx.send_replace(true);
     }
 
     fn is_paused(&self) -> bool {
@@ -584,14 +599,8 @@ impl Protocol {
         }
     }
 
-    // Mark the protocol in paused state.
-    pub fn pause(&self) {
-        let _ = self.paused_tx.send_replace(false);
-    }
-
-    // Mark the protocol in unpaused state.
-    pub fn unpause(&self) {
-        let _ = self.paused_tx.send_replace(true);
+    fn set_ready_for_write(&self) {
+        let _ = self.ready_for_write_tx.send_replace(true);
     }
 
     // Listen for the protocol events.
