@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use nxzr_core::controller::protocol::ProtocolInner;
+use nxzr_core::controller::protocol::Protocol;
 use std::time::Duration;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
@@ -42,7 +42,7 @@ struct ProtocolControl {}
 impl ProtocolControl {
     async fn run(&self) {
         let (transport, transport_handle) = Transport::register();
-        let protocol = ProtocolInner::new();
+        let protocol = Protocol::new();
 
         let handle_error = async || {
             transport.pause();

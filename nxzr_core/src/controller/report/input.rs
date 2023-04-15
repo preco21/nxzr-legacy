@@ -54,6 +54,9 @@ pub enum TriggerButtonsElapsedTimeCommand {
     Home(u32),
 }
 
+// Length of 50 is a standard input report size in format.
+// See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
+const REPORT_MIN_LEN: usize = 50;
 const SUBCOMMAND_OFFSET: usize = 16;
 
 // Processes outgoing messages from the controller to the host(Nintendo Switch).
@@ -69,14 +72,8 @@ impl InputReport {
         Self { buf }
     }
 
-    pub fn with_raw(data: &[u8], report_size: Option<usize>) -> ReportResult<Self> {
-        // Length of 50 is a standard input report size in format
-        // See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
-        let min_len = match report_size {
-            Some(report_size) => std::cmp::max(report_size, 50),
-            None => 50,
-        };
-        if data.len() < min_len {
+    pub fn with_raw(data: &[u8]) -> ReportResult<Self> {
+        if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
         let [0xA1, ..] = data else {

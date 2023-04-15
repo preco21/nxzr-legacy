@@ -29,6 +29,8 @@ impl OutputReportId {
     }
 }
 
+const REPORT_MIN_LEN: usize = 11;
+
 // Processes incoming messages from the host (Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct OutputReport {
@@ -42,12 +44,8 @@ impl OutputReport {
         Self { buf }
     }
 
-    pub fn with_raw(data: &[u8], report_size: Option<usize>) -> ReportResult<Self> {
-        let min_len = match report_size {
-            Some(report_size) => std::cmp::max(report_size, 12),
-            None => 12,
-        };
-        if data.len() < min_len {
+    pub fn with_raw(data: &[u8]) -> ReportResult<Self> {
+        if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
         let [0xA2, ..] = data else {
@@ -78,7 +76,11 @@ impl OutputReport {
     }
 
     pub fn subcommand(&self) -> Option<Subcommand> {
-        Subcommand::from_byte(self.buf[11])
+        if self.buf.len() < 12 {
+            Some(Subcommand::Empty)
+        } else {
+            Subcommand::from_byte(self.buf[11])
+        }
     }
 
     pub fn set_subcommand(&mut self, subcommand: Subcommand) {

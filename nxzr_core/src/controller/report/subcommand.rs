@@ -12,6 +12,7 @@ pub enum Subcommand {
     SetPlayerLights,
     Enable6AxisSensor,
     EnableVibration,
+    Empty,
 }
 
 impl Subcommand {
@@ -43,6 +44,8 @@ impl Subcommand {
             Self::SetPlayerLights => 0x30,
             Self::Enable6AxisSensor => 0x40,
             Self::EnableVibration => 0x48,
+            // NOTE: Case of returning this variant must not happen.
+            Self::Empty => 0x00,
         }
     }
 }
