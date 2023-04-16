@@ -22,10 +22,12 @@ use tokio::{
 pub trait TransportRead {
     async fn read(&self) -> std::io::Result<&[u8]>;
 }
+
 #[async_trait]
 pub trait TransportWrite {
     async fn write(&self, buf: &[u8]) -> std::io::Result<()>;
 }
+
 pub trait TransportCombined: TransportRead + TransportWrite {}
 
 #[derive(Debug)]
