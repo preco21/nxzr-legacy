@@ -169,7 +169,7 @@ impl InputReport {
     }
 
     pub fn set_6axis_data(&mut self) {
-        // FIXME: revisit
+        // FIXME: revisit -> handle gyro
         for i in 14..50 {
             self.buf[i] = 0x00;
         }
