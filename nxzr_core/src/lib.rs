@@ -1,5 +1,7 @@
 pub mod controller;
 
+use std::time::Duration;
+
 use strum::{Display, IntoStaticStr};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -10,6 +12,36 @@ pub struct Error {
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ErrorKind {
+    // Invalid value range has been entered.
+    InvalidRange,
+    // Indicates that given data has not enough length. Usually used in constructors.
+    TooShort,
+    // Indicates that given data is malformed thus cannot be processed. Usually used in constructors.
+    Malformed,
+    // Returned when accessing/processing data that do not support given bounds.
+    OutOfBounds,
+    // There's no data for a value within a range. Usually used instead of
+    // `OutOfBounds` for a return value of getter methods where `OutOfBounds` is
+    // not appropriate. Since it's more descriptive to indicate that you are
+    // accessing no-existent data than just saying data out-of-bounds.
+    NoData,
+    // There is no calibration data available.
+    StateNoCalibrationDataAvailable,
+    // The button is not available for the controller of choice.
+    StateButtonNotAvailable,
+    // Unable to create stick calibration instance from the given data.
+    StateUnableToCreateStickCalibration,
+    // Failed to parse output report.
+    ProtocolOutputReportParsingFailed,
+    // Failed to create input report.
+    ProtocolInputReportCreationFailed,
+    // Write operation in protocol is too slow.
+    ProtocolWriteTooSlow(Duration),
+    // Returned if invariant violation happens.
+    Invariant,
+    // Feature is not implemented.
+    NotImplemented,
+    // Internal errors
     Internal(InternalErrorKind),
 }
 
@@ -17,9 +49,6 @@ pub enum ErrorKind {
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
     EventSubscriptionFailed,
-    ControllerReportError(controller::report::ReportError),
-    ControllerStateError(controller::state::StateError),
-    ProtocolError(controller::protocol::ProtocolErrorKind),
 }
 
 impl Error {
@@ -52,24 +81,6 @@ impl From<std::io::Error> for Error {
         Self {
             kind: ErrorKind::Internal(InternalErrorKind::Io(err.kind())),
             message: err.to_string(),
-        }
-    }
-}
-
-impl From<controller::report::ReportError> for Error {
-    fn from(err: controller::report::ReportError) -> Self {
-        Self {
-            kind: ErrorKind::Internal(InternalErrorKind::ControllerReportError(err)),
-            message: String::new(),
-        }
-    }
-}
-
-impl From<controller::state::StateError> for Error {
-    fn from(err: controller::state::StateError) -> Self {
-        Self {
-            kind: ErrorKind::Internal(InternalErrorKind::ControllerStateError(err)),
-            message: String::new(),
         }
     }
 }

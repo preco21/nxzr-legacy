@@ -15,8 +15,10 @@ pub struct Error {
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ErrorKind {
-    Transport(TransportErrorKind),
     Internal(InternalErrorKind),
+    TransportOperationWhileClosing,
+    TransportMonitorLock(Error),
+    TransportMonitorWindow(Error),
 }
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]

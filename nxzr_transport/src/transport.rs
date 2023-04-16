@@ -12,11 +12,6 @@ use tokio::time::sleep;
 const DEFAULT_FLOW_CONTROL: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum TransportErrorKind {
-    OperationWhileClosing,
-}
-
 #[derive(Debug, Default)]
 pub struct TransportConfig {
     num_flow_control: Option<usize>,
@@ -46,7 +41,8 @@ impl Transport {
                             match res {
                                 Ok(()) => {},
                                 Err(err) => {
-                                    let _ = msg_tx.send(Event::MonitorLockError(err));
+                                    let err = Error::new(ErrorKind::TransportMonitorLock(err));
+                                    let _ = msg_tx.send(Event::Error(err));
                                 },
                             }
                         },
@@ -66,7 +62,8 @@ impl Transport {
                             match res {
                                 Ok(()) => {},
                                 Err(err) => {
-                                    let _ = msg_tx.send(Event::MonitorWindowError(err));
+                                    let err = Error::new(ErrorKind::TransportMonitorWindow(err));
+                                    let _ = msg_tx.send(Event::Error(err));
                                 },
                             }
                         },
@@ -236,9 +233,7 @@ impl TransportInner {
 
     pub async fn read(&self) -> Result<&[u8]> {
         if self.is_closing() {
-            return Err(Error::new(ErrorKind::Transport(
-                TransportErrorKind::OperationWhileClosing,
-            )));
+            return Err(Error::new(ErrorKind::TransportOperationWhileClosing));
         }
         self.active().await;
         // TODO: ITR read
@@ -247,9 +242,7 @@ impl TransportInner {
 
     pub async fn write(&self, buf: &[u8]) -> Result<()> {
         if self.is_closing() {
-            return Err(Error::new(ErrorKind::Transport(
-                TransportErrorKind::OperationWhileClosing,
-            )));
+            return Err(Error::new(ErrorKind::TransportOperationWhileClosing));
         }
         self.active().await;
         self.writable().await;
@@ -277,8 +270,7 @@ impl TransportInner {
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    MonitorLockError(Error),
-    MonitorWindowError(Error),
+    Error(Error),
 }
 
 #[derive(Debug)]
