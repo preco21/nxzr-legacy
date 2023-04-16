@@ -75,7 +75,6 @@ impl ButtonKey {
                 Self::L,
                 Self::Zl,
             ],
-            _ => panic!("Unable to get available buttons for unknown controller type."),
         }
     }
 
@@ -130,7 +129,6 @@ impl ButtonKey {
                 | Self::Zl => true,
                 _ => false,
             },
-            _ => false,
         }
     }
 }

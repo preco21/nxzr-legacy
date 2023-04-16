@@ -147,7 +147,7 @@ impl Protocol {
         let buf = transport.read().await?;
         let output_report = match OutputReport::with_raw(buf) {
             Ok(output_report) => output_report,
-            Err(err) => {
+            Err(_) => {
                 let err = Error::with_message(
                     ErrorKind::ProtocolOutputReportParsingFailed,
                     "Failed to parse output report, ignoring.".to_owned(),
