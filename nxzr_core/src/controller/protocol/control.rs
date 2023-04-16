@@ -71,6 +71,9 @@ impl ProtocolControl {
                 }
             }));
         }
+
+        // FIXME: Ping to start writer thread -- ready_for_write() 기다렸다가 시작하기 write는
+
         // FIXME: protocol.process_read(), protocol.process_write() 시 error 처리하기
         // {
         //     // Handles shutdown sequence.

@@ -584,7 +584,6 @@ impl Protocol {
     fn command_set_player_lights(&self, input_report: &mut InputReport) {
         input_report.set_ack(0x80);
         input_report.set_reply_to_subcommand_id(Subcommand::SetPlayerLights);
-        // FIXME: Ping to start writer thread
         self.set_ready_for_write();
     }
 
