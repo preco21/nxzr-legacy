@@ -415,7 +415,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "strum",
- "strum_macros",
  "tokio",
 ]
 
