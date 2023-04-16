@@ -78,11 +78,23 @@ impl ControllerState {
         &self.button_state
     }
 
+    pub fn button_state_mut(&mut self) -> &mut ButtonState {
+        &mut self.button_state
+    }
+
     pub fn l_stick_state(&self) -> &StickState {
         &self.l_stick_state
     }
 
+    pub fn l_stick_state_mut(&mut self) -> &mut StickState {
+        &mut self.l_stick_state
+    }
+
     pub fn r_stick_state(&self) -> &StickState {
         &self.r_stick_state
+    }
+
+    pub fn r_stick_state_mut(&mut self) -> &mut StickState {
+        &mut self.r_stick_state
     }
 }

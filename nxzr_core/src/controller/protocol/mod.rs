@@ -187,13 +187,15 @@ impl Protocol {
         &self,
         transport: &impl TransportWrite,
         // NOTE: Write hook may be used to notify controller state updater loop to continue.
-        write_hook: impl Future<Output = ()>,
+        write_hook: Option<impl Future<Output = ()>>,
     ) -> Result<()> {
         self.wait_for_continue().await;
         let now = time::Instant::now();
         let input_report = self.generate_input_report(None)?;
         self.handle_write(transport, &input_report).await?;
-        write_hook.await;
+        if let Some(write_hook) = write_hook {
+            write_hook.await;
+        }
         let state = self.state.get();
         if state.send_delay == f64::INFINITY {
             self.notify_writer_wake.notified().await
