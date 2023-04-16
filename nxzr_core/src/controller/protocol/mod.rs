@@ -281,15 +281,13 @@ impl Protocol {
                 };
             }
         });
-        // TODO: sig input ready, start writer
+        // TODO: Revisit: Should send set_ready_for_write() and start writer thread?
         // if let Some(mode) = mode {
         //     match mode {
-        //         0x30 | 0x31 | 0x32 | 0x33 => {
-        //         }
+        //         0x30 | 0x31 | 0x32 | 0x33 => {}
         //         _ => {}
         //     }
         // }
-        // FIXME: Revisit
         self.notify_writer_wake.notify_waiters();
     }
 
