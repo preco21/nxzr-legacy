@@ -105,7 +105,7 @@ pub struct ProtocolConfig {
 #[derive(Debug)]
 pub struct Protocol {
     state: Shared,
-    controller_type: ControllerType,
+    controller: ControllerType,
     notify_data_received: Notify,
     notify_writer_wake: Notify,
     ready_for_write_tx: watch::Sender<bool>,
@@ -121,7 +121,7 @@ impl Protocol {
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
             state: Shared::new(config.controller_state),
-            controller_type: config.controller,
+            controller: config.controller,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
             ready_for_write_tx: watch::channel(false).0,
@@ -300,7 +300,7 @@ impl Protocol {
     ) -> Result<()> {
         let mut pairing_bytes: [u8; 4] = [0x00; 4];
         pairing_bytes[1..4].copy_from_slice(&input_report.data()[4..7]);
-        let close_pairing_mask = self.controller_type.close_pairing_masks();
+        let close_pairing_mask = self.controller.close_pairing_masks();
         let state = self.state.get();
         if state.is_pairing && (u32::from_be_bytes(pairing_bytes) & close_pairing_mask) != 0 {
             self.dispatch_event(Event::Log(LogType::PairingSuccessful));
@@ -319,6 +319,15 @@ impl Protocol {
             Some(_) => mode,
             None => state.report_mode,
         };
+        if self.controller != state.controller_state.controller() {
+            return Err(Error::with_message(
+                ErrorKind::Internal(InternalErrorKind::ProtocolError(
+                    ProtocolErrorKind::Invariant,
+                )),
+                "Supplied controller type in ControllerState does not match with one passed on Protocol init."
+                    .to_owned(),
+            ));
+        }
         let Some(mode) = mode else {
             return Err(Error::with_message(
                 ErrorKind::Internal(InternalErrorKind::ProtocolError(ProtocolErrorKind::InputReportCreationFailed)),
@@ -334,7 +343,7 @@ impl Protocol {
         };
         input_report.set_input_report_id(id);
         match id {
-            InputReportId::Default => input_report.fill_default_report(self.controller_type),
+            InputReportId::Default => input_report.fill_default_report(self.controller),
             _ => {
                 let timer: u64 = match state.connected_at {
                     Some(connected_at) => {
@@ -451,7 +460,7 @@ impl Protocol {
         // bd_address = list(map(lambda x: int(x, 16), address[0].split(':')))
         input_report.set_ack(0x82);
         // FIXME: update VVV
-        input_report.sub_0x02_device_info([0xFFu8; 6], None, self.controller_type)?;
+        input_report.sub_0x02_device_info([0xFFu8; 6], None, self.controller)?;
         Ok(())
     }
 
@@ -510,7 +519,7 @@ impl Protocol {
         input_report.set_reply_to_subcommand_id(Subcommand::TriggerButtonsElapsedTime);
         // HACK: We assume this command is only used during pairing, sets values
         // and let the Switch to assign a player number.
-        match self.controller_type {
+        match self.controller {
             // INFO: Currently we don't support a combined JoyCon.
             ControllerType::JoyConL | ControllerType::JoyConR => input_report
                 .sub_0x04_trigger_buttons_elapsed_time(&[

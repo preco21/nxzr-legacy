@@ -26,13 +26,12 @@ pub type StateResult<T> = Result<T, StateError>;
 
 #[derive(Debug, Default)]
 pub struct ControllerStateConfig {
-    pub controller: Option<ControllerType>,
+    pub controller: ControllerType,
     pub spi_flash: Option<SpiFlash>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct ControllerState {
-    // TODO: pass from caller
     controller: ControllerType,
     button_state: ButtonState,
     l_stick_state: StickState,
@@ -45,10 +44,6 @@ impl ControllerState {
     }
 
     pub fn with_config(config: ControllerStateConfig) -> StateResult<Self> {
-        let controller = match config.controller {
-            Some(controller) => controller,
-            None => ControllerType::ProController,
-        };
         match config.spi_flash {
             Some(spi_flash) => {
                 let Some(l_calibration) = StickCalibration::with_left_stick_bytes(
@@ -78,15 +73,15 @@ impl ControllerState {
                 })?;
                 r_stick_state.reset_to_center()?;
                 Ok(Self {
-                    controller,
-                    button_state: ButtonState::with_controller(controller),
+                    controller: config.controller,
+                    button_state: ButtonState::with_controller(config.controller),
                     l_stick_state,
                     r_stick_state,
                 })
             }
             None => Ok(Self {
-                controller,
-                button_state: ButtonState::with_controller(controller),
+                controller: config.controller,
+                button_state: ButtonState::with_controller(config.controller),
                 l_stick_state: StickState::new(),
                 r_stick_state: StickState::new(),
             }),

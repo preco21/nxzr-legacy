@@ -145,7 +145,9 @@ impl ButtonKey {
  */
 #[derive(Clone, Debug, Default)]
 pub struct ButtonState {
-    // FIXME: pass from caller
+    // TODO: Refactor ButtonState later on such that no controller type is
+    // retained in the state and split into granular ButtonState per controller
+    // type.
     controller: ControllerType,
     bytes: [u8; 3],
 }
