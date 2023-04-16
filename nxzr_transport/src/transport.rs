@@ -36,16 +36,16 @@ impl Transport {
             handles.push(tokio::spawn(async move {
                 loop {
                     tokio::select! {
-                        _ = inner.closing() => break,
                         res = inner.monitor_lock() => {
                             match res {
-                                Ok(()) => {},
+                                Ok(_) => {},
                                 Err(err) => {
                                     let err = Error::new(ErrorKind::TransportMonitorLock(err));
                                     let _ = msg_tx.send(Event::Error(err));
                                 },
                             }
                         },
+                        _ = inner.closing() => break,
                     }
                 }
             }));
@@ -57,16 +57,16 @@ impl Transport {
             handles.push(tokio::spawn(async move {
                 loop {
                     tokio::select! {
-                        _ = inner.closing() => break,
                         res = inner.monitor_window() => {
                             match res {
-                                Ok(()) => {},
+                                Ok(_) => {},
                                 Err(err) => {
                                     let err = Error::new(ErrorKind::TransportMonitorWindow(err));
                                     let _ = msg_tx.send(Event::Error(err));
                                 },
                             }
                         },
+                        _ = inner.closing() => break,
                     }
                 }
             }));

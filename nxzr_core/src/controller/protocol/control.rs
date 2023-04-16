@@ -1,19 +1,84 @@
+use super::{Protocol, ProtocolConfig, TransportCombined};
 use crate::Result;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use super::{Protocol, ProtocolConfig};
+// FIXME
+// #[derive(Debug)]
+// pub struct ProtocolControl<Transport>
+// where
+//     Transport: TransportCombined + Clone + Send + Sync,
+// {
+//     transport: Transport,
+//     protocol: Arc<Protocol>,
+// }
 
 #[derive(Debug)]
-pub struct ProtocolControl {
-    inner: Arc<Protocol>,
+pub struct ProtocolControl {}
+
+pub struct ProtocolHandle {
+    _close_rx: mpsc::Receiver<()>,
+}
+
+impl Drop for ProtocolHandle {
+    fn drop(&mut self) {
+        // Required for drop order
+    }
 }
 
 impl ProtocolControl {
-    pub fn new(config: ProtocolConfig) -> Result<Self> {
-        Ok(Self {
-            inner: Arc::new(Protocol::new(config)?),
-        })
+    pub fn new(
+        transport: impl TransportCombined + Clone + Send + Sync,
+        config: ProtocolConfig,
+    ) -> Result<Self> {
+        let protocol = Arc::new(Protocol::new(config)?);
+        let (close_tx, close_rx) = mpsc::channel(1);
+        let (controller_state_req_tx, controller_state_req_rx) = mpsc::unbounded_channel();
+        let mut handles = vec![];
+        {
+            // Logger thread.
+            let protocol = protocol.clone();
+            handles.push(tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        event = protocol.events() => {
+                            println!("{:?}", event);
+                        },
+                        _ = close_tx.closed() => {
+                            break;
+                        },
+                    }
+                }
+            }));
+        }
+        {
+            let transport = transport.clone();
+            let protocol = protocol.clone();
+            handles.push(tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        res = protocol.process_read(&transport) => {
+                            match res {
+                                Ok(_) => {},
+                                Err(_) => {
+                                    // handle
+                                    panic!()
+                                }
+                            }
+                        },
+                        // res = inner.process_read() => {
+                        //     // inner.close_transport() when errored
+                        //     // this will call will_close_tx?
+                        // },
+                        // will close? 는 여기서 처리하고 close_tx는 따로 spawn한 스레드에서 처리하는게 나을 것 같은데
+                        _ = close_tx.closed() => {
+                            let _ = will_close_tx.send(());
+                        },
+                    }
+                }
+            }));
+        }
+        Ok(Self {})
     }
 
     // 기본적으로 얘가 Err, Ok 같은거 다뤄 줘야 함 + 그럼에도, shutdown 시그널에 의해
@@ -26,11 +91,6 @@ impl ProtocolControl {
     // FIXME: 얘 밖으로 뺴기
     // 얘는 transport만 없으면 여러번 호출될 수 있음, 근데 있으면 터짐
     pub async fn run(&self) -> Result<ProtocolHandle> {
-        let (close_tx, close_rx) = mpsc::channel(1);
-        // let (closed_tx, closed_rx) = mpsc::channel(1);
-
-        let (will_close_tx, will_close_rx) = mpsc::channel(1);
-
         // halt -> 일단 멈춤
         // closed -> closed 상태 표기?
 
@@ -53,24 +113,6 @@ impl ProtocolControl {
         // Also, we don't directly use transport's closing signals (e.g.
         // `t.closing()`, `t.closed()`) as we need to decouple the logic in
         // different contexts and streamline shutdown signal handling.
-        let mut handles = vec![];
-        {
-            let inner = self.inner.clone();
-            handles.push(tokio::spawn(async move {
-                loop {
-                    tokio::select! {
-                        // res = inner.process_read() => {
-                        //     // inner.close_transport() when errored
-                        //     // this will call will_close_tx?
-                        // },
-                        // will close? 는 여기서 처리하고 close_tx는 따로 spawn한 스레드에서 처리하는게 나을 것 같은데
-                        _ = close_tx.closed() => {
-                            let _ = will_close_tx.send(());
-                        }
-                    }
-                }
-            }));
-        }
 
         // FIXME: Ping to start writer thread -- ready_for_write() 기다렸다가 시작하기 write는
 
@@ -108,15 +150,5 @@ impl ProtocolControl {
             // will_close_rx:
             _close_rx: close_rx,
         })
-    }
-}
-
-pub struct ProtocolHandle {
-    _close_rx: mpsc::Receiver<()>,
-}
-
-impl Drop for ProtocolHandle {
-    fn drop(&mut self) {
-        // Required for drop order
     }
 }

@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
                     Ok(0) => {
                         println!("Stream ended");
                         break;
-                    }
+                    },
                     Ok(n) => {
                         let buf = &buf[..n];
                         println!("Received {} bytes", buf.len());
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
                     Err(err) => {
                         println!("Read failed: {}", &err);
                         continue;
-                    }
+                    },
                 }
             },
             _ = lines.next_line() => break,
