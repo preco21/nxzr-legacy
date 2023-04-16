@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use std::{future::Future, sync::Mutex, time::Duration};
 use strum::{Display, IntoStaticStr};
 use tokio::{
-    sync::{broadcast, mpsc, oneshot, watch, Notify},
+    sync::{mpsc, oneshot, watch, Notify},
     time,
 };
 
@@ -100,11 +100,6 @@ impl Shared {
 pub struct ProtocolConfig {
     controller: ControllerType,
     controller_state: ControllerState,
-}
-
-struct ControllerStateUpdateRequest {
-    f: Box<dyn FnMut(&mut ControllerState)>,
-    tx: oneshot::Sender<()>,
 }
 
 #[derive(Debug)]
