@@ -136,8 +136,13 @@ impl Protocol {
     }
 
     // Resolved when the first response is received by the reader.
-    pub async fn wait_for_response(&self) {
-        self.notify_data_received.notified().await;
+    pub async fn wait_for_connection(&self, transport_w: &impl TransportWrite) {
+        loop {
+            tokio::select! {
+                _ = self.notify_data_received.notified() => break,
+                _ = time::timeout(Duration::from_millis(1000), self.handle_write(transport_w, InputReport::new())) => {}
+            }
+        }
     }
 
     // Runs reader operation using the given transport.
@@ -192,7 +197,7 @@ impl Protocol {
         self.wait_for_continue().await;
         let now = time::Instant::now();
         let input_report = self.generate_input_report(None)?;
-        self.handle_write(transport, &input_report).await?;
+        self.handle_write(transport, input_report).await?;
         if let Some(write_hook) = write_hook {
             write_hook.await;
         }
@@ -271,7 +276,7 @@ impl Protocol {
     async fn handle_write(
         &self,
         transport_w: &impl TransportWrite,
-        input_report: &InputReport,
+        input_report: InputReport,
     ) -> Result<()> {
         let mut pairing_bytes: [u8; 4] = [0x00; 4];
         pairing_bytes[1..4].copy_from_slice(&input_report.data()[4..7]);
@@ -416,7 +421,7 @@ impl Protocol {
                 return Ok(());
             }
         }
-        self.handle_write(transport_w, &response_report).await?;
+        self.handle_write(transport_w, response_report).await?;
         Ok(())
     }
 

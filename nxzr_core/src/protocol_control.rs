@@ -124,6 +124,7 @@ impl ProtocolControl {
                 }
             }));
         }
+        // FIXME: Move to other function?
         {
             // Handler for `ControllerState` updates
             let protocol = protocol.clone();
@@ -166,9 +167,7 @@ impl ProtocolControl {
             let will_close_tx = will_close_tx.clone();
             let mut will_close_rx = will_close_tx.subscribe();
             handles.push(tokio::spawn(async move {
-                // FIXME: send empty report;
-                protocol.wait_for_response().await;
-                protocol.wait_for_continue().await;
+                protocol.wait_for_connection(&transport).await;
                 loop {
                     tokio::select! {
                         _ = will_close_rx.recv() => break,
