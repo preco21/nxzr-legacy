@@ -1,4 +1,4 @@
-use super::{StateError, StateResult};
+use crate::{Error, ErrorKind, Result};
 
 #[derive(Debug, Default)]
 pub struct StickStateConfig {
@@ -19,11 +19,11 @@ impl StickState {
         Self::with_config(Default::default()).unwrap()
     }
 
-    pub fn with_config(config: StickStateConfig) -> StateResult<Self> {
+    pub fn with_config(config: StickStateConfig) -> Result<Self> {
         let horizontal = match config.horizontal {
             Some(horizontal) => {
                 if horizontal >= 0x1000 {
-                    return Err(StateError::InvalidRange);
+                    return Err(Error::new(ErrorKind::InvalidRange));
                 } else {
                     horizontal
                 }
@@ -33,7 +33,7 @@ impl StickState {
         let vertical = match config.vertical {
             Some(vertical) => {
                 if vertical >= 0x1000 {
-                    return Err(StateError::InvalidRange);
+                    return Err(Error::new(ErrorKind::InvalidRange));
                 } else {
                     vertical
                 }
@@ -47,7 +47,7 @@ impl StickState {
         })
     }
 
-    pub fn with_raw(bytes: [u8; 3], calibration: Option<StickCalibration>) -> StateResult<Self> {
+    pub fn with_raw(bytes: [u8; 3], calibration: Option<StickCalibration>) -> Result<Self> {
         let stick_h = (bytes[0] as u16) | (((bytes[1] & 0xF) as u16) << 8);
         let stick_v = ((bytes[1] >> 4) as u16) | ((bytes[2] as u16) << 4);
         Self::with_config(StickStateConfig {
@@ -62,9 +62,9 @@ impl StickState {
         self.h_stick
     }
 
-    pub fn set_horizontal(&mut self, horizontal: u16) -> StateResult<()> {
+    pub fn set_horizontal(&mut self, horizontal: u16) -> Result<()> {
         if horizontal >= 0x1000 {
-            return Err(StateError::InvalidRange);
+            return Err(Error::new(ErrorKind::InvalidRange));
         }
         self.h_stick = horizontal;
         Ok(())
@@ -74,17 +74,17 @@ impl StickState {
         self.v_stick
     }
 
-    pub fn set_vertical(&mut self, vertical: u16) -> StateResult<()> {
+    pub fn set_vertical(&mut self, vertical: u16) -> Result<()> {
         if vertical >= 0x1000 {
-            return Err(StateError::InvalidRange);
+            return Err(Error::new(ErrorKind::InvalidRange));
         }
         self.v_stick = vertical;
         Ok(())
     }
 
-    pub fn is_center(&self, radius: Option<u16>) -> StateResult<bool> {
+    pub fn is_center(&self, radius: Option<u16>) -> Result<bool> {
         let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
+            return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
         };
         let radius = match radius {
             Some(radius) => radius,
@@ -96,59 +96,59 @@ impl StickState {
             && (self.v_stick <= stick_cal.v_center + radius))
     }
 
-    pub fn reset_to_center(&mut self) -> StateResult<()> {
+    pub fn reset_to_center(&mut self) -> Result<()> {
         let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
+            return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
         };
         self.h_stick = stick_cal.h_center;
         self.v_stick = stick_cal.v_center;
         Ok(())
     }
 
-    pub fn set_up(&mut self) -> StateResult<()> {
+    pub fn set_up(&mut self) -> Result<()> {
         let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
+            return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
         };
         self.h_stick = stick_cal.h_center;
         self.v_stick = stick_cal.v_center + stick_cal.v_max_above_center;
         Ok(())
     }
 
-    pub fn set_down(&mut self) -> StateResult<()> {
+    pub fn set_down(&mut self) -> Result<()> {
         let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
+            return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
         };
         self.h_stick = stick_cal.h_center;
         self.v_stick = stick_cal.v_center - stick_cal.v_max_above_center;
         Ok(())
     }
 
-    pub fn set_left(&mut self) -> StateResult<()> {
+    pub fn set_left(&mut self) -> Result<()> {
         let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
+            return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
         };
         self.h_stick = stick_cal.h_center - stick_cal.h_max_below_center;
         self.v_stick = stick_cal.v_center;
         Ok(())
     }
 
-    pub fn set_right(&mut self) -> StateResult<()> {
+    pub fn set_right(&mut self) -> Result<()> {
         let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
+            return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
         };
         self.h_stick = stick_cal.h_center + stick_cal.h_max_above_center;
         self.v_stick = stick_cal.v_center;
         Ok(())
     }
 
-    pub fn calibration(&self) -> StateResult<&StickCalibration> {
+    pub fn calibration(&self) -> Result<&StickCalibration> {
         let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
+            return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
         };
         Ok(&stick_cal)
     }
 
-    pub fn set_calibration(&mut self, calibration: StickCalibration) -> StateResult<()> {
+    pub fn set_calibration(&mut self, calibration: StickCalibration) -> Result<()> {
         self.stick_cal = Some(calibration);
         Ok(())
     }

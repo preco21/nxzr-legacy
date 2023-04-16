@@ -1,5 +1,4 @@
-use super::{StateError, StateResult};
-use crate::controller::ControllerType;
+use crate::{controller::ControllerType, Error, ErrorKind, Result};
 use strum::Display;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -209,13 +208,13 @@ impl ButtonState {
         }
     }
 
-    pub fn toggle_button(&mut self, key: ButtonKey) -> StateResult<()> {
+    pub fn toggle_button(&mut self, key: ButtonKey) -> Result<()> {
         self.set_button(key, !self.is_button_set(key))
     }
 
-    pub fn set_button(&mut self, key: ButtonKey, flag: bool) -> StateResult<()> {
+    pub fn set_button(&mut self, key: ButtonKey, flag: bool) -> Result<()> {
         if !ButtonKey::can_use_button(self.controller, key) {
-            return Err(StateError::ButtonNotAvailable);
+            return Err(Error::new(ErrorKind::StateButtonNotAvailable));
         }
         let mut toggle = |idx: usize, bit: usize| {
             if flag != check_bit(self.bytes[idx], bit) {

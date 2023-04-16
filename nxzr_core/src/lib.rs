@@ -24,13 +24,11 @@ pub enum ErrorKind {
     // `OutOfBounds` for a return value of getter methods where `OutOfBounds` is
     // not appropriate. Since it's more descriptive to indicate that you are
     // accessing no-existent data than just saying data out-of-bounds.
-    NoData,
+    NoDataAvailable,
     // There is no calibration data available.
     StateNoCalibrationDataAvailable,
     // The button is not available for the controller of choice.
     StateButtonNotAvailable,
-    // Unable to create stick calibration instance from the given data.
-    StateUnableToCreateStickCalibration,
     // Failed to parse output report.
     ProtocolOutputReportParsingFailed,
     // Failed to create input report.

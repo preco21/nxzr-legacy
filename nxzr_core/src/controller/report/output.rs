@@ -89,7 +89,7 @@ impl OutputReport {
 
     pub fn subcommand_data(&self) -> Result<&[u8]> {
         let Some(slice) = self.buf.get(12..) else {
-            return Err(Error::new(ErrorKind::NoData));
+            return Err(Error::new(ErrorKind::NoDataAvailable));
         };
         Ok(slice)
     }
