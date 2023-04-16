@@ -14,7 +14,7 @@ const DEFAULT_READ_BUF_SIZE: usize = 50;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum TransportErrorKind {
-    BeingClosed,
+    OperationWhileClosing,
 }
 
 #[derive(Debug, Default)]
@@ -237,7 +237,7 @@ impl TransportInner {
     pub async fn read(&self) -> Result<&[u8]> {
         if self.is_closing() {
             return Err(Error::new(ErrorKind::Transport(
-                TransportErrorKind::BeingClosed,
+                TransportErrorKind::OperationWhileClosing,
             )));
         }
         self.active().await;
@@ -248,7 +248,7 @@ impl TransportInner {
     pub async fn write(&self, buf: &[u8]) -> Result<()> {
         if self.is_closing() {
             return Err(Error::new(ErrorKind::Transport(
-                TransportErrorKind::BeingClosed,
+                TransportErrorKind::OperationWhileClosing,
             )));
         }
         self.active().await;
