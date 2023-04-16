@@ -1,8 +1,8 @@
-pub mod controller;
-
 use std::time::Duration;
-
 use strum::{Display, IntoStaticStr};
+
+pub mod controller;
+pub mod protocol_control;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Error {

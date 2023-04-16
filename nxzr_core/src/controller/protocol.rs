@@ -1,5 +1,5 @@
 use super::{
-    helper::SendDelay,
+    delay::SendDelay,
     report::{
         input::{InputReport, InputReportId, TriggerButtonsElapsedTimeCommand},
         output::{OutputReport, OutputReportId},
@@ -17,8 +17,6 @@ use tokio::{
     sync::{mpsc, oneshot, watch, Notify},
     time,
 };
-
-mod control;
 
 #[async_trait]
 pub trait TransportRead {

@@ -1,4 +1,4 @@
-use super::{Protocol, ProtocolConfig, SubscriptionReq, TransportCombined};
+use crate::controller::protocol::{Protocol, ProtocolConfig, TransportCombined};
 use crate::Result;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -62,7 +62,7 @@ impl ProtocolControl {
         //     }));
         // }
         {
-            // Cleanup thread.
+            // For cleanup handling
             let transport = transport.clone();
             let will_close_tx = will_close_tx.clone();
             handles.push(tokio::spawn(async move {
@@ -72,7 +72,7 @@ impl ProtocolControl {
             }));
         }
         {
-            // Handle reads.
+            // Protocol reader thread
             let transport = transport.clone();
             let protocol = protocol.clone();
             let will_close_tx = will_close_tx.clone();
@@ -95,7 +95,7 @@ impl ProtocolControl {
             }));
         }
         {
-            // Handle writes.
+            // Protocol writer thread
             let transport = transport.clone();
             let protocol = protocol.clone();
             let will_close_tx = will_close_tx.clone();
@@ -125,7 +125,7 @@ impl ProtocolControl {
             }));
         }
         {
-            // Handle controller state changes.
+            // Handler for `ControllerState` updates
             let protocol = protocol.clone();
             let will_close_tx = will_close_tx.clone();
             let mut will_close_rx = will_close_tx.subscribe();
@@ -160,7 +160,7 @@ impl ProtocolControl {
         }
         // FIXME: Move to other function?
         {
-            // Handles for connection.
+            // Connection handler
             let transport = transport.clone();
             let protocol = protocol.clone();
             let will_close_tx = will_close_tx.clone();
@@ -168,6 +168,7 @@ impl ProtocolControl {
             handles.push(tokio::spawn(async move {
                 // FIXME: send empty report;
                 protocol.wait_for_response().await;
+                protocol.wait_for_continue().await;
                 loop {
                     tokio::select! {
                         _ = will_close_rx.recv() => break,
