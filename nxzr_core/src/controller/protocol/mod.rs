@@ -12,10 +12,10 @@ use super::{
 };
 use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use async_trait::async_trait;
-use std::{sync::Mutex, time::Duration};
+use std::{future::Future, sync::Mutex, time::Duration};
 use strum::{Display, IntoStaticStr};
 use tokio::{
-    sync::{mpsc, oneshot, watch, Notify},
+    sync::{broadcast, mpsc, oneshot, watch, Notify},
     time,
 };
 
@@ -102,15 +102,17 @@ pub struct ProtocolConfig {
     controller_state: ControllerState,
 }
 
+struct ControllerStateUpdateRequest {
+    f: Box<dyn FnMut(&mut ControllerState)>,
+    tx: oneshot::Sender<()>,
+}
+
 #[derive(Debug)]
 pub struct Protocol {
     state: Shared,
     controller_type: ControllerType,
     notify_data_received: Notify,
     notify_writer_wake: Notify,
-    // FIXME: sig_is_send
-    // Replace this with mpsc + oneshot req/res pattern
-    notify_controller_state_send: Notify,
     ready_for_write_tx: watch::Sender<bool>,
     paused_tx: watch::Sender<bool>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
@@ -127,7 +129,6 @@ impl Protocol {
             controller_type: config.controller,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
-            notify_controller_state_send: Notify::new(),
             ready_for_write_tx: watch::channel(false).0,
             paused_tx: watch::channel(false).0,
             event_sub_tx,
@@ -141,21 +142,15 @@ impl Protocol {
     }
 
     // Updates the controller state by replacing the current one.
-    pub async fn set_controller_state(&self, controller_state: ControllerState) -> Result<()> {
+    pub async fn set_controller_state(&self, controller_state: ControllerState) {
         self.wait_for_continue().await;
         self.state.set_controller_state(controller_state);
-        // FIXME: here
-        // self.notify_controller_state
-        Ok(())
     }
 
     // Modifies the controller state in-place.
-    pub async fn modify_controller_state(&self, f: impl FnMut(&mut ControllerState)) -> Result<()> {
+    pub async fn modify_controller_state(&self, f: impl FnMut(&mut ControllerState)) {
         self.wait_for_continue().await;
         self.state.modify_controller_state(f);
-        // FIXME: here
-        // self.notify_controller_state
-        Ok(())
     }
 
     // Resolved when the first response is received by the reader.
@@ -212,11 +207,17 @@ impl Protocol {
     }
 
     // Runs writer operation using the given transport.
-    pub async fn process_write(&self, transport: &impl TransportWrite) -> Result<()> {
+    pub async fn process_write(
+        &self,
+        transport: &impl TransportWrite,
+        // NOTE: Write hook may be used to notify controller state updater loop to continue.
+        write_hook: impl Future<Output = ()>,
+    ) -> Result<()> {
         self.wait_for_continue().await;
         let now = time::Instant::now();
         let input_report = self.generate_input_report(None)?;
         self.handle_write(transport, &input_report).await?;
+        write_hook.await;
         let state = self.state.get();
         if state.send_delay == f64::INFINITY {
             self.notify_writer_wake.notified().await
@@ -314,7 +315,6 @@ impl Protocol {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
         }
         transport_w.write(input_report.data()).await?;
-        self.notify_controller_state_send.notify_waiters();
         Ok(())
     }
 
