@@ -201,7 +201,7 @@ impl TransportInner {
         Ok(())
     }
 
-    pub async fn active(&self) -> Result<()> {
+    pub async fn running(&self) -> Result<()> {
         let mut rx = self.active_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await.unwrap();
@@ -235,7 +235,7 @@ impl TransportInner {
         if self.is_closing() {
             return Err(Error::new(ErrorKind::TransportOperationWhileClosing));
         }
-        self.active().await;
+        self.running().await;
         // TODO: ITR read
         Ok(&[])
     }
@@ -244,7 +244,7 @@ impl TransportInner {
         if self.is_closing() {
             return Err(Error::new(ErrorKind::TransportOperationWhileClosing));
         }
-        self.active().await;
+        self.running().await;
         self.writable().await;
         Ok(())
     }
