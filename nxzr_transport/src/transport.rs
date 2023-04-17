@@ -1,12 +1,12 @@
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::hci;
 use crate::{Error, ErrorKind, InternalErrorKind, Result};
-use futures::future::join_all;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use strum::{Display, IntoStaticStr};
 use tokio::sync::{mpsc, oneshot, watch};
+use tokio::task::JoinSet;
 use tokio::time::sleep;
 
 const DEFAULT_FLOW_CONTROL: usize = 4;
@@ -27,52 +27,46 @@ impl Transport {
     pub async fn register(config: TransportConfig) -> Result<(Self, TransportHandle)> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let inner = Arc::new(TransportInner::new(config, close_tx, closed_tx).await?);
-        let mut handles = vec![];
-        {
-            // Handles writer lock timing.
+        let inner = Arc::new(TransportInner::new(config, closed_tx).await?);
+        let mut set = JoinSet::new();
+        // Handle writer lock timing.
+        set.spawn({
             let inner = inner.clone();
             let msg_tx = msg_tx.clone();
-            handles.push(tokio::spawn(async move {
+            async move {
                 loop {
-                    tokio::select! {
-                        res = inner.monitor_lock() => {
-                            match res {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    let err = Error::new(ErrorKind::TransportMonitorLock(err));
-                                    let _ = msg_tx.send(Event::Error(err));
-                                },
-                            }
-                        },
-                        _ = inner.closing() => break,
+                    let res = inner.monitor_lock().await;
+                    match res {
+                        Ok(_) => {}
+                        Err(err) => {
+                            let err = Error::new(ErrorKind::TransportMonitorLock(err));
+                            let _ = msg_tx.send(Event::Error(err));
+                        }
                     }
                 }
-            }));
-        }
-        {
-            // Handles writer window timing.
+            }
+        });
+        // Handles writer window timing.
+        set.spawn({
             let inner = inner.clone();
             let msg_tx = msg_tx.clone();
-            handles.push(tokio::spawn(async move {
+            async move {
                 loop {
-                    tokio::select! {
-                        res = inner.monitor_window() => {
-                            match res {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    let err = Error::new(ErrorKind::TransportMonitorWindow(err));
-                                    let _ = msg_tx.send(Event::Error(err));
-                                },
-                            }
-                        },
-                        _ = inner.closing() => break,
+                    let res = inner.monitor_window().await;
+                    match res {
+                        Ok(_) => {}
+                        Err(err) => {
+                            let err = Error::new(ErrorKind::TransportMonitorWindow(err));
+                            let _ = msg_tx.send(Event::Error(err));
+                        }
                     }
                 }
-            }));
-        }
+            }
+        });
         tokio::spawn(async move {
-            let _ = join_all(handles).await;
+            close_tx.closed().await;
+            set.abort_all();
+            while let Some(_) = set.join_next().await {}
             drop(closed_rx);
         });
         Ok((
@@ -132,17 +126,12 @@ pub(crate) struct TransportInner {
     writing_tx: watch::Sender<bool>,
     flow_control: Arc<BoundedSemaphore>,
     read_buf_size: usize,
-    close_tx: mpsc::Sender<()>,
     closed_tx: mpsc::Sender<()>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
 
 impl TransportInner {
-    pub async fn new(
-        config: TransportConfig,
-        close_tx: mpsc::Sender<()>,
-        closed_tx: mpsc::Sender<()>,
-    ) -> Result<Self> {
+    pub async fn new(config: TransportConfig, closed_tx: mpsc::Sender<()>) -> Result<Self> {
         // Device ids must be targeting to the local machine.
         let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
         // 0x04 = HCI_EVT; 0x13 = Number of completed packets
@@ -174,7 +163,6 @@ impl TransportInner {
             write_lock,
             active_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
-            close_tx,
             closed_tx,
             event_sub_tx,
             flow_control: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
@@ -251,15 +239,6 @@ impl TransportInner {
 
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
         Event::subscribe(&mut self.event_sub_tx.clone()).await
-    }
-
-    pub fn is_closing(&self) -> bool {
-        self.close_tx.is_closed()
-    }
-
-    pub fn closing(&self) -> impl Future<Output = ()> {
-        let close_tx = self.close_tx.clone();
-        async move { close_tx.closed().await }
     }
 
     pub fn closed(&self) -> impl Future<Output = ()> {

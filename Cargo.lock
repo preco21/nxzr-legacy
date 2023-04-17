@@ -441,7 +441,6 @@ version = "0.1.0"
 dependencies = [
  "bluer",
  "dbus",
- "futures",
  "libc",
  "strum",
  "tokio",
