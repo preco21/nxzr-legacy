@@ -62,7 +62,7 @@ impl Shared {
         self.state.lock().unwrap().clone()
     }
 
-    pub fn modify<R>(&self, mut f: impl FnMut(&mut State) -> R) -> R {
+    pub fn modify<R>(&self, mut f: impl FnOnce(&mut State) -> R) -> R {
         let mut write_lock = self.state.lock().unwrap();
         f(&mut write_lock)
     }
@@ -77,7 +77,7 @@ impl Shared {
         state.controller_state = controller_state;
     }
 
-    pub fn modify_controller_state(&self, mut f: impl FnMut(&mut ControllerState)) {
+    pub fn modify_controller_state(&self, mut f: impl FnOnce(&mut ControllerState)) {
         let mut write_lock = self.state.lock().unwrap();
         f(&mut write_lock.controller_state)
     }
@@ -118,34 +118,40 @@ impl Protocol {
         })
     }
 
-    // Marks a certain point when the connection is established.
+    // Mark a certain point when the connection is established.
     pub fn establish_connection(&self) {
         self.state.set_connected_at(Some(time::Instant::now()));
     }
 
-    // Updates the controller state by replacing the current one.
+    // Update the controller state by replacing the current one.
     pub async fn set_controller_state(&self, controller_state: ControllerState) {
         self.wait_for_continue().await;
         self.state.set_controller_state(controller_state);
     }
 
-    // Modifies the controller state in-place.
-    pub async fn modify_controller_state(&self, f: impl FnMut(&mut ControllerState)) {
+    // Modify the controller state in-place.
+    pub async fn modify_controller_state(&self, f: impl FnOnce(&mut ControllerState)) {
         self.wait_for_continue().await;
         self.state.modify_controller_state(f);
     }
 
     // Resolved when the first response is received by the reader.
-    pub async fn wait_for_connection(&self, transport_w: &impl TransportWrite) {
-        loop {
-            tokio::select! {
-                _ = self.notify_data_received.notified() => break,
-                _ = time::timeout(Duration::from_millis(1000), self.handle_write(transport_w, InputReport::new())) => {}
-            }
-        }
+    pub async fn wait_for_connection(&self) {
+        self.notify_data_received.notified().await;
     }
 
-    // Runs reader operation using the given transport.
+    // Send empty input reports to the host.
+    pub async fn send_empty_input_report(
+        &self,
+        transport_write: &impl TransportWrite,
+    ) -> Result<()> {
+        self.handle_write(transport_write, InputReport::new())
+            .await?;
+        time::sleep(Duration::from_millis(1000)).await;
+        Ok(())
+    }
+
+    // Run reader operation using the given transport.
     pub async fn process_read(&self, transport: &impl TransportCombined) -> Result<()> {
         // FIXME: receive addr
         self.notify_data_received.notify_waiters();
@@ -187,7 +193,7 @@ impl Protocol {
         Ok(())
     }
 
-    // Runs writer operation using the given transport.
+    // Run writer operation using the given transport.
     pub async fn process_write(
         &self,
         transport: &impl TransportWrite,
@@ -275,7 +281,7 @@ impl Protocol {
 
     async fn handle_write(
         &self,
-        transport_w: &impl TransportWrite,
+        transport_write: &impl TransportWrite,
         input_report: InputReport,
     ) -> Result<()> {
         let mut pairing_bytes: [u8; 4] = [0x00; 4];
@@ -289,7 +295,7 @@ impl Protocol {
         if self.is_paused() {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
         }
-        transport_w.write(input_report.data()).await?;
+        transport_write.write(input_report.data()).await?;
         Ok(())
     }
 
@@ -357,7 +363,7 @@ impl Protocol {
 
     async fn reply_to_subcommand(
         &self,
-        transport_w: &impl TransportWrite,
+        transport_write: &impl TransportWrite,
         output_report: &OutputReport,
     ) -> Result<()> {
         let Some(subcommand) = output_report.subcommand() else {
@@ -421,7 +427,7 @@ impl Protocol {
                 return Ok(());
             }
         }
-        self.handle_write(transport_w, response_report).await?;
+        self.handle_write(transport_write, response_report).await?;
         Ok(())
     }
 

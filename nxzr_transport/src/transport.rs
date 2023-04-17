@@ -65,8 +65,7 @@ impl Transport {
         });
         tokio::spawn(async move {
             close_tx.closed().await;
-            set.abort_all();
-            while let Some(_) = set.join_next().await {}
+            set.shutdown().await;
             drop(closed_rx);
         });
         Ok((
