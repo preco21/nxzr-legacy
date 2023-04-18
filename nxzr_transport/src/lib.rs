@@ -2,6 +2,7 @@ use strum::{Display, IntoStaticStr};
 use tokio::sync::AcquireError;
 use transport::TransportErrorKind;
 
+pub mod event;
 pub mod semaphore;
 pub mod session;
 pub mod sock;
@@ -15,10 +16,15 @@ pub struct Error {
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ErrorKind {
+    Transport(TransportErrorKind),
     Internal(InternalErrorKind),
-    TransportOperationWhileClosing,
-    TransportMonitorLock(Error),
-    TransportMonitorWindow(Error),
+}
+
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+pub enum TransportErrorKind {
+    OperationWhileClosing,
+    MonitorLock(Error),
+    MonitorWindow(Error),
 }
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
