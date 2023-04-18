@@ -285,7 +285,7 @@ fn create_task(
                     Ok(_) => {},
                     Err(err) => {
                         let _ = close_tx.send(());
-                        return Err(Error::new(ErrorKind::ProtocolControlExited(Box::new(err))))
+                        return Err(err)
                     }
                 }
             },

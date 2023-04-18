@@ -1,5 +1,5 @@
 use super::{spi_flash::SpiFlash, ControllerType};
-use crate::{Error, ErrorKind, Result};
+use crate::{Error, ErrorKind, Result, StateErrorKind};
 use button::ButtonState;
 use stick::{StickCalibration, StickState, StickStateConfig};
 
@@ -34,7 +34,7 @@ impl ControllerState {
                         None => spi_flash.factory_l_stick_calibration(),
                     },
                 ) else {
-                    return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
+                    return Err(Error::new(ErrorKind::State(StateErrorKind::NoCalibrationDataAvailable)));
                 };
                 let mut l_stick_state = StickState::with_config(StickStateConfig {
                     calibration: Some(l_calibration),
@@ -47,7 +47,7 @@ impl ControllerState {
                         None => spi_flash.factory_r_stick_calibration(),
                     },
                 ) else {
-                    return Err(Error::new(ErrorKind::StateNoCalibrationDataAvailable));
+                    return Err(Error::new(ErrorKind::State(StateErrorKind::NoCalibrationDataAvailable)));
                 };
                 let mut r_stick_state = StickState::with_config(StickStateConfig {
                     calibration: Some(r_calibration),

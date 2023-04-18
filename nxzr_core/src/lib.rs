@@ -12,6 +12,18 @@ pub struct Error {
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ErrorKind {
+    // Report errors
+    Report(ReportErrorKind),
+    // State errors
+    State(StateErrorKind),
+    // Protocol errors
+    Protocol(ProtocolErrorKind),
+    // Internal errors
+    Internal(InternalErrorKind),
+}
+
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+pub enum ReportErrorKind {
     // Invalid value range has been entered.
     InvalidRange,
     // Indicates that given data has not enough length. Usually used in constructors.
@@ -25,22 +37,32 @@ pub enum ErrorKind {
     // not appropriate. Since it's more descriptive to indicate that you are
     // accessing no-existent data than just saying data out-of-bounds.
     NoDataAvailable,
+    // Returned if invariant violation happens.
+    Invariant,
+}
+
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+pub enum StateErrorKind {
+    // Invalid value range has been entered.
+    InvalidRange,
     // There is no calibration data available.
-    StateNoCalibrationDataAvailable,
+    NoCalibrationDataAvailable,
     // The button is not available for the controller of choice.
-    StateButtonNotAvailable,
+    ButtonNotAvailable,
+}
+
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+pub enum ProtocolErrorKind {
     // Failed to parse output report.
-    ProtocolOutputReportParsingFailed,
+    OutputReportParsingFailed,
     // Failed to create input report.
-    ProtocolInputReportCreationFailed,
+    InputReportCreationFailed,
     // Write operation in protocol is too slow.
-    ProtocolWriteTooSlow(Duration),
+    WriteTooSlow(Duration),
     // Returned if invariant violation happens.
     Invariant,
     // Feature is not implemented.
     NotImplemented,
-    // Internal errors
-    Internal(InternalErrorKind),
 }
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]

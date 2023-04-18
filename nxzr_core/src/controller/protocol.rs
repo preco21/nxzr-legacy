@@ -9,7 +9,7 @@ use super::{
     state::ControllerState,
     ControllerType,
 };
-use crate::{Error, ErrorKind, InternalErrorKind, Result};
+use crate::{Error, ErrorKind, InternalErrorKind, ProtocolErrorKind, Result};
 use async_trait::async_trait;
 use std::{future::Future, sync::Mutex, time::Duration};
 use strum::{Display, IntoStaticStr};
@@ -160,7 +160,7 @@ impl Protocol {
             Ok(output_report) => output_report,
             Err(_) => {
                 let err = Error::with_message(
-                    ErrorKind::ProtocolOutputReportParsingFailed,
+                    ErrorKind::Protocol(ProtocolErrorKind::OutputReportParsingFailed),
                     "Failed to parse output report, ignoring.".to_owned(),
                 );
                 self.dispatch_event(Event::Error(err));
@@ -169,7 +169,7 @@ impl Protocol {
         };
         let Some(output_report_id) = output_report.output_report_id() else {
             let err = Error::with_message(
-                ErrorKind::ProtocolOutputReportParsingFailed,
+                ErrorKind::Protocol(ProtocolErrorKind::OutputReportParsingFailed),
                 "Failed to parse `id` from output report (maybe unknown?), ignoring.".to_owned(),
             );
             self.dispatch_event(Event::Error(err));
@@ -184,7 +184,7 @@ impl Protocol {
             }
             OutputReportId::RequestIrNfcMcu => {
                 let err = Error::with_message(
-                    ErrorKind::NotImplemented,
+                    ErrorKind::Protocol(ProtocolErrorKind::NotImplemented),
                     "Attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring.".to_owned(),
                 );
                 self.dispatch_event(Event::Error(err));
@@ -218,7 +218,7 @@ impl Protocol {
                 None => {
                     let slow_duration = elapsed - send_delay;
                     let err = Error::with_message(
-                ErrorKind::ProtocolWriteTooSlow(slow_duration),
+                ErrorKind::Protocol(ProtocolErrorKind::WriteTooSlow(slow_duration)),
                 format!(
                     "Write operation is taking longer than usual to complete: {:?}, skipping the write.",
                     slow_duration
@@ -237,7 +237,7 @@ impl Protocol {
         if let Some(mode) = mode {
             if mode == 0x21 {
                 let err = Error::with_message(
-                    ErrorKind::Invariant,
+                    ErrorKind::Protocol(ProtocolErrorKind::Invariant),
                     "Unexpectedly setting report mode for standard input reports.".to_owned(),
                 );
                 self.dispatch_event(Event::Error(err));
@@ -257,7 +257,7 @@ impl Protocol {
                     Some(delay) => state.send_delay = delay,
                     None => {
                         let err = Error::with_message(
-                            ErrorKind::Invariant,
+                            ErrorKind::Protocol(ProtocolErrorKind::Invariant),
                             format!(
                                 "Unknown delay for report mode {:?}, assuming it as 1/15.",
                                 mode
@@ -307,21 +307,21 @@ impl Protocol {
         };
         if self.controller != state.controller_state.controller() {
             return Err(Error::with_message(
-                ErrorKind::Invariant,
+                ErrorKind::Protocol(ProtocolErrorKind::Invariant),
                 "Supplied controller type in ControllerState does not match with one passed on Protocol init."
                     .to_owned(),
             ));
         }
         let Some(mode) = mode else {
             return Err(Error::with_message(
-                ErrorKind::ProtocolInputReportCreationFailed,
+                ErrorKind::Protocol(ProtocolErrorKind::InputReportCreationFailed),
                 "No input report mode is supplied.".to_owned()
             ));
         };
         let mut input_report = InputReport::new();
         let Some(id) = InputReportId::from_byte(mode) else {
             return Err(Error::with_message(
-                ErrorKind::ProtocolInputReportCreationFailed,
+                ErrorKind::Protocol(ProtocolErrorKind::InputReportCreationFailed),
                 "Unknown report mode is used for generating input report.".to_owned()
             ));
         };
@@ -368,7 +368,7 @@ impl Protocol {
     ) -> Result<()> {
         let Some(subcommand) = output_report.subcommand() else {
             let err = Error::with_message(
-                ErrorKind::NotImplemented,
+                ErrorKind::Protocol(ProtocolErrorKind::NotImplemented),
                 "Unknown subcommand received.".to_owned()
             );
             self.dispatch_event(Event::Error(err));
@@ -376,7 +376,7 @@ impl Protocol {
         };
         if let Subcommand::Empty = subcommand {
             let err = Error::with_message(
-                ErrorKind::Invariant,
+                ErrorKind::Protocol(ProtocolErrorKind::Invariant),
                 "Received output report does not contain a subcommand".to_owned(),
             );
             self.dispatch_event(Event::Error(err));
@@ -417,7 +417,7 @@ impl Protocol {
             }
             unsupported_subcommand => {
                 let err = Error::with_message(
-                    ErrorKind::NotImplemented,
+                    ErrorKind::Protocol(ProtocolErrorKind::NotImplemented),
                     format!(
                         "Unsupported subcommand: {}, ignoring.",
                         unsupported_subcommand
@@ -548,7 +548,7 @@ impl Protocol {
             }
             _ => {
                 let err = Error::with_message(
-                    ErrorKind::NotImplemented,
+                    ErrorKind::Protocol(ProtocolErrorKind::NotImplemented),
                     format!(
                         "Command {} for Subcommand NFC IR is not implemented.",
                         command

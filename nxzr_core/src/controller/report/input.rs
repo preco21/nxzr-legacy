@@ -1,6 +1,6 @@
 use super::subcommand::Subcommand;
 use crate::controller::ControllerType;
-use crate::{Error, ErrorKind, Result};
+use crate::{Error, ErrorKind, ReportErrorKind, Result};
 use strum::Display;
 
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
@@ -75,10 +75,10 @@ impl InputReport {
 
     pub fn with_raw(data: &[u8]) -> Result<Self> {
         if data.len() < REPORT_MIN_LEN {
-            return Err(Error::new(ErrorKind::TooShort));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::TooShort)));
         }
         let [0xA1, ..] = data else {
-            return Err(Error::new(ErrorKind::Malformed));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::Malformed)));
         };
         Ok(Self { buf: data.to_vec() })
     }
@@ -178,7 +178,7 @@ impl InputReport {
     // Returns `true` if the total data length matches 313
     pub fn set_ir_nfc_data(&mut self, data: &[u8]) -> Result<bool> {
         if data.len() > 313 {
-            return Err(Error::new(ErrorKind::OutOfBounds));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::OutOfBounds)));
         }
         self.buf[50..50 + data.len()].copy_from_slice(data);
         Ok(data.len() == 313)
@@ -214,7 +214,7 @@ impl InputReport {
 
     pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8, data: &[u8]) -> Result<()> {
         if size > 0x1D || data.len() != size.into() {
-            return Err(Error::new(ErrorKind::OutOfBounds));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::OutOfBounds)));
         }
         // Creates input report data with spi flash read subcommand
         self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead);
@@ -243,43 +243,43 @@ impl InputReport {
             match *command {
                 TriggerButtonsElapsedTimeCommand::LeftTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Invariant));
+                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
                     }
                     set(0, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::RightTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Invariant));
+                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
                     }
                     set(2, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::ZLeftTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Invariant));
+                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
                     }
                     set(4, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::ZRightTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Invariant));
+                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
                     }
                     set(6, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::SLeftTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Invariant));
+                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
                     }
                     set(8, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::SRightTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Invariant));
+                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
                     }
                     set(10, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::Home(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Invariant));
+                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
                     }
                     set(12, ms);
                 }

@@ -1,5 +1,5 @@
 use super::subcommand::Subcommand;
-use crate::{Error, ErrorKind, Result};
+use crate::{Error, ErrorKind, ReportErrorKind, Result};
 use strum::Display;
 
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#output-reports
@@ -46,10 +46,10 @@ impl OutputReport {
 
     pub fn with_raw(data: &[u8]) -> Result<Self> {
         if data.len() < REPORT_MIN_LEN {
-            return Err(Error::new(ErrorKind::TooShort));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::TooShort)));
         }
         let [0xA2, ..] = data else {
-            return Err(Error::new(ErrorKind::Malformed));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::Malformed)));
         };
         Ok(Self { buf: data.to_vec() })
     }
@@ -89,7 +89,7 @@ impl OutputReport {
 
     pub fn subcommand_data(&self) -> Result<&[u8]> {
         let Some(slice) = self.buf.get(12..) else {
-            return Err(Error::new(ErrorKind::NoDataAvailable));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::NoDataAvailable)));
         };
         Ok(slice)
     }
@@ -100,7 +100,7 @@ impl OutputReport {
 
     pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> Result<()> {
         if size > 0x1D || u32::from(size) + offset > 0x80000 {
-            return Err(Error::new(ErrorKind::OutOfBounds));
+            return Err(Error::new(ErrorKind::Report(ReportErrorKind::OutOfBounds)));
         }
         // Creates output report data with spi flash read subcommand
         self.set_output_report_id(OutputReportId::SubCommand);
