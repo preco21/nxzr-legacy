@@ -42,29 +42,30 @@ impl ProtocolControl {
         let protocol = Arc::new(Protocol::new(config)?);
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let (internal_close_tx, _) = broadcast::channel(1);
+        let (internal_close_tx, mut internal_close_rx) = broadcast::channel(1);
         let (state_send_tx, state_send_rx) = mpsc::channel(1);
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         let mut set = JoinSet::<Result<()>>::new();
         // Setup protocol events relay
-        set.spawn(create_task(
+        let events_relay_fut = create_task(
             ProtocolControlTask::setup_events_relay(protocol.clone(), msg_tx.clone()),
             internal_close_tx.clone(),
-        ));
+        );
+
         // Setup protocol reader task
-        set.spawn(create_task(
+        let protocol_reader_fut = create_task(
             ProtocolControlTask::setup_reader(transport.clone(), protocol.clone()),
             internal_close_tx.clone(),
-        ));
+        );
         // Setup protocol writer task
-        set.spawn(create_task(
+        let protocol_writer_fut = create_task(
             ProtocolControlTask::setup_writer(transport.clone(), protocol.clone(), state_send_rx),
             internal_close_tx.clone(),
-        ));
+        );
         // Setup protocol connection handler
-        set.spawn({
+        let protocol_conn_handler_fut = {
             let transport = transport.clone();
             let protocol = protocol.clone();
             let mut internal_close_rx = internal_close_tx.subscribe();
@@ -88,14 +89,16 @@ impl ProtocolControl {
                 }
                 drop(connected_rx);
                 empty_report_sender.await.unwrap();
-                Ok(())
+                Result::<()>::Ok(())
             }
-        });
+        };
+        set.spawn(events_relay_fut);
+        set.spawn(protocol_reader_fut);
+        set.spawn(protocol_writer_fut);
+        set.spawn(protocol_conn_handler_fut);
         // Task cleanup handling
         tokio::spawn({
             let transport = transport.clone();
-            let internal_close_tx = internal_close_tx.clone();
-            let mut internal_close_rx = internal_close_tx.clone().subscribe();
             async move {
                 tokio::select! {
                     _ = close_tx.closed() => {
@@ -122,6 +125,7 @@ impl ProtocolControl {
                 protocol,
                 closed_tx,
                 event_sub_tx,
+                state_send_tx,
             },
             ProtocolHandle {
                 _close_rx: close_rx,
@@ -133,29 +137,29 @@ impl ProtocolControl {
     pub async fn update_controller_state(&self) -> Result<()> {
         self.protocol.ready_for_write().await;
         let protocol = self.protocol.clone();
-        let (ready_tx, ready_rx) = oneshot::channel();
-        let fut = async {
-            // FIXME: Test
-            protocol
-                .modify_controller_state(|state| {
-                    if let Err(err) = state
-                        .button_state_mut()
-                        .set_button(crate::controller::state::button::ButtonKey::A, true)
-                    {
-                        println!("{}", err);
-                    };
-                })
-                .await;
-            self.state_send_tx
-                .send(ControllerStateReq { ready_tx })
-                .await
-                .unwrap();
-            ready_rx.await.unwrap();
-        };
-        tokio::select! {
-            _ = fut => {}
-            _ = procotol.recv() => break,
-        }
+        // let (ready_tx, ready_rx) = oneshot::channel();
+        // let fut = async {
+        //     // FIXME: Test
+        //     protocol
+        //         .modify_controller_state(|state| {
+        //             if let Err(err) = state
+        //                 .button_state_mut()
+        //                 .set_button(crate::controller::state::button::ButtonKey::A, true)
+        //             {
+        //                 println!("{}", err);
+        //             };
+        //         })
+        //         .await;
+        //     self.state_send_tx
+        //         .send(ControllerStateReq { ready_tx })
+        //         .await
+        //         .unwrap();
+        //     ready_rx.await.unwrap();
+        // };
+        // tokio::select! {
+        //     _ = fut => {}
+        //     _ = procotol.recv() => break,
+        // }
         Ok(())
     }
 
