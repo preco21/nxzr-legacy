@@ -1,29 +1,24 @@
 use crate::controller::protocol::{Protocol, ProtocolConfig, TransportCombined};
-use crate::Result;
+use crate::{Error, ErrorKind, Result};
+use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
-
-// FIXME
-// #[derive(Debug)]
-// pub struct ProtocolControl<Transport>
-// where
-//     Transport: TransportCombined + Clone + Send + Sync,
-// {
-//     transport: Transport,
-//     protocol: Arc<Protocol>,
-// }
+use tokio::task::JoinSet;
 
 pub trait Transport: TransportCombined + Clone + Send + Sync + 'static {
     fn pause(&self);
 }
 
 #[derive(Debug)]
-struct ControllerStateReq {
+pub(crate) struct ControllerStateSendReq {
     ready_tx: oneshot::Sender<()>,
 }
 
 #[derive(Debug)]
-pub struct ProtocolControl {}
+pub struct ProtocolControl {
+    protocol: Arc<Protocol>,
+    closed_tx: mpsc::Sender<()>,
+}
 
 pub struct ProtocolHandle {
     _close_rx: mpsc::Receiver<()>,
@@ -36,15 +31,107 @@ impl Drop for ProtocolHandle {
 }
 
 impl ProtocolControl {
-    pub fn new(
+    pub fn connect(
         transport: impl Transport,
         config: ProtocolConfig,
     ) -> Result<(Self, ProtocolHandle)> {
         let protocol = Arc::new(Protocol::new(config)?);
         let (close_tx, close_rx) = mpsc::channel(1);
-        let (will_close_tx, _) = broadcast::channel(1);
-        let (controller_state_req_tx, mut controller_state_req_rx) = mpsc::channel(1);
-        let mut handles = vec![];
+        let (closed_tx, closed_rx) = mpsc::channel(1);
+        let (internal_close_tx, _) = broadcast::channel(1);
+        let (ctrl_state_send_req_tx, mut ctrl_state_send_req_rx) = mpsc::channel(1);
+        let mut set = JoinSet::<Result<()>>::new();
+        // Setup protocol reader task
+        set.spawn(create_task(
+            ProtocolControlTask::setup_reader(transport.clone(), protocol.clone()),
+            internal_close_tx.clone(),
+            internal_close_tx.subscribe(),
+        ));
+        // Setup protocol writer task
+        set.spawn(create_task(
+            ProtocolControlTask::setup_writer(
+                transport.clone(),
+                protocol.clone(),
+                ctrl_state_send_req_rx,
+            ),
+            internal_close_tx.clone(),
+            internal_close_tx.subscribe(),
+        ));
+        // Setup protocol connection handler
+        set.spawn(create_task(
+            ProtocolControlTask::setup_writer(
+                transport.clone(),
+                protocol.clone(),
+                ctrl_state_send_req_rx,
+            ),
+            internal_close_tx.clone(),
+            internal_close_tx.subscribe(),
+        ));
+        // Task cleanup handling
+        tokio::spawn({
+            let transport = transport.clone();
+            let internal_close_tx = internal_close_tx.clone();
+            let mut internal_close_rx = internal_close_tx.clone().subscribe();
+            async move {
+                tokio::select! {
+                    _ = close_tx.closed() => {},
+                    _ = internal_close_rx.recv() => {},
+                }
+                transport.pause();
+                let _ = internal_close_tx.send(());
+                // FIXME: Send if there's any error stuff...
+                while let Some(_) = set.join_next().await {}
+                drop(closed_rx);
+            }
+        });
+        protocol.establish_connection();
+        Ok((
+            Self {
+                protocol,
+                closed_tx,
+            },
+            ProtocolHandle {
+                _close_rx: close_rx,
+            },
+        ))
+    }
+
+    pub fn send_controller_state(&self) {
+        // Handler for `ControllerState` updates
+        // let protocol = protocol.clone();
+        // let will_close_tx = will_close_tx.clone();
+        // let mut will_close_rx = will_close_tx.subscribe();
+        // handles.push(tokio::spawn(async move {
+        //     protocol.ready_for_write().await;
+        //     loop {
+        //         let (ready_tx, ready_rx) = oneshot::channel();
+        //         let fut = async {
+        //             // FIXME: Test
+        //             protocol
+        //                 .modify_controller_state(|state| {
+        //                     if let Err(err) = state
+        //                         .button_state_mut()
+        //                         .set_button(crate::controller::state::button::ButtonKey::A, true)
+        //                     {
+        //                         println!("{}", err);
+        //                     };
+        //                 })
+        //                 .await;
+        //             controller_state_req_tx
+        //                 .send(ControllerStateReq { ready_tx })
+        //                 .await
+        //                 .unwrap();
+        //             ready_rx.await.unwrap();
+        //         };
+        //         tokio::select! {
+        //             _ = fut => {}
+        //             _ = will_close_rx.recv() => break,
+        //         }
+        //     }
+        // }));
+    }
+
+    pub fn events(&self) {
         // TODO: 로그는 함수로 빼는게 나을 것 같은데? .events() 그대로 expose
         // {
         //     // Run logger thread.
@@ -61,127 +148,6 @@ impl ProtocolControl {
         //         }
         //     }));
         // }
-        {
-            // For cleanup handling
-            let transport = transport.clone();
-            let will_close_tx = will_close_tx.clone();
-            handles.push(tokio::spawn(async move {
-                close_tx.closed().await;
-                transport.pause();
-                let _ = will_close_tx.send(());
-            }));
-        }
-        {
-            // Protocol reader thread
-            let transport = transport.clone();
-            let protocol = protocol.clone();
-            let will_close_tx = will_close_tx.clone();
-            let mut will_close_rx = will_close_tx.subscribe();
-            handles.push(tokio::spawn(async move {
-                loop {
-                    tokio::select! {
-                        res = protocol.process_read(&transport) => {
-                            match res {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    println!("{}", err);
-                                    let _ = will_close_tx.send(());
-                                }
-                            }
-                        },
-                        _ = will_close_rx.recv() => break,
-                    }
-                }
-            }));
-        }
-        {
-            // Protocol writer thread
-            let transport = transport.clone();
-            let protocol = protocol.clone();
-            let will_close_tx = will_close_tx.clone();
-            let mut will_close_rx = will_close_tx.subscribe();
-            handles.push(tokio::spawn(async move {
-                protocol.ready_for_write().await;
-                loop {
-                    let ready_tx = match controller_state_req_rx.try_recv() {
-                        Ok(ControllerStateReq { ready_tx }) => Some(async move {
-                            let _ = ready_tx.send(());
-                        }),
-                        Err(_) => None,
-                    };
-                    tokio::select! {
-                        res = protocol.process_write(&transport, ready_tx) => {
-                            match res {
-                                Ok(_) => {},
-                                Err(err) => {
-                                    println!("{}", err);
-                                    let _ = will_close_tx.send(());
-                                }
-                            }
-                        },
-                        _ = will_close_rx.recv() => break,
-                    }
-                }
-            }));
-        }
-        // FIXME: Move to other function?
-        {
-            // Handler for `ControllerState` updates
-            let protocol = protocol.clone();
-            let will_close_tx = will_close_tx.clone();
-            let mut will_close_rx = will_close_tx.subscribe();
-            handles.push(tokio::spawn(async move {
-                protocol.ready_for_write().await;
-                loop {
-                    let (ready_tx, ready_rx) = oneshot::channel();
-                    let fut = async {
-                        // FIXME: Test
-                        protocol
-                            .modify_controller_state(|state| {
-                                if let Err(err) = state.button_state_mut().set_button(
-                                    crate::controller::state::button::ButtonKey::A,
-                                    true,
-                                ) {
-                                    println!("{}", err);
-                                };
-                            })
-                            .await;
-                        controller_state_req_tx
-                            .send(ControllerStateReq { ready_tx })
-                            .await
-                            .unwrap();
-                        ready_rx.await.unwrap();
-                    };
-                    tokio::select! {
-                        _ = fut => {}
-                        _ = will_close_rx.recv() => break,
-                    }
-                }
-            }));
-        }
-        // FIXME: Move to other function?
-        {
-            // Connection handler
-            let transport = transport.clone();
-            let protocol = protocol.clone();
-            let will_close_tx = will_close_tx.clone();
-            let mut will_close_rx = will_close_tx.subscribe();
-            handles.push(tokio::spawn(async move {
-                protocol.wait_for_connection(&transport).await;
-                loop {
-                    tokio::select! {
-                        _ = will_close_rx.recv() => break,
-                    }
-                }
-            }));
-        }
-        protocol.establish_connection();
-        Ok((
-            Self {},
-            ProtocolHandle {
-                _close_rx: close_rx,
-            },
-        ))
     }
 
     // 기본적으로 얘가 Err, Ok 같은거 다뤄 줘야 함 + 그럼에도, shutdown 시그널에 의해
@@ -249,5 +215,82 @@ impl ProtocolControl {
 
         // check for join errors then if there's an error return Err()
         //
+    }
+}
+
+pub(crate) struct ProtocolControlTask {}
+
+impl ProtocolControlTask {
+    pub async fn setup_reader(transport: impl Transport, protocol: Arc<Protocol>) -> Result<()> {
+        loop {
+            protocol.process_read(&transport).await?;
+        }
+    }
+
+    pub async fn setup_writer(
+        transport: impl Transport,
+        protocol: Arc<Protocol>,
+        mut ctrl_state_send_req_rx: mpsc::Receiver<ControllerStateSendReq>,
+    ) -> Result<()> {
+        protocol.ready_for_write().await;
+        loop {
+            let ctrl_state_ready_tx = match ctrl_state_send_req_rx.try_recv() {
+                Ok(ControllerStateSendReq { ready_tx }) => Some(async move {
+                    let _ = ready_tx.send(());
+                }),
+                Err(_) => None,
+            };
+            protocol
+                .process_write(&transport, ctrl_state_ready_tx)
+                .await?;
+        }
+    }
+
+    pub async fn setup_connection_handler(
+        transport: impl Transport,
+        protocol: Arc<Protocol>,
+    ) -> Result<()> {
+        let (connected_tx, connected_rx) = mpsc::channel::<()>(1);
+        // 이것만 따로 때서 만들어야 할까?
+        let empty_report_sender = {
+            let protocol = protocol.clone();
+            tokio::spawn(async move {
+                // Send empty input reports for 10 times until the host decides to reply.
+                for _ in 0..10 {
+                    tokio::select! {
+                        // FIXME: interval로 바꿔?
+                        _ = protocol.send_empty_input_report(&transport) => {},
+                        _ = connected_tx.closed() => break,
+                    }
+                }
+            })
+        };
+        protocol.wait_for_connection().await;
+        // FIXME: how to make sure this to be called always?
+        drop(connected_rx);
+        empty_report_sender.await.unwrap();
+        Ok(())
+    }
+}
+
+fn create_task(
+    fut: impl Future<Output = Result<()>>,
+    close_tx: broadcast::Sender<()>,
+    mut close_rx: broadcast::Receiver<()>,
+) -> impl Future<Output = Result<()>> {
+    async move {
+        tokio::select! {
+            res = fut => {
+                match res {
+                    Ok(_) => {},
+                    Err(err) => {
+                        let _ = close_tx.send(());
+                        return Err(Error::new(ErrorKind::ProtocolControlExited(Box::new(err))))
+                    }
+                }
+            },
+            _ = close_rx.recv() => {},
+        }
+        Ok(())
     }
 }
