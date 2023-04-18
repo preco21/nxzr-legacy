@@ -1,4 +1,5 @@
 use crate::controller::protocol::{self, Protocol, ProtocolConfig, TransportCombined};
+use crate::controller::state::ControllerState;
 use crate::event::setup_event;
 use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use std::future::Future;
@@ -20,6 +21,7 @@ pub(crate) struct StateSendReq {
 pub struct ProtocolControl {
     protocol: Arc<Protocol>,
     state_send_tx: mpsc::Sender<StateSendReq>,
+    term_tx: mpsc::Sender<()>,
     closed_tx: mpsc::Sender<()>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
@@ -96,6 +98,7 @@ impl ProtocolControl {
         set.spawn(protocol_reader_fut);
         set.spawn(protocol_writer_fut);
         set.spawn(protocol_conn_handler_fut);
+        let (term_tx, term_rx) = mpsc::channel(1);
         // Task cleanup handling
         tokio::spawn({
             let transport = transport.clone();
@@ -109,6 +112,9 @@ impl ProtocolControl {
                         transport.pause();
                     },
                 }
+                // This will allow the support methods to get notified when the
+                // actual close happens on either of shutdown channels resolved.
+                drop(term_rx);
                 while let Some(res) = set.join_next().await {
                     if let Ok(inner) = res {
                         if let Err(err) = inner {
@@ -123,6 +129,7 @@ impl ProtocolControl {
         Ok((
             Self {
                 protocol,
+                term_tx,
                 closed_tx,
                 event_sub_tx,
                 state_send_tx,
@@ -134,32 +141,24 @@ impl ProtocolControl {
     }
 
     // Update controller state in-place and wait for it to complete.
-    pub async fn update_controller_state(&self) -> Result<()> {
+    pub async fn update_controller_state(
+        &self,
+        f: impl FnOnce(&mut ControllerState),
+    ) -> Result<()> {
         self.protocol.ready_for_write().await;
-        let protocol = self.protocol.clone();
-        // let (ready_tx, ready_rx) = oneshot::channel();
-        // let fut = async {
-        //     // FIXME: Test
-        //     protocol
-        //         .modify_controller_state(|state| {
-        //             if let Err(err) = state
-        //                 .button_state_mut()
-        //                 .set_button(crate::controller::state::button::ButtonKey::A, true)
-        //             {
-        //                 println!("{}", err);
-        //             };
-        //         })
-        //         .await;
-        //     self.state_send_tx
-        //         .send(ControllerStateReq { ready_tx })
-        //         .await
-        //         .unwrap();
-        //     ready_rx.await.unwrap();
-        // };
-        // tokio::select! {
-        //     _ = fut => {}
-        //     _ = procotol.recv() => break,
-        // }
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let fut = async {
+            self.protocol.modify_controller_state(f).await;
+            self.state_send_tx
+                .send(StateSendReq { ready_tx })
+                .await
+                .unwrap();
+            let _ = ready_rx.await;
+        };
+        tokio::select! {
+            _ = fut => {}
+            _ = self.term_tx.closed() => {},
+        }
         Ok(())
     }
 
