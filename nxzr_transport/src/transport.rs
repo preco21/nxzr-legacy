@@ -147,14 +147,8 @@ impl TransportInner {
             event_mask: [1 << 0x1b, 0],
             opcode: 0,
         })?;
-        let num_flow_control = match config.num_flow_control {
-            Some(num) => num,
-            None => DEFAULT_FLOW_CONTROL,
-        };
-        let read_buf_size = match config.read_buf_size {
-            Some(num) => num,
-            None => DEFAULT_READ_BUF_SIZE,
-        };
+        let num_flow_control = config.num_flow_control.unwrap_or(DEFAULT_FLOW_CONTROL);
+        let read_buf_size = config.read_buf_size.unwrap_or(DEFAULT_READ_BUF_SIZE);
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;

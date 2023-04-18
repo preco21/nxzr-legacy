@@ -198,12 +198,9 @@ impl InputReport {
         fm_version: Option<[u8; 2]>,
         controller_type: ControllerType,
     ) -> Result<()> {
-        let fm_version_u = match fm_version {
-            Some(version) => version,
-            None => [0x04, 0x00],
-        };
+        let fm_version = fm_version.unwrap_or([0x04, 0x00]);
         self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo);
-        self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version_u);
+        self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version);
         self.buf[SUBCOMMAND_OFFSET + 2] = controller_type.id();
         self.buf[SUBCOMMAND_OFFSET + 3] = 0x02;
         self.buf[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);

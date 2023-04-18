@@ -86,10 +86,7 @@ impl StickState {
         let Some(ref stick_cal) = self.stick_cal else {
             return Err(Error::new(ErrorKind::State(StateErrorKind::NoCalibrationDataAvailable)));
         };
-        let radius = match radius {
-            Some(radius) => radius,
-            None => 0,
-        };
+        let radius = radius.unwrap_or(0);
         Ok((stick_cal.h_center - radius <= self.h_stick)
             && (self.h_stick <= stick_cal.h_center + radius)
             && (stick_cal.v_center - radius <= self.v_stick)

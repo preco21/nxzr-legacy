@@ -245,11 +245,7 @@ impl Protocol {
         }
         self.state.modify(|state| {
             state.report_mode = mode;
-            let is_pairing = match is_pairing {
-                Some(flag) => flag,
-                None => state.is_pairing,
-            };
-            if is_pairing {
+            if is_pairing.unwrap_or(state.is_pairing) {
                 state.send_delay = 1.0 / 15.0;
             } else {
                 let delay = SendDelay::new(mode).to_byte();

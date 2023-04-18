@@ -28,17 +28,10 @@ pub struct Session {
 
 impl Session {
     pub fn new(config: SessionConfig) -> Result<Self> {
-        let control_psm = match config.control_psm {
-            Some(psm) => psm,
-            None => DEFAULT_CTL_PSM,
-        };
-        let interrupt_psm = match config.interrupt_psm {
-            Some(psm) => psm,
-            None => DEFAULT_ITR_PSM,
-        };
+        let control_psm = config.control_psm.unwrap_or(DEFAULT_CTL_PSM);
+        let interrupt_psm = config.interrupt_psm.unwrap_or(DEFAULT_ITR_PSM);
         let ctl_sock = LazySeqPacketListener::new()?;
         ctl_sock.set_reuse_addr()?;
-
         let itr_sock = LazySeqPacketListener::new()?;
         ctl_sock.set_reuse_addr()?;
 
