@@ -9,7 +9,7 @@ use super::{
     state::ControllerState,
     ControllerType,
 };
-use crate::{Error, ErrorKind, InternalErrorKind, ProtocolErrorKind, Result};
+use crate::{event::setup_event, Error, ErrorKind, InternalErrorKind, ProtocolErrorKind, Result};
 use async_trait::async_trait;
 use std::{future::Future, sync::Mutex, time::Duration};
 use strum::{Display, IntoStaticStr};
@@ -607,18 +607,18 @@ impl Protocol {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum Event {
+    Log(LogType),
+    Error(Error),
+}
+
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum LogType {
     PairingSuccessful,
     WriteWhilePaused,
     RepetitiveSetOfReportMode,
     SubcommandReceived(Subcommand),
-}
-
-#[derive(Debug, Clone)]
-pub enum Event {
-    Log(LogType),
-    Error(Error),
 }
 
 #[derive(Debug)]
@@ -628,58 +628,5 @@ pub struct SubscriptionReq {
 }
 
 impl Event {
-    pub fn handle_events(
-        mut msg_rx: mpsc::UnboundedReceiver<Event>,
-        mut sub_rx: mpsc::Receiver<SubscriptionReq>,
-    ) -> Result<()> {
-        tokio::spawn(async move {
-            struct Subscription {
-                tx: mpsc::UnboundedSender<Event>,
-            }
-            let mut subs: Vec<Subscription> = vec![];
-            loop {
-                tokio::select! {
-                    msg = msg_rx.recv(), if subs.len() > 0 => {
-                        match msg {
-                            Some(evt) => {
-                                subs.retain(|sub| sub.tx.send(evt.clone()).is_ok());
-                            }
-                            None => break,
-                        }
-                    },
-                    sub_opts = sub_rx.recv() => {
-                        match sub_opts {
-                            Some(SubscriptionReq { tx, ready_tx }) => {
-                                let _ = ready_tx.send(());
-                                subs.push(Subscription { tx });
-                            }
-                            None => break,
-                        };
-                    },
-                }
-            }
-        });
-        Ok(())
-    }
-
-    pub async fn subscribe(
-        sub_tx: &mut mpsc::Sender<SubscriptionReq>,
-    ) -> Result<mpsc::UnboundedReceiver<Event>> {
-        let (tx, rx) = mpsc::unbounded_channel();
-        let (ready_tx, ready_rx) = oneshot::channel();
-        sub_tx
-            .send(SubscriptionReq { tx, ready_tx })
-            .await
-            .map_err(|_| {
-                Error::new(ErrorKind::Internal(
-                    InternalErrorKind::EventSubscriptionFailed,
-                ))
-            })?;
-        ready_rx.await.map_err(|_| {
-            Error::new(ErrorKind::Internal(
-                InternalErrorKind::EventSubscriptionFailed,
-            ))
-        })?;
-        Ok(rx)
-    }
+    setup_event!();
 }

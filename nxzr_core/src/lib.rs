@@ -2,6 +2,7 @@ use std::time::Duration;
 use strum::{Display, IntoStaticStr};
 
 pub mod controller;
+pub mod event;
 pub mod protocol_control;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
