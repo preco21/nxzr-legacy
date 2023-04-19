@@ -62,7 +62,7 @@ impl Shared {
         self.state.lock().unwrap().clone()
     }
 
-    pub fn modify<R>(&self, mut f: impl FnOnce(&mut State) -> R) -> R {
+    pub fn modify<R>(&self, f: impl FnOnce(&mut State) -> R) -> R {
         let mut write_lock = self.state.lock().unwrap();
         f(&mut write_lock)
     }
@@ -77,7 +77,7 @@ impl Shared {
         state.controller_state = controller_state;
     }
 
-    pub fn modify_controller_state(&self, mut f: impl FnOnce(&mut ControllerState)) {
+    pub fn modify_controller_state(&self, f: impl FnOnce(&mut ControllerState)) {
         let mut write_lock = self.state.lock().unwrap();
         f(&mut write_lock.controller_state)
     }
