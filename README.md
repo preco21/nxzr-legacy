@@ -11,7 +11,7 @@
 
 ## Troubleshooting
 
-## `.cargo/config.toml` is not respected
+### `.cargo/config.toml` is not respected
 
 At the time of writing, Rust Workspaces feature doesn't respect per-workspace `.cargo/config.toml`. So, you will want to directly move into each crate instead to run build:
 
@@ -28,5 +28,22 @@ You may want to open each workspace per editor since rust-analyzer does not work
 
 Opening the entire project in VSCode may fail to run `cargo check` internally due to the target platform mismatches.
 
+Due to this issue, running `rust-analyzer` check on the root is disabled for binaries like `nxzr_gui`, `nxzr_server`.
+
+Open the project directly to work with those:
+
+```shell
+code nxzr_server
+```
+
 Tracking issues:
 - https://github.com/rust-lang/rust-analyzer/issues/11900
+
+### `cargo check` fails
+
+Make sure to install required components:
+
+```shell
+rustup component add rustfmt
+rustup component add clippy
+```
