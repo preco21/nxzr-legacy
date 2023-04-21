@@ -10,8 +10,14 @@ edition = "2021"
 publish = false
 
 [dependencies]
-bluer = { version = "0.15.7", features = ["full"] }
-dbus = { version = "0.9.7", features = ["vendored"] }
+# Making these dependencies optional allows cross-platform development on
+# platforms other than `linux`.
+bluer = { version = "0.15.7", features = ["full"], optional = true }
+dbus = { version = "0.9.7", features = ["vendored"], optional = true }
 libc = "0.2.140"
 strum = { version = "0.24.1", features = ["derive"] }
 tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
+
+[target.'cfg(linux)'.dependencies]
+bluer = { version = "0.15.7", features = ["full"] }
+dbus = { version = "0.9.7", features = ["vendored"] }
