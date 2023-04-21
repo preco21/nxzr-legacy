@@ -12,12 +12,12 @@ publish = false
 [dependencies]
 # Making these dependencies optional allows cross-platform development on
 # platforms other than `linux`.
-bluer = { version = "0.15.7", features = ["full"], optional = true }
+bluer = { version = "0.15.7", features = ["l2cap"], optional = true }
 dbus = { version = "0.9.7", features = ["vendored"], optional = true }
 libc = "0.2.140"
 strum = { version = "0.24.1", features = ["derive"] }
 tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
 
 [target.'cfg(linux)'.dependencies]
-bluer = { version = "0.15.7", features = ["full"] }
+bluer = { version = "0.15.7", features = ["l2cap"] }
 dbus = { version = "0.9.7", features = ["vendored"] }

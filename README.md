@@ -26,12 +26,18 @@ Tracking issues:
 
 You may want to open each workspace per editor since rust-analyzer does not work well with VSCode Workspaces feature.
 
-Opening the entire project as a whole in VSCode may fail to run `cargo check` internally due to the target platform mismatches.
+Due to platform mismatches, some dependencies are marked as "optional" for some crates.
 
-Open the project directly to work with those:
+Because of the this, opening the entire project as a whole in VSCode might fail to run `cargo check` internally.
+
+In order to work with cross-compiling projects, you will want to use [`cross`](https://github.com/cross-rs/cross) instead.
+
+Make sure the [Docker daemon](https://www.docker.com/) is running on your system which allows you to cross-compile projects.
+
+Then, open a project directly to work with `cross`:
 
 ```shell
-code nxzr_server
+code nxzr_transport
 ```
 
 Tracking issues:
@@ -47,6 +53,7 @@ rustup component add rustfmt
 rustup component add clippy
 ```
 
-The project includes multi-target crates, so it may fail to build when commands like `cargo check` is executed on the project root.
+This project includes multi compilation targets, so it may fail to build when
+commands like `cargo check` is executed on the project root.
 
-Make sure to run `cargo check` on sub-directory not the root.
+Please refer to "Caveats when using VSCode Workspaces feature" section above if you want to cross-compile projects.
