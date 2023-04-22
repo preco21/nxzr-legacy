@@ -40,6 +40,8 @@ impl Session {
         // let ctl_sock = l2cap::SeqPacketListener::bind();
         // let itr_sock =
         // Self { ctl_sock, itr_sock }
+        // FIXME: https://www.ibm.com/docs/en/ztpf/1.1.0.15?topic=apis-setsockopt-set-options-associated-socket
+        // SO_SNDBUF
     }
 
     pub fn bind() -> Result<()> {}
