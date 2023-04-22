@@ -1,22 +1,23 @@
 use super::{spi_flash::SpiFlash, ControllerType};
 use button::ButtonState;
 use stick::{StickCalibration, StickState, StickStateConfig};
-use strum::{Display, IntoStaticStr};
+use thiserror::Error;
 
 pub mod button;
 pub mod stick;
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+#[derive(Clone, Error, Debug)]
 pub enum StateError {
     // Invalid value range has been entered.
+    #[error("invalid value range supplied")]
     InvalidRange,
     // There is no calibration data available.
+    #[error("no calibration data is supplied, unable to call the method")]
     NoCalibrationDataAvailable,
     // The button is not available for the controller of choice.
+    #[error("given button is not available")]
     ButtonNotAvailable,
 }
-
-impl std::error::Error for StateError {}
 
 #[derive(Debug, Default)]
 pub struct ControllerStateConfig {

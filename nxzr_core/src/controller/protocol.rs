@@ -10,97 +10,63 @@ use super::{
     state::ControllerState,
     ControllerType,
 };
-use crate::event::{self, setup_event, EventError};
+use crate::event::{setup_event, EventError};
 use async_trait::async_trait;
 use std::{future::Future, sync::Mutex, time::Duration};
 use strum::{Display, IntoStaticStr};
+use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch, Notify},
     time,
 };
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ProtocolError {
-    pub kind: ProtocolErrorKind,
-    pub message: String,
-}
-
-#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum ProtocolErrorKind {
-    General(ProtocolGeneralErrorKind),
-    Internal(ProtocolInternalErrorKind),
-}
-
-#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum ProtocolGeneralErrorKind {
-    // Failed to parse output report.
-    OutputReportParsingFailed,
-    // Failed to create input report.
+#[derive(Clone, Error, Debug)]
+pub enum ProtocolError {
+    #[error("failed to parse output report from raw buffer, ignoring")]
+    OutputReportParseFailed,
+    #[error("failed to parse `id` from output report (maybe unknown?), ignoring")]
+    OutputReportIdParseFailed,
+    #[error("no input report mode is supplied")]
+    NoInputReportModeSupplied,
+    #[error("failed to create input report from given data")]
     InputReportCreationFailed,
-    // Write operation in protocol is too slow.
+    #[error("unknown report mode is used for generating input report")]
+    UnknownInputReportMode,
+    #[error("write operation is slower than usual: {0:?}, ignoring")]
     WriteTooSlow(Duration),
-    // Returned if invariant violation happens.
-    Invariant,
-    // Feature is not implemented.
-    NotImplemented,
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
+    #[error("invariant violation: {0}")]
+    Invariant(String),
+    #[error("internal error: {0}")]
+    Internal(ProtocolInternalError),
 }
 
-#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum ProtocolInternalErrorKind {
-    Report(ReportError),
+#[derive(Clone, Error, Debug)]
+pub enum ProtocolInternalError {
+    #[error("io: {0}")]
     Io(std::io::ErrorKind),
-    Event(event::EventError),
-}
-
-impl ProtocolError {
-    pub(crate) fn new(kind: ProtocolErrorKind) -> Self {
-        Self {
-            kind,
-            message: String::new(),
-        }
-    }
-
-    pub(crate) fn with_message(kind: ProtocolErrorKind, message: String) -> Self {
-        Self { kind, message }
-    }
-}
-
-impl std::fmt::Display for ProtocolError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if self.message.is_empty() {
-            write!(f, "{}", &self.kind)
-        } else {
-            write!(f, "{}: {}", &self.kind, &self.message)
-        }
-    }
-}
-
-impl std::error::Error for ProtocolError {}
-
-impl From<ReportError> for ProtocolError {
-    fn from(err: ReportError) -> Self {
-        Self {
-            kind: ProtocolErrorKind::ReportError(err),
-            message: err.to_string(),
-        }
-    }
+    #[error("event: {0}")]
+    Event(EventError),
+    #[error("report: {0}")]
+    Report(ReportError),
 }
 
 impl From<std::io::Error> for ProtocolError {
     fn from(err: std::io::Error) -> Self {
-        Self {
-            kind: ProtocolErrorKind::Io(err.kind()),
-            message: err.to_string(),
-        }
+        Self::Internal(ProtocolInternalError::Io(err.kind()))
     }
 }
 
-impl From<event::EventError> for ProtocolError {
-    fn from(err: event::EventError) -> Self {
-        Self {
-            kind: ProtocolErrorKind::EventError(err),
-            message: err.to_string(),
-        }
+impl From<EventError> for ProtocolError {
+    fn from(err: EventError) -> Self {
+        Self::Internal(ProtocolInternalError::Event(err))
+    }
+}
+
+impl From<ReportError> for ProtocolError {
+    fn from(err: ReportError) -> Self {
+        Self::Internal(ProtocolInternalError::Report(err))
     }
 }
 
@@ -248,20 +214,12 @@ impl Protocol {
         let output_report = match OutputReport::with_raw(buf) {
             Ok(output_report) => output_report,
             Err(_) => {
-                let err = ProtocolError::with_message(
-                    ProtocolErrorKind::OutputReportParsingFailed,
-                    "Failed to parse output report, ignoring.".to_owned(),
-                );
-                self.dispatch_event(Event::Error(err));
+                self.dispatch_event(Event::Error(ProtocolError::OutputReportParseFailed));
                 return Ok(());
             }
         };
         let Some(output_report_id) = output_report.output_report_id() else {
-            let err = ProtocolError::with_message(
-                ProtocolErrorKind::OutputReportParsingFailed,
-                "Failed to parse `id` from output report (maybe unknown?), ignoring.".to_owned(),
-            );
-            self.dispatch_event(Event::Error(err));
+            self.dispatch_event(Event::Error(ProtocolError::OutputReportIdParseFailed));
             return Ok(());
         };
         match output_report_id {
@@ -272,11 +230,9 @@ impl Protocol {
                 // noop: Rumble
             }
             OutputReportId::RequestIrNfcMcu => {
-                let err = ProtocolError::with_message(
-                    ProtocolErrorKind::NotImplemented,
-                    "Attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring.".to_owned(),
-                );
-                self.dispatch_event(Event::Error(err));
+                self.dispatch_event(Event::Error(
+                    ProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring".to_owned()
+                )));
             }
         }
         Ok(())
@@ -306,14 +262,7 @@ impl Protocol {
                 Some(delay) => delay,
                 None => {
                     let slow_duration = elapsed - send_delay;
-                    let err = ProtocolError::with_message(
-                ProtocolErrorKind::WriteTooSlow(slow_duration),
-                format!(
-                    "Write operation is taking longer than usual to complete: {:?}, skipping the write.",
-                    slow_duration
-                ),
-            );
-                    self.dispatch_event(Event::Error(err));
+                    self.dispatch_event(Event::Error(ProtocolError::WriteTooSlow(slow_duration)));
                     return Ok(());
                 }
             };
@@ -325,11 +274,9 @@ impl Protocol {
     fn set_report_mode(&self, mode: Option<u8>, is_pairing: Option<bool>) {
         if let Some(mode) = mode {
             if mode == 0x21 {
-                let err = ProtocolError::with_message(
-                    ProtocolErrorKind::Invariant,
-                    "Unexpectedly setting report mode for standard input reports.".to_owned(),
-                );
-                self.dispatch_event(Event::Error(err));
+                self.dispatch_event(Event::Error(ProtocolError::Invariant(
+                    "unexpectedly setting report mode for standard input reports.".to_owned(),
+                )));
             }
         }
         self.state.modify(|state| {
@@ -341,14 +288,10 @@ impl Protocol {
                 match delay {
                     Some(delay) => state.send_delay = delay,
                     None => {
-                        let err = ProtocolError::with_message(
-                            ProtocolErrorKind::Invariant,
-                            format!(
-                                "Unknown delay for report mode {:?}, assuming it as 1/15.",
-                                mode
-                            ),
-                        );
-                        self.dispatch_event(Event::Error(err));
+                        self.dispatch_event(Event::Error(ProtocolError::Invariant(format!(
+                            "unknown delay for report mode {:?}, assuming it as 1/15.",
+                            mode
+                        ))));
                         state.send_delay = 1.0 / 15.0;
                     }
                 };
@@ -391,24 +334,16 @@ impl Protocol {
             None => state.report_mode,
         };
         if self.controller != state.controller_state.controller() {
-            return Err(ProtocolError::with_message(
-                ProtocolErrorKind::Invariant,
-                "Supplied controller type in ControllerState does not match with one passed on Protocol init."
-                    .to_owned(),
-            ));
+            return Err(
+                ProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one passed on `Protocol` init.".to_owned())
+            );
         }
         let Some(mode) = mode else {
-            return Err(ProtocolError::with_message(
-                ProtocolErrorKind::InputReportCreationFailed,
-                "No input report mode is supplied.".to_owned()
-            ));
+            return Err(ProtocolError::NoInputReportModeSupplied);
         };
         let mut input_report = InputReport::new();
         let Some(id) = InputReportId::from_byte(mode) else {
-            return Err(ProtocolError::with_message(
-                ProtocolErrorKind::InputReportCreationFailed,
-                "Unknown report mode is used for generating input report.".to_owned()
-            ));
+            return Err(ProtocolError::UnknownInputReportMode);
         };
         input_report.set_input_report_id(id);
         match id {
@@ -452,19 +387,15 @@ impl Protocol {
         output_report: &OutputReport,
     ) -> Result<(), ProtocolError> {
         let Some(subcommand) = output_report.subcommand() else {
-            let err = ProtocolError::with_message(
-                ProtocolErrorKind::NotImplemented,
-                "Unknown subcommand received.".to_owned()
-            );
-            self.dispatch_event(Event::Error(err));
+            self.dispatch_event(Event::Error(
+                ProtocolError::NotImplemented("unknown subcommand received.".to_owned())
+            ));
             return Ok(())
         };
         if let Subcommand::Empty = subcommand {
-            let err = ProtocolError::with_message(
-                ProtocolErrorKind::Invariant,
-                "Received output report does not contain a subcommand".to_owned(),
-            );
-            self.dispatch_event(Event::Error(err));
+            self.dispatch_event(Event::Error(ProtocolError::Invariant(
+                "received output report does not contain a subcommand".to_owned(),
+            )));
         }
         self.dispatch_event(Event::Log(LogType::SubcommandReceived(subcommand)));
         let sub_command_data = output_report.subcommand_data()?;
@@ -501,14 +432,10 @@ impl Protocol {
                 self.command_enable_vibration(&mut response_report);
             }
             unsupported_subcommand => {
-                let err = ProtocolError::with_message(
-                    ProtocolErrorKind::NotImplemented,
-                    format!(
-                        "Unsupported subcommand: {}, ignoring.",
-                        unsupported_subcommand
-                    ),
-                );
-                self.dispatch_event(Event::Error(err));
+                self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
+                    "unsupported subcommand: {}, ignoring.",
+                    unsupported_subcommand
+                ))));
                 return Ok(());
             }
         }
@@ -638,14 +565,10 @@ impl Protocol {
                 input_report.set_reply_to_subcommand_id(Subcommand::SetNfcIrMcuState);
             }
             _ => {
-                let err = ProtocolError::with_message(
-                    ProtocolErrorKind::NotImplemented,
-                    format!(
-                        "Command {} for Subcommand NFC IR is not implemented.",
-                        command
-                    ),
-                );
-                self.dispatch_event(Event::Error(err));
+                self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
+                    "command {} for Subcommand NFC IR is not implemented.",
+                    command
+                ))));
             }
         }
     }

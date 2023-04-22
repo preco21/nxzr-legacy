@@ -1,11 +1,10 @@
-use strum::{Display, IntoStaticStr};
+use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+#[derive(Clone, Error, Debug)]
 pub enum EventError {
+    #[error("failed to subscribe events")]
     SubscriptionFailed,
 }
-
-impl std::error::Error for EventError {}
 
 macro_rules! setup_event {
     () => {
