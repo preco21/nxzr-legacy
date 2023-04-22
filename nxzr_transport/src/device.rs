@@ -1,5 +1,5 @@
 const HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
-const HID_PATH: &str = "/bluez/nxzr/controller";
+const HID_PATH: &str = "/org/bluez/nxzr/dev";
 
 #[derive(Debug)]
 pub struct ControllerDevice;

@@ -1,6 +1,7 @@
 use crate::event::{setup_event, EventError};
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::hci;
+use bluer::l2cap;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -185,6 +186,8 @@ pub(crate) struct TransportInner {
 
 impl TransportInner {
     pub async fn new(
+        itr_sock: l2cap::SeqPacket,
+        ctl_sock: l2cap::SeqPacket,
         config: TransportConfig,
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
@@ -213,6 +216,8 @@ impl TransportInner {
         Ok(Self {
             write_window,
             write_lock,
+            itr_sock,
+            ctl_sock,
             running_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
             closed_tx,
@@ -257,7 +262,7 @@ impl TransportInner {
         self.running().await;
         self.write_sem.acquire_forget().await?;
         self.writable().await;
-        // TODO: ITR send
+        self.itr_sock.send(buf).await?;
         Ok(())
     }
 
