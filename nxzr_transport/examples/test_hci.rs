@@ -8,20 +8,23 @@ use tokio::{
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+// NOTE: To test HCI sockets properly, you must run this example as "root".
+// You can test the example with following commands:
+// sudo hcitool -i hci0 cmd 0x04 0x0008 04 13 05 01 01 00 01 00
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let local_sa = SocketAddr::new(0);
     let dg = Datagram::bind(local_sa).await?;
-    dg.as_ref().set_filter(Filter {
-        type_mask: 0xffffffff,
-        event_mask: [0xffffffff, 0xffffffff],
-        opcode: 0,
-    })?;
     // dg.as_ref().set_filter(Filter {
-    //     type_mask: 1 << 0x04,
-    //     event_mask: [1 << 0x13, 0],
+    //     type_mask: 0xffffffff,
+    //     event_mask: [0xffffffff, 0xffffffff],
     //     opcode: 0,
     // })?;
+    dg.as_ref().set_filter(Filter {
+        type_mask: 1 << 0x04,
+        event_mask: [1 << 0x13, 0],
+        opcode: 0,
+    })?;
 
     println!("Listening on local... Press enter to quit.");
     let stdin = BufReader::new(tokio::io::stdin());
@@ -41,6 +44,7 @@ async fn main() -> Result<()> {
                     },
                     Ok(n) => {
                         let buf = &buf[..n];
+                        println!("{buf:?}");
                         println!("Received {} bytes", buf.len());
                     },
                     Err(err) => {
