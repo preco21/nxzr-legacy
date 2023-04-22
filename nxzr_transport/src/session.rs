@@ -1,16 +1,14 @@
-use crate::{
-    sock::{self, l2cap::LazySeqPacketListener},
-    Result,
-};
+use crate::sock::{self, l2cap::LazySeqPacketListener};
 use bluer::l2cap::{self, SocketAddr};
 use std::os::fd::AsRawFd;
 use strum::{Display, IntoStaticStr};
+use thiserror::Error;
 
 const DEFAULT_CTL_PSM: u32 = 17;
 const DEFAULT_ITR_PSM: u32 = 19;
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum SessionErrorKind {
+#[derive(Clone, Error, Debug)]
+pub enum SessionError {
     Unknown,
 }
 
@@ -27,7 +25,7 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(config: SessionConfig) -> Result<Self> {
+    pub fn new(config: SessionConfig) -> Result<Self, SessionError> {
         let control_psm = config.control_psm.unwrap_or(DEFAULT_CTL_PSM);
         let interrupt_psm = config.interrupt_psm.unwrap_or(DEFAULT_ITR_PSM);
         let ctl_sock = LazySeqPacketListener::new()?;

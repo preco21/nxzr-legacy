@@ -1,7 +1,5 @@
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/sock.rs#L1
-
 //! System socket base.
-
 use libc::{c_int, sockaddr, socklen_t, Ioctl, SOCK_CLOEXEC, SOCK_NONBLOCK};
 use std::{
     fmt::Debug,

@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::sleep;
 
-const DEFAULT_FLOW_CONTROL: usize = 4;
+const DEFAULT_FLOW_CONTROL_PERMITS: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
 
 #[derive(Clone, Error, Debug)]
@@ -173,6 +173,8 @@ impl Drop for TransportHandle {
 pub(crate) struct TransportInner {
     write_window: hci::Datagram,
     write_lock: hci::Datagram,
+    itr_sock: l2cap::SeqPacket,
+    ctl_sock: l2cap::SeqPacket,
     running_tx: watch::Sender<bool>,
     writing_tx: watch::Sender<bool>,
     write_sem: Arc<BoundedSemaphore>,
@@ -201,7 +203,9 @@ impl TransportInner {
             event_mask: [1 << 0x1b, 0],
             opcode: 0,
         })?;
-        let num_flow_control = config.num_flow_control.unwrap_or(DEFAULT_FLOW_CONTROL);
+        let num_flow_control = config
+            .num_flow_control
+            .unwrap_or(DEFAULT_FLOW_CONTROL_PERMITS);
         let read_buf_size = config.read_buf_size.unwrap_or(DEFAULT_READ_BUF_SIZE);
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
