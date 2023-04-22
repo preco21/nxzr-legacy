@@ -8,13 +8,13 @@ pub mod protocol_control;
 
 #[derive(Clone, Error, Debug)]
 pub enum Error {
-    #[error("report error: {0}")]
+    #[error(transparent)]
     Report(#[from] ReportError),
-    #[error("state error: {0}")]
+    #[error(transparent)]
     State(#[from] StateError),
-    #[error("protocol error: {0}")]
+    #[error(transparent)]
     Protocol(#[from] ProtocolError),
-    #[error("event error: {0}")]
+    #[error(transparent)]
     Event(#[from] EventError),
 }
 
