@@ -19,6 +19,6 @@ strum = { version = "0.24.1", features = ["derive"] }
 thiserror = "1.0.40"
 tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
 
-[target.'cfg(linux)'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 bluer = { version = "0.15.7", features = ["l2cap"] }
 dbus = { version = "0.9.7", features = ["vendored"] }
