@@ -1,7 +1,6 @@
 use crate::event::{setup_event, EventError};
 use crate::semaphore::BoundedSemaphore;
-use crate::sock::hci;
-use bluer::l2cap;
+use crate::sock::{hci, l2cap};
 use bytes::{Bytes, BytesMut};
 use std::future::Future;
 use std::sync::Arc;
@@ -191,6 +190,9 @@ impl TransportInner {
         config: TransportConfig,
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
+        // Reset `SO_SNDBUF` of the given client sockets.
+        itr_sock.reset_sndbuf()?;
+        ctl_sock.reset_sndbuf()?;
         // Device ids must be targeting to the local machine.
         let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
         // 0x04 = HCI_EVT; 0x13 = Number of completed packets

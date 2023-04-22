@@ -23,7 +23,7 @@ use crate::sock::{
 use libc::{
     AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_DGRAM,
     SOCK_SEQPACKET, SOCK_STREAM, SOL_BLUETOOTH, SOL_SOCKET, SO_ERROR, SO_RCVBUF, SO_REUSEADDR,
-    TIOCINQ, TIOCOUTQ,
+    SO_SNDBUF, TIOCINQ, TIOCOUTQ,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
@@ -539,6 +539,11 @@ impl Socket<SeqPacket> {
         })
     }
 
+    // Sets `SO_REUSEADDR` socket option to `1`.
+    pub fn enable_reuse_addr(&self) -> Result<()> {
+        sock::setsockopt(self.fd.get_ref(), SOL_SOCKET, SO_REUSEADDR, &1)
+    }
+
     /// Convert the socket into a [SeqPacketListener].
     ///
     /// `backlog` defines the maximum number of pending connections are queued by the operating system
@@ -551,6 +556,20 @@ impl Socket<SeqPacket> {
                 .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid backlog"))?,
         )?;
         Ok(SeqPacketListener { socket: self })
+    }
+
+    // Listen on the socket.
+    //
+    // `backlog` defines the maximum number of pending connections are queued by the operating system
+    // at any given time.
+    pub fn listen_on(&self, backlog: u32) -> Result<()> {
+        sock::listen(
+            self.fd.get_ref(),
+            backlog
+                .try_into()
+                .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid backlog"))?,
+        )?;
+        Ok(())
     }
 
     /// Establish a sequential packet connection with a peer at the specified socket address.
@@ -892,6 +911,15 @@ impl SeqPacket {
         socket.connect(addr).await
     }
 
+    /// Resets `SO_SNDBUF` value to `0`
+    pub fn reset_sndbuf(&self) -> Result<()> {
+        // Resetting socket option `SO_SNDBUF` to `0` let the OS to set the
+        // value to its default like `4608`.
+        // Ref: https://www.ibm.com/docs/en/ztpf/1.1.0.15?topic=apis-setsockopt-set-options-associated-socket
+        let owned_fd = unsafe { OwnedFd::new(self.socket.as_raw_fd()) };
+        sock::setsockopt(&owned_fd, SOL_SOCKET, SO_SNDBUF, &0)
+    }
+
     /// Gets the peer address of this stream.
     pub fn peer_addr(&self) -> Result<SocketAddr> {
         self.socket.peer_addr_priv()
@@ -1135,62 +1163,62 @@ impl FromRawFd for Datagram {
 
 #[derive(Debug)]
 pub struct LazySeqPacketListener {
-    listener: SeqPacketListener,
+    socket: Socket<SeqPacket>,
 }
 
 impl LazySeqPacketListener {
+    // Creates a new Listener without immediate binding.
     pub fn new() -> Result<Self> {
         let socket = Socket::<SeqPacket>::new_seq_packet()?;
-        let listener = SeqPacketListener { socket };
-        Ok(Self { listener })
+        Ok(Self { socket })
     }
 
-    fn as_owned_fd(&self) -> OwnedFd {
-        unsafe { OwnedFd::new(self.listener.as_ref().as_raw_fd()) }
+    // Sets `SO_REUSEADDR` socket option to `1`.
+    pub fn enable_reuse_addr(&self) -> Result<()> {
+        self.socket.enable_reuse_addr()?;
+        Ok(())
     }
 
-    pub fn set_reuse_addr(&self) -> Result<()> {
-        sock::setsockopt(&self.as_owned_fd(), SOL_SOCKET, SO_REUSEADDR, &1)
-    }
-
+    // Binds the socket.
     pub async fn bind(&self, sa: SocketAddr) -> Result<()> {
-        self.listener.as_ref().bind(sa)
+        self.socket.bind(sa)?;
+        Ok(())
     }
 
+    // Accepts a new incoming connection from this listener.
     pub async fn accept(&self) -> Result<(SeqPacket, SocketAddr)> {
-        self.listener.accept().await
+        let (socket, sa) = self.socket.accept_priv().await?;
+        Ok((SeqPacket { socket }, sa))
     }
 
+    // Polls to accept a new incoming connection to this listener.
     pub fn poll_accept(&self, cx: &mut Context) -> Poll<Result<(SeqPacket, SocketAddr)>> {
-        self.listener.poll_accept(cx)
+        let (socket, sa) = std::task::ready!(self.socket.poll_accept_priv(cx))?;
+        Poll::Ready(Ok((SeqPacket { socket }, sa)))
     }
 
+    // Start listen on the socket.
     pub async fn listen(&self, backlog: u32) -> Result<()> {
-        sock::listen(
-            &self.as_owned_fd(),
-            backlog
-                .try_into()
-                .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid backlog"))?,
-        )
+        self.socket.listen_on(backlog)?;
+        Ok(())
     }
 
     pub unsafe fn from_raw_fd(fd: RawFd) -> Result<Self> {
-        let listener = SeqPacketListener {
+        Ok(Self {
             socket: Socket::from_raw_fd(fd)?,
-        };
-        Ok(Self { listener })
+        })
     }
 }
 
 impl AsRef<Socket<SeqPacket>> for LazySeqPacketListener {
     fn as_ref(&self) -> &Socket<SeqPacket> {
-        &self.listener.as_ref()
+        &self.socket
     }
 }
 
 impl AsRawFd for LazySeqPacketListener {
     fn as_raw_fd(&self) -> RawFd {
-        self.listener.as_raw_fd()
+        self.socket.as_raw_fd()
     }
 }
 
