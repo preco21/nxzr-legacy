@@ -15,9 +15,14 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 async fn main() -> Result<()> {
     let local_sa = SocketAddr::new(0);
     let dg = Datagram::bind(local_sa).await?;
+    // dg.as_ref().set_filter(hci_filter {
+    //     type_mask: 1 << 0x04,
+    //     event_mask: [1 << 0x13, 0],
+    //     opcode: 0,
+    // })?;
     dg.as_ref().set_filter(hci_filter {
-        type_mask: 1 << 0x04,
-        event_mask: [1 << 0x13, 0],
+        type_mask: 0xffffffff,
+        event_mask: [0xffffffff, 0xffffffff],
         opcode: 0,
     })?;
 
