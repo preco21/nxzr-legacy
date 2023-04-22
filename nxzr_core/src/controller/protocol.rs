@@ -289,8 +289,7 @@ impl Protocol {
                     Some(delay) => state.send_delay = delay,
                     None => {
                         self.dispatch_event(Event::Error(ProtocolError::Invariant(format!(
-                            "unknown delay for report mode {:?}, assuming it as 1/15.",
-                            mode
+                            "unknown delay for report mode `{mode:?}`, assuming it as 1/15.",
                         ))));
                         state.send_delay = 1.0 / 15.0;
                     }
@@ -433,8 +432,7 @@ impl Protocol {
             }
             unsupported_subcommand => {
                 self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
-                    "unsupported subcommand: {}, ignoring.",
-                    unsupported_subcommand
+                    "unsupported subcommand: `{unsupported_subcommand}`, ignoring.",
                 ))));
                 return Ok(());
             }
@@ -566,8 +564,7 @@ impl Protocol {
             }
             _ => {
                 self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
-                    "command {} for Subcommand NFC IR is not implemented.",
-                    command
+                    "command `{command}` for Subcommand NFC IR is not implemented.",
                 ))));
             }
         }
@@ -612,8 +609,8 @@ impl Protocol {
     }
 
     // Listen for the protocol events.
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, EventError> {
-        Event::subscribe(&mut self.event_sub_tx.clone()).await
+    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, ProtocolError> {
+        Ok(Event::subscribe(&mut self.event_sub_tx.clone()).await?)
     }
 
     fn dispatch_event(&self, event: Event) {
