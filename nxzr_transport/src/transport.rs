@@ -1,16 +1,56 @@
-use crate::event::setup_event;
+use crate::event::{setup_event, EventError};
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::hci;
-use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
+use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::sleep;
 
 const DEFAULT_FLOW_CONTROL: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
+
+#[derive(Clone, Error, Debug)]
+pub enum TransportError {
+    #[error("operation called when transport is closed")]
+    OperationWhileClosed,
+    #[error("failed to receive packets from `monitor lock` hci socket")]
+    MonitorLock,
+    #[error("failed to receive packets from `monitor window` hci socket")]
+    MonitorWindow,
+    #[error("internal error: {0}")]
+    Internal(TransportInternalError),
+}
+
+#[derive(Clone, Error, Debug)]
+pub enum TransportInternalError {
+    #[error("io: {0}")]
+    Io(std::io::ErrorKind),
+    #[error("event: {0}")]
+    Event(EventError),
+    #[error("semaphore acquire failed")]
+    SemaphoreFailed,
+}
+
+impl From<std::io::Error> for TransportError {
+    fn from(err: std::io::Error) -> Self {
+        Self::Internal(TransportInternalError::Io(err.kind()))
+    }
+}
+
+impl From<EventError> for TransportError {
+    fn from(err: EventError) -> Self {
+        Self::Internal(TransportInternalError::Event(err))
+    }
+}
+
+impl From<tokio::sync::AcquireError> for TransportError {
+    fn from(_: tokio::sync::AcquireError) -> Self {
+        Self::Internal(TransportInternalError::SemaphoreFailed)
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct TransportConfig {
@@ -24,10 +64,15 @@ pub struct Transport {
 }
 
 impl Transport {
-    pub async fn register(config: TransportConfig) -> Result<(Self, TransportHandle)> {
+    pub async fn register(
+        config: TransportConfig,
+    ) -> Result<(Self, TransportHandle), TransportError> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
         let inner = Arc::new(TransportInner::new(config, closed_tx).await?);
+        let (msg_tx, msg_rx) = mpsc::unbounded_channel();
+        let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
+        Event::handle_events(msg_rx, event_sub_rx)?;
         let mut set = JoinSet::new();
         // Handle writer lock timing.
         set.spawn({
@@ -35,38 +80,35 @@ impl Transport {
             let msg_tx = msg_tx.clone();
             async move {
                 loop {
-                    let res = inner.monitor_lock().await;
-                    match res {
-                        Ok(_) => {}
-                        Err(err) => {
-                            let err = Error::new(ErrorKind::TransportMonitorLock);
-                            let _ = msg_tx.send(Event::Error(err));
-                        }
+                    if let Err(err) = inner.monitor_lock().await {
+                        let _ = msg_tx.send(Event::Error(err));
                     }
                 }
             }
         });
-        // Handles writer window timing.
+        // Handle writer window timing.
         set.spawn({
             let inner = inner.clone();
             let msg_tx = msg_tx.clone();
             async move {
                 loop {
-                    let res = inner.monitor_window().await;
-                    match res {
-                        Ok(_) => {}
-                        Err(err) => {
-                            let err = Error::new(ErrorKind::TransportMonitorWindow);
-                            let _ = msg_tx.send(Event::Error(err));
-                        }
+                    if let Err(err) = inner.monitor_window().await {
+                        let _ = msg_tx.send(Event::Error(err));
                     }
                 }
             }
         });
-        tokio::spawn(async move {
-            close_tx.closed().await;
-            set.shutdown().await;
-            drop(closed_rx);
+        tokio::spawn({
+            let inner = inner.clone();
+            async move {
+                close_tx.closed().await;
+                // Generally, it's recommended to pause from caller before it
+                // gets ended up here. We are assuming the user may not be able
+                // to `.pause()` it anyway.
+                inner.pause();
+                set.shutdown().await;
+                drop(closed_rx);
+            }
         });
         Ok((
             Self { inner },
@@ -76,12 +118,22 @@ impl Transport {
         ))
     }
 
-    pub async fn read(&self) -> Result<&[u8]> {
-        self.inner.read().await
+    // We are exposing `Result<T, std::io::Error>` type here in order to
+    // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
+    pub async fn read(&self) -> Result<&[u8], std::io::Error> {
+        self.inner
+            .read()
+            .await
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "transport error"))
     }
 
-    pub async fn write(&self, buf: &[u8]) -> Result<()> {
-        self.inner.write(buf).await
+    // We are exposing `Result<T, std::io::Error>` type here in order to
+    // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
+    pub async fn write(&self, buf: &[u8]) -> Result<(), std::io::Error> {
+        self.inner
+            .write(buf)
+            .await
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "transport error"))
     }
 
     pub async fn pause(&self) {
@@ -92,8 +144,8 @@ impl Transport {
         self.inner.resume();
     }
 
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
-        self.inner.events()
+    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, TransportError> {
+        self.inner.events().await
     }
 
     pub fn closed(&self) -> impl Future<Output = ()> {
@@ -121,16 +173,19 @@ impl Drop for TransportHandle {
 pub(crate) struct TransportInner {
     write_window: hci::Datagram,
     write_lock: hci::Datagram,
-    active_tx: watch::Sender<bool>,
+    running_tx: watch::Sender<bool>,
     writing_tx: watch::Sender<bool>,
-    flow_control: Arc<BoundedSemaphore>,
+    write_sem: Arc<BoundedSemaphore>,
     read_buf_size: usize,
     closed_tx: mpsc::Sender<()>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
 
 impl TransportInner {
-    pub async fn new(config: TransportConfig, closed_tx: mpsc::Sender<()>) -> Result<Self> {
+    pub async fn new(
+        config: TransportConfig,
+        closed_tx: mpsc::Sender<()>,
+    ) -> Result<Self, TransportError> {
         // Device ids must be targeting to the local machine.
         let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
         // 0x04 = HCI_EVT; 0x13 = Number of completed packets
@@ -154,24 +209,24 @@ impl TransportInner {
         Ok(Self {
             write_window,
             write_lock,
-            active_tx: watch::channel(true).0,
+            running_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
             closed_tx,
             event_sub_tx,
-            flow_control: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
+            write_sem: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
             read_buf_size,
         })
     }
 
-    async fn monitor_window(&self) -> Result<()> {
+    async fn monitor_window(&self) -> Result<(), TransportError> {
         let mut buf = vec![0; 10 as _];
         self.write_window.recv(&mut buf).await?;
         let permits: u16 = u16::from(buf[6]) + u16::from(buf[7]) * 0x100;
-        let _ = self.flow_control.add_permits(permits as usize);
+        let _ = self.write_sem.add_permits(permits as usize);
         Ok(())
     }
 
-    async fn monitor_lock(&self) -> Result<()> {
+    async fn monitor_lock(&self) -> Result<(), TransportError> {
         let mut buf = vec![0; 10 as _];
         self.write_lock.recv(&mut buf).await?;
         if buf[5] < 5 {
@@ -182,25 +237,45 @@ impl TransportInner {
         Ok(())
     }
 
-    pub async fn running(&self) -> Result<()> {
-        let mut rx = self.active_tx.subscribe();
+    pub async fn read(&self) -> Result<&[u8], TransportError> {
+        if self.is_closed() {
+            return Err(TransportError::OperationWhileClosed);
+        }
+        self.running().await;
+        // TODO: ITR read
+        Ok(&[])
+    }
+
+    pub async fn write(&self, buf: &[u8]) -> Result<(), TransportError> {
+        if self.is_closed() {
+            return Err(TransportError::OperationWhileClosed);
+        }
+        self.running().await;
+        self.write_sem.acquire_forget().await?;
+        self.writable().await;
+        // TODO: ITR send
+        Ok(())
+    }
+
+    pub async fn running(&self) {
+        let mut rx = self.running_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await.unwrap();
         }
     }
 
     pub fn pause(&self) {
-        self.active_tx.send_replace(false);
+        self.running_tx.send_replace(false);
     }
 
     pub fn resume(&self) {
-        self.active_tx.send_replace(true);
+        self.running_tx.send_replace(true);
     }
 
-    pub async fn writable(&self) -> Result<()> {
+    pub async fn writable(&self) {
         let mut rx = self.writing_tx.subscribe();
         while !*rx.borrow() {
-            rx.changed().await?;
+            rx.changed().await.unwrap();
         }
     }
 
@@ -212,26 +287,12 @@ impl TransportInner {
         self.writing_tx.send_replace(true);
     }
 
-    pub async fn read(&self) -> Result<&[u8]> {
-        if self.is_closing() {
-            return Err(Error::new(ErrorKind::TransportOperationWhileClosing));
-        }
-        self.running().await;
-        // TODO: ITR read
-        Ok(&[])
+    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, TransportError> {
+        Ok(Event::subscribe(&mut self.event_sub_tx.clone()).await?)
     }
 
-    pub async fn write(&self, buf: &[u8]) -> Result<()> {
-        if self.is_closing() {
-            return Err(Error::new(ErrorKind::TransportOperationWhileClosing));
-        }
-        self.running().await;
-        self.writable().await;
-        Ok(())
-    }
-
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
-        Event::subscribe(&mut self.event_sub_tx.clone()).await
+    fn is_closed(&self) -> bool {
+        self.closed_tx.is_closed()
     }
 
     pub fn closed(&self) -> impl Future<Output = ()> {
@@ -242,7 +303,7 @@ impl TransportInner {
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Error(Error),
+    Error(TransportError),
 }
 
 #[derive(Debug)]
