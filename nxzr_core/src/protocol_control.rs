@@ -149,10 +149,7 @@ impl ProtocolControl {
         let (ready_tx, ready_rx) = oneshot::channel();
         let fut = async {
             self.protocol.modify_controller_state(f).await;
-            self.state_send_tx
-                .send(StateSendReq { ready_tx })
-                .await
-                .unwrap();
+            let _ = self.state_send_tx.send(StateSendReq { ready_tx }).await;
             let _ = ready_rx.await;
         };
         tokio::select! {
