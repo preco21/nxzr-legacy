@@ -1,16 +1,19 @@
+use event::EventError;
+use thiserror::Error;
+use transport::TransportError;
+
+pub mod event;
+pub mod semaphore;
+pub mod session;
 pub mod sock;
+pub mod transport;
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+#[derive(Clone, Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    Transport(#[from] TransportError),
+    #[error(transparent)]
+    Event(#[from] EventError),
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub type Result<T> = std::result::Result<T, Error>;

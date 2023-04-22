@@ -4,7 +4,6 @@ use crate::sock::{
     sys::{sockaddr_hci, BTPROTO_HCI},
     OwnedFd,
 };
-use futures::ready;
 use libc::{
     AF_BLUETOOTH, EAGAIN, EINPROGRESS, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_RAW, SOL_SOCKET, SO_ERROR,
     SO_RCVBUF, TIOCINQ, TIOCOUTQ,
@@ -60,6 +59,23 @@ impl sock::SysSockAddr for SocketAddr {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub struct Filter {
+    pub type_mask: u32,
+    pub event_mask: [u32; 2],
+    pub opcode: u16,
+}
+
+impl From<Filter> for hci_filter {
+    fn from(f: Filter) -> Self {
+        hci_filter {
+            type_mask: f.type_mask,
+            event_mask: f.event_mask,
+            opcode: f.opcode,
+        }
+    }
+}
+
 pub struct Socket {
     fd: AsyncFd<OwnedFd>,
 }
@@ -95,8 +111,9 @@ impl Socket {
         sock::getpeername(self.fd.get_ref())
     }
 
-    pub fn set_filter(&self, filter: hci_filter) -> Result<()> {
-        sock::setsockopt(self.fd.get_ref(), SOL_HCI, HCI_FILTER, &filter)
+    pub fn set_filter(&self, filter: Filter) -> Result<()> {
+        let f: hci_filter = filter.into();
+        sock::setsockopt(self.fd.get_ref(), SOL_HCI, HCI_FILTER, &f)
     }
 
     pub fn recv_buffer(&self) -> Result<i32> {

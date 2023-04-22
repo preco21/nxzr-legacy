@@ -1,36 +1,31 @@
 use super::{spi_flash::SpiFlash, ControllerType};
 use button::ButtonState;
 use stick::{StickCalibration, StickState, StickStateConfig};
-use strum::{Display, IntoStaticStr};
+use thiserror::Error;
 
 pub mod button;
 pub mod stick;
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+#[derive(Clone, Error, Debug)]
 pub enum StateError {
     // Invalid value range has been entered.
+    #[error("invalid value range supplied")]
     InvalidRange,
     // There is no calibration data available.
+    #[error("no calibration data is supplied, unable to call the method")]
     NoCalibrationDataAvailable,
     // The button is not available for the controller of choice.
+    #[error("given button is not available")]
     ButtonNotAvailable,
-    // Unable to create stick calibration instance from the given data.
-    UnableToCreateStickCalibration,
-    // Returned if any invariant violation happens.
-    Invariant,
 }
 
-impl std::error::Error for StateError {}
-
-pub type StateResult<T> = Result<T, StateError>;
-
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct ControllerStateConfig {
-    pub controller: Option<ControllerType>,
+    pub controller: ControllerType,
     pub spi_flash: Option<SpiFlash>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ControllerState {
     controller: ControllerType,
     button_state: ButtonState,
@@ -43,11 +38,7 @@ impl ControllerState {
         Self::with_config(Default::default()).unwrap()
     }
 
-    pub fn with_config(config: ControllerStateConfig) -> StateResult<Self> {
-        let controller = match config.controller {
-            Some(controller) => controller,
-            None => ControllerType::ProController,
-        };
+    pub fn with_config(config: ControllerStateConfig) -> Result<Self, StateError> {
         match config.spi_flash {
             Some(spi_flash) => {
                 let Some(l_calibration) = StickCalibration::with_left_stick_bytes(
@@ -77,15 +68,15 @@ impl ControllerState {
                 })?;
                 r_stick_state.reset_to_center()?;
                 Ok(Self {
-                    controller,
-                    button_state: ButtonState::with_controller(controller),
+                    controller: config.controller,
+                    button_state: ButtonState::with_controller(config.controller),
                     l_stick_state,
                     r_stick_state,
                 })
             }
             None => Ok(Self {
-                controller,
-                button_state: ButtonState::with_controller(controller),
+                controller: config.controller,
+                button_state: ButtonState::with_controller(config.controller),
                 l_stick_state: StickState::new(),
                 r_stick_state: StickState::new(),
             }),
@@ -100,11 +91,23 @@ impl ControllerState {
         &self.button_state
     }
 
+    pub fn button_state_mut(&mut self) -> &mut ButtonState {
+        &mut self.button_state
+    }
+
     pub fn l_stick_state(&self) -> &StickState {
         &self.l_stick_state
     }
 
+    pub fn l_stick_state_mut(&mut self) -> &mut StickState {
+        &mut self.l_stick_state
+    }
+
     pub fn r_stick_state(&self) -> &StickState {
         &self.r_stick_state
+    }
+
+    pub fn r_stick_state_mut(&mut self) -> &mut StickState {
+        &mut self.r_stick_state
     }
 }

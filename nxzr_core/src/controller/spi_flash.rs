@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct SpiFlashConfig {
     pub buffer: Option<Vec<u8>>,
     pub size: Option<usize>,

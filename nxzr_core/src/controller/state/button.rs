@@ -1,6 +1,7 @@
-use super::{StateError, StateResult};
 use crate::controller::ControllerType;
 use strum::Display;
+
+use super::StateError;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ButtonKey {
@@ -75,7 +76,6 @@ impl ButtonKey {
                 Self::L,
                 Self::Zl,
             ],
-            _ => panic!("Unable to get available buttons for unknown controller type."),
         }
     }
 
@@ -130,7 +130,6 @@ impl ButtonKey {
                 | Self::Zl => true,
                 _ => false,
             },
-            _ => false,
         }
     }
 }
@@ -143,8 +142,11 @@ impl ButtonKey {
  * 2        Minus 	Plus 	R Stick L Stick Home 	Capture
  * 3        Down 	Up 	    Right 	Left 	SR 	    SL 	    L 	    ZL
  */
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ButtonState {
+    // TODO: Refactor ButtonState later on such that no controller type is
+    // retained in the state and split into granular ButtonState per controller
+    // type.
     controller: ControllerType,
     bytes: [u8; 3],
 }
@@ -208,11 +210,11 @@ impl ButtonState {
         }
     }
 
-    pub fn toggle_button(&mut self, key: ButtonKey) -> StateResult<()> {
+    pub fn toggle_button(&mut self, key: ButtonKey) -> Result<(), StateError> {
         self.set_button(key, !self.is_button_set(key))
     }
 
-    pub fn set_button(&mut self, key: ButtonKey, flag: bool) -> StateResult<()> {
+    pub fn set_button(&mut self, key: ButtonKey, flag: bool) -> Result<(), StateError> {
         if !ButtonKey::can_use_button(self.controller, key) {
             return Err(StateError::ButtonNotAvailable);
         }

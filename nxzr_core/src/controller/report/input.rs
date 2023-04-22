@@ -1,28 +1,33 @@
-use super::{subcommand::Subcommand, ReportError, ReportResult};
+use super::{subcommand::Subcommand, ReportError};
 use crate::controller::ControllerType;
 use strum::Display;
 
+// Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputReportId {
-    Unknown,
-    // 0x3F Default input report for sending input packets to the host
+    // 0x3F Default input reports
     Default,
     // 0x21 Standard input reports used for subcommand replies
     Standard,
-    // 0x30 Full input reports with IMU data instead of subcommand replies
+    // 0x30 Standard full mode - input reports with IMU data instead of subcommand replies
     Imu,
-    // 0x31 Full input reports with NFC/IR data plus to IMU data
-    ImuWithNfcIrData,
+    // 0x31 Standard full mode - input reports with NFC/IR data plus to IMU data
+    NfcIrMcu,
+    // 0x32, 0x33 Unknown ids - treats as standard input reports
+    Unknown1,
+    Unknown2,
 }
 
 impl InputReportId {
-    pub fn from_byte(byte: u8) -> Self {
+    pub fn from_byte(byte: u8) -> Option<Self> {
         match byte {
-            0x3F => Self::Default,
-            0x21 => Self::Standard,
-            0x30 => Self::Imu,
-            0x31 => Self::ImuWithNfcIrData,
-            _ => Self::Unknown,
+            0x3F => Some(Self::Default),
+            0x21 => Some(Self::Standard),
+            0x30 => Some(Self::Imu),
+            0x31 => Some(Self::NfcIrMcu),
+            0x32 => Some(Self::Unknown1),
+            0x33 => Some(Self::Unknown2),
+            _ => None,
         }
     }
 
@@ -31,16 +36,10 @@ impl InputReportId {
             Self::Default => 0x3F,
             Self::Standard => 0x21,
             Self::Imu => 0x30,
-            Self::ImuWithNfcIrData => 0x31,
-            _ => panic!("Unknown input report id cannot be converted to a byte."),
+            Self::NfcIrMcu => 0x31,
+            Self::Unknown1 => 0x32,
+            Self::Unknown2 => 0x33,
         }
-    }
-
-    pub fn try_to_byte(&self) -> Option<u8> {
-        if let Self::Unknown = self {
-            return None;
-        }
-        Some(self.to_byte())
     }
 }
 
@@ -55,6 +54,9 @@ pub enum TriggerButtonsElapsedTimeCommand {
     Home(u32),
 }
 
+// Length of 50 is a standard input report size in format.
+// See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
+const REPORT_MIN_LEN: usize = 50;
 const SUBCOMMAND_OFFSET: usize = 16;
 
 // Processes outgoing messages from the controller to the host(Nintendo Switch).
@@ -70,21 +72,27 @@ impl InputReport {
         Self { buf }
     }
 
-    pub fn with_raw(data: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf = data.as_ref();
-        // Length of 50 is a standard input report size in format
-        // See: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#standard-input-report-format
-        let min_len = match report_size {
-            Some(report_size) => std::cmp::max(report_size, 50),
-            None => 50,
-        };
-        if buf.len() < min_len {
+    pub fn with_raw(data: &[u8]) -> Result<Self, ReportError> {
+        if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
-        let [0xA1, ..] = buf else {
+        let [0xA1, ..] = data else {
             return Err(ReportError::Malformed);
         };
-        Ok(Self { buf: buf.to_vec() })
+        Ok(Self { buf: data.to_vec() })
+    }
+
+    pub fn fill_default_report(&mut self, controller_type: ControllerType) {
+        // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-0x3f
+        self.buf[1..3].copy_from_slice(&[0x28, 0xCA, 0x08]);
+        match controller_type {
+            ControllerType::JoyConL | ControllerType::JoyConR => {
+                self.buf[4..11].copy_from_slice(&[0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80]);
+            }
+            ControllerType::ProController => {
+                self.buf[4..11].copy_from_slice(&[0x40, 0x8A, 0x4F, 0x8A, 0xD0, 0x7E, 0xDF, 0x7F]);
+            }
+        }
     }
 
     pub fn clear_subcommand(&mut self) {
@@ -102,18 +110,12 @@ impl InputReport {
         &self.buf[16..51]
     }
 
-    pub fn input_report_id(&self) -> InputReportId {
+    pub fn input_report_id(&self) -> Option<InputReportId> {
         InputReportId::from_byte(self.buf[1])
     }
 
-    pub fn set_input_report_id(&mut self, id: InputReportId) -> ReportResult<()> {
-        match id.try_to_byte() {
-            Some(byte) => {
-                self.buf[1] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedReportId),
-        }
+    pub fn set_input_report_id(&mut self, id: InputReportId) {
+        self.buf[1] = id.to_byte();
     }
 
     pub fn set_timer(&mut self, timer: u64) {
@@ -126,8 +128,8 @@ impl InputReport {
         self.buf[3] = 0x8E;
     }
 
-    pub fn set_button_status(&mut self, button_status: [u8; 3]) {
-        self.buf[4..7].copy_from_slice(&button_status);
+    pub fn set_button(&mut self, button_status: &[u8; 3]) {
+        self.buf[4..7].copy_from_slice(button_status);
     }
 
     pub fn set_analog_stick(
@@ -166,15 +168,14 @@ impl InputReport {
     }
 
     pub fn set_6axis_data(&mut self) {
-        // FIXME: revisit
+        // FIXME: revisit -> handle gyro
         for i in 14..50 {
             self.buf[i] = 0x00;
         }
     }
 
     // Returns `true` if the total data length matches 313
-    pub fn set_ir_nfc_data(&mut self, data: impl AsRef<[u8]>) -> ReportResult<bool> {
-        let data = data.as_ref();
+    pub fn set_ir_nfc_data(&mut self, data: &[u8]) -> Result<bool, ReportError> {
         if data.len() > 313 {
             return Err(ReportError::OutOfBounds);
         }
@@ -182,18 +183,12 @@ impl InputReport {
         Ok(data.len() == 313)
     }
 
-    pub fn reply_to_subcommand_id(&self) -> Subcommand {
+    pub fn reply_to_subcommand_id(&self) -> Option<Subcommand> {
         Subcommand::from_byte(self.buf[15])
     }
 
-    pub fn set_reply_to_subcommand_id(&mut self, id: Subcommand) -> ReportResult<()> {
-        match id.try_to_byte() {
-            Some(byte) => {
-                self.buf[15] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedSubcommand),
-        }
+    pub fn set_reply_to_subcommand_id(&mut self, id: Subcommand) {
+        self.buf[15] = id.to_byte();
     }
 
     pub fn sub_0x02_device_info(
@@ -201,17 +196,11 @@ impl InputReport {
         mac_addr: [u8; 6],
         fm_version: Option<[u8; 2]>,
         controller_type: ControllerType,
-    ) -> ReportResult<()> {
-        let Some(controller_id) = controller_type.try_id() else {
-            return Err(ReportError::Invariant);
-        };
-        let fm_version_u = match fm_version {
-            Some(version) => version,
-            None => [0x04, 0x00],
-        };
-        self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo)?;
-        self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version_u);
-        self.buf[SUBCOMMAND_OFFSET + 2] = controller_id;
+    ) -> Result<(), ReportError> {
+        let fm_version = fm_version.unwrap_or([0x04, 0x00]);
+        self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo);
+        self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version);
+        self.buf[SUBCOMMAND_OFFSET + 2] = controller_type.id();
         self.buf[SUBCOMMAND_OFFSET + 3] = 0x02;
         self.buf[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
         self.buf[SUBCOMMAND_OFFSET + 10] = 0x01;
@@ -223,14 +212,13 @@ impl InputReport {
         &mut self,
         offset: u32,
         size: u8,
-        data: impl AsRef<[u8]>,
-    ) -> ReportResult<()> {
-        let data = data.as_ref();
+        data: &[u8],
+    ) -> Result<(), ReportError> {
         if size > 0x1D || data.len() != size.into() {
             return Err(ReportError::OutOfBounds);
         }
         // Creates input report data with spi flash read subcommand
-        self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead)?;
+        self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead);
         let mut cur_offset = offset;
         // Write offset to data
         for i in SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 4 {
@@ -244,9 +232,8 @@ impl InputReport {
 
     pub fn sub_0x04_trigger_buttons_elapsed_time(
         &mut self,
-        commands: impl AsRef<[TriggerButtonsElapsedTimeCommand]>,
-    ) -> ReportResult<()> {
-        let commands = commands.as_ref();
+        commands: &[TriggerButtonsElapsedTimeCommand],
+    ) -> Result<(), ReportError> {
         const MAX_MS: u32 = 10 * 0xFFFF;
         let mut set = |offset: usize, ms: u32| {
             let value = (ms / 10) as u16;
@@ -303,11 +290,21 @@ impl InputReport {
     }
 
     pub fn data(&self) -> &[u8] {
-        match self.input_report_id() {
-            InputReportId::Standard => &self.buf[..51],
+        let Some(id) = self.input_report_id() else {
+            return &self.buf[..51];
+        };
+        match id {
+            InputReportId::Default | InputReportId::Standard => &self.buf[..51],
             InputReportId::Imu => &self.buf[..50],
-            InputReportId::ImuWithNfcIrData => &self.buf[..363],
-            _ => &self.buf[..51],
+            InputReportId::NfcIrMcu | InputReportId::Unknown1 | InputReportId::Unknown2 => {
+                &self.buf[..363]
+            }
         }
+    }
+}
+
+impl AsMut<[u8]> for InputReport {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.buf
     }
 }

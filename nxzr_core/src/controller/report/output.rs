@@ -1,22 +1,21 @@
-use super::subcommand::Subcommand;
-use super::{ReportError, ReportResult};
+use super::{subcommand::Subcommand, ReportError};
 use strum::Display;
 
+// Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#output-reports
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum OutputReportId {
-    Unknown,
     SubCommand,
     RumbleOnly,
     RequestIrNfcMcu,
 }
 
 impl OutputReportId {
-    pub fn from_byte(byte: u8) -> Self {
+    pub fn from_byte(byte: u8) -> Option<Self> {
         match byte {
-            0x01 => Self::SubCommand,
-            0x10 => Self::RumbleOnly,
-            0x11 => Self::RequestIrNfcMcu,
-            _ => Self::Unknown,
+            0x01 => Some(Self::SubCommand),
+            0x10 => Some(Self::RumbleOnly),
+            0x11 => Some(Self::RequestIrNfcMcu),
+            _ => None,
         }
     }
 
@@ -25,19 +24,13 @@ impl OutputReportId {
             Self::SubCommand => 0x01,
             Self::RumbleOnly => 0x10,
             Self::RequestIrNfcMcu => 0x11,
-            _ => panic!("Unknown output report id cannot be converted to a byte."),
         }
-    }
-
-    pub fn try_to_byte(&self) -> Option<u8> {
-        if let Self::Unknown = self {
-            return None;
-        }
-        Some(self.to_byte())
     }
 }
 
-// Processes incoming messages from the host(Nintendo Switch).
+const REPORT_MIN_LEN: usize = 11;
+
+// Processes incoming messages from the host (Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct OutputReport {
     buf: Vec<u8>,
@@ -50,33 +43,22 @@ impl OutputReport {
         Self { buf }
     }
 
-    pub fn with_raw(data: impl AsRef<[u8]>, report_size: Option<usize>) -> ReportResult<Self> {
-        let buf = data.as_ref();
-        let min_len = match report_size {
-            Some(report_size) => std::cmp::max(report_size, 12),
-            None => 12,
-        };
-        if buf.len() < min_len {
+    pub fn with_raw(data: &[u8]) -> Result<Self, ReportError> {
+        if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
-        let [0xA2, ..] = buf else {
+        let [0xA2, ..] = data else {
             return Err(ReportError::Malformed);
         };
-        Ok(Self { buf: buf.to_vec() })
+        Ok(Self { buf: data.to_vec() })
     }
 
-    pub fn output_report_id(&self) -> OutputReportId {
+    pub fn output_report_id(&self) -> Option<OutputReportId> {
         OutputReportId::from_byte(self.buf[1])
     }
 
-    pub fn set_output_report_id(&mut self, id: OutputReportId) -> ReportResult<()> {
-        match id.try_to_byte() {
-            Some(byte) => {
-                self.buf[1] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedReportId),
-        }
+    pub fn set_output_report_id(&mut self, id: OutputReportId) {
+        self.buf[1] = id.to_byte();
     }
 
     pub fn timer(&self) -> u8 {
@@ -92,39 +74,36 @@ impl OutputReport {
         &self.buf[3..11]
     }
 
-    pub fn subcommand(&self) -> Subcommand {
-        Subcommand::from_byte(self.buf[11])
-    }
-
-    pub fn set_subcommand(&mut self, subcommand: Subcommand) -> ReportResult<()> {
-        match subcommand.try_to_byte() {
-            Some(byte) => {
-                self.buf[11] = byte;
-                Ok(())
-            }
-            None => Err(ReportError::UnsupportedSubcommand),
+    pub fn subcommand(&self) -> Option<Subcommand> {
+        if self.buf.len() < 12 {
+            Some(Subcommand::Empty)
+        } else {
+            Subcommand::from_byte(self.buf[11])
         }
     }
 
-    pub fn subcommand_data(&self) -> ReportResult<&[u8]> {
+    pub fn set_subcommand(&mut self, subcommand: Subcommand) {
+        self.buf[11] = subcommand.to_byte();
+    }
+
+    pub fn subcommand_data(&self) -> Result<&[u8], ReportError> {
         let Some(slice) = self.buf.get(12..) else {
-            return Err(ReportError::NoData);
+            return Err(ReportError::NoDataAvailable);
         };
         Ok(slice)
     }
 
-    pub fn set_subcommand_data(&mut self, data: impl AsRef<[u8]>) {
-        let data = data.as_ref();
+    pub fn set_subcommand_data(&mut self, data: &[u8]) {
         self.buf[12..12 + data.len()].copy_from_slice(data);
     }
 
-    pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> ReportResult<()> {
+    pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8) -> Result<(), ReportError> {
         if size > 0x1D || u32::from(size) + offset > 0x80000 {
             return Err(ReportError::OutOfBounds);
         }
         // Creates output report data with spi flash read subcommand
-        self.set_output_report_id(OutputReportId::SubCommand)?;
-        self.set_subcommand(Subcommand::SpiFlashRead)?;
+        self.set_output_report_id(OutputReportId::SubCommand);
+        self.set_subcommand(Subcommand::SpiFlashRead);
         let mut cur_offset = offset;
         for i in 12..12 + 4 {
             self.buf[i] = (cur_offset % 0x100) as u8;

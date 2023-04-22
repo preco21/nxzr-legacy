@@ -10,13 +10,15 @@ edition = "2021"
 publish = false
 
 [dependencies]
-futures = "0.3.27"
+# Making these dependencies optional allows cross-platform development on
+# platforms other than `linux`.
+bluer = { version = "0.15.7", features = ["l2cap"], optional = true }
+dbus = { version = "0.9.7", features = ["vendored"], optional = true }
 libc = "0.2.140"
-tokio = { version = "1.25.0", features = ["net", "io-util"] }
+strum = { version = "0.24.1", features = ["derive"] }
+thiserror = "1.0.40"
+tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
 
-[dev-dependencies]
-tokio = { version = "1.25.0", features = [
-    "io-std",
-    "io-util",
-    "rt-multi-thread",
-] }
+[target.'cfg(target_os = "linux")'.dependencies]
+bluer = { version = "0.15.7", features = ["l2cap"] }
+dbus = { version = "0.9.7", features = ["vendored"] }
