@@ -2,6 +2,7 @@ use crate::event::{setup_event, EventError};
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::hci;
 use bluer::l2cap;
+use bytes::{Bytes, BytesMut};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -118,7 +119,7 @@ impl Transport {
 
     // We are exposing `Result<T, std::io::Error>` type here in order to
     // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
-    pub async fn read(&self) -> Result<&[u8], std::io::Error> {
+    pub async fn read(&self) -> Result<Bytes, std::io::Error> {
         self.inner
             .read()
             .await
@@ -127,7 +128,7 @@ impl Transport {
 
     // We are exposing `Result<T, std::io::Error>` type here in order to
     // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
-    pub async fn write(&self, buf: &[u8]) -> Result<(), std::io::Error> {
+    pub async fn write(&self, buf: Bytes) -> Result<(), std::io::Error> {
         self.inner
             .write(buf)
             .await
@@ -172,7 +173,8 @@ pub(crate) struct TransportInner {
     write_window: hci::Datagram,
     write_lock: hci::Datagram,
     itr_sock: l2cap::SeqPacket,
-    ctl_sock: l2cap::SeqPacket,
+    // Control socket must always be dropped with interrupt socket like a pair.
+    _ctl_sock: l2cap::SeqPacket,
     running_tx: watch::Sender<bool>,
     writing_tx: watch::Sender<bool>,
     write_sem: Arc<BoundedSemaphore>,
@@ -215,7 +217,7 @@ impl TransportInner {
             write_window,
             write_lock,
             itr_sock,
-            ctl_sock,
+            _ctl_sock: ctl_sock,
             running_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
             write_sem: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
@@ -245,23 +247,26 @@ impl TransportInner {
         Ok(())
     }
 
-    pub async fn read(&self) -> Result<&[u8], TransportError> {
+    pub async fn read(&self) -> Result<Bytes, TransportError> {
         if self.is_closed() {
             return Err(TransportError::OperationWhileClosed);
         }
         self.running().await;
-        // TODO: ITR read
-        Ok(&[])
+        let mut buf = BytesMut::with_capacity(self.read_buf_size);
+        self.itr_sock.recv(&mut buf).await?;
+        Ok(buf.freeze())
     }
 
-    pub async fn write(&self, buf: &[u8]) -> Result<(), TransportError> {
+    pub async fn write(&self, buf: Bytes) -> Result<(), TransportError> {
         if self.is_closed() {
             return Err(TransportError::OperationWhileClosed);
         }
         self.running().await;
         self.write_sem.acquire_forget().await?;
         self.writable().await;
-        self.itr_sock.send(buf).await?;
+        // Writing a buffer in length more than MTU may fail, however, L2CAP's
+        // `SeqPacket` socket seems allows writing buf regardless of the length.
+        self.itr_sock.send(&buf).await?;
         Ok(())
     }
 
