@@ -1,4 +1,3 @@
-use std::time::Duration;
 use strum::{Display, IntoStaticStr};
 
 pub mod controller;
@@ -11,65 +10,22 @@ pub struct Error {
     pub message: String,
 }
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum ErrorKind {
     // Report errors
-    Report(ReportErrorKind),
+    Report(controller::report::ReportError),
     // State errors
-    State(StateErrorKind),
+    State(controller::state::StateError),
     // Protocol errors
-    Protocol(ProtocolErrorKind),
+    Protocol(controller::protocol::ProtocolErrorKind),
     // Internal errors
     Internal(InternalErrorKind),
 }
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum ReportErrorKind {
-    // Invalid value range has been entered.
-    InvalidRange,
-    // Indicates that given data has not enough length. Usually used in constructors.
-    TooShort,
-    // Indicates that given data is malformed thus cannot be processed. Usually used in constructors.
-    Malformed,
-    // Returned when accessing/processing data that do not support given bounds.
-    OutOfBounds,
-    // There's no data for a value within a range. Usually used instead of
-    // `OutOfBounds` for a return value of getter methods where `OutOfBounds` is
-    // not appropriate. Since it's more descriptive to indicate that you are
-    // accessing no-existent data than just saying data out-of-bounds.
-    NoDataAvailable,
-    // Returned if invariant violation happens.
-    Invariant,
-}
-
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum StateErrorKind {
-    // Invalid value range has been entered.
-    InvalidRange,
-    // There is no calibration data available.
-    NoCalibrationDataAvailable,
-    // The button is not available for the controller of choice.
-    ButtonNotAvailable,
-}
-
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum ProtocolErrorKind {
-    // Failed to parse output report.
-    OutputReportParsingFailed,
-    // Failed to create input report.
-    InputReportCreationFailed,
-    // Write operation in protocol is too slow.
-    WriteTooSlow(Duration),
-    // Returned if invariant violation happens.
-    Invariant,
-    // Feature is not implemented.
-    NotImplemented,
-}
-
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum InternalErrorKind {
     Io(std::io::ErrorKind),
-    EventSubscriptionFailed,
+    Event(event::EventError),
 }
 
 impl Error {
@@ -101,6 +57,42 @@ impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Self {
             kind: ErrorKind::Internal(InternalErrorKind::Io(err.kind())),
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<controller::report::ReportError> for Error {
+    fn from(err: controller::report::ReportError) -> Self {
+        Self {
+            kind: ErrorKind::Report(err),
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<controller::state::StateError> for Error {
+    fn from(err: controller::state::StateError) -> Self {
+        Self {
+            kind: ErrorKind::State(err),
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<controller::protocol::ProtocolError> for Error {
+    fn from(err: controller::protocol::ProtocolError) -> Self {
+        Self {
+            kind: ErrorKind::Protocol(err.kind),
+            message: err.message,
+        }
+    }
+}
+
+impl From<event::EventError> for Error {
+    fn from(err: event::EventError) -> Self {
+        Self {
+            kind: ErrorKind::Internal(InternalErrorKind::Event(err)),
             message: err.to_string(),
         }
     }

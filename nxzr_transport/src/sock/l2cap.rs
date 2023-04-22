@@ -1,3 +1,4 @@
+use super::OwnedFd;
 use crate::sock;
 use bluer::l2cap::{SeqPacket, Socket, SocketAddr};
 use libc::{SOL_SOCKET, SO_REUSEADDR};
@@ -6,8 +7,6 @@ use std::{
     os::fd::{AsRawFd, FromRawFd, RawFd},
     task::{Context, Poll},
 };
-
-use super::OwnedFd;
 
 #[derive(Debug)]
 pub struct LazySeqPacketListener {

@@ -1,7 +1,7 @@
 use crate::controller::protocol::{self, Protocol, ProtocolConfig, TransportCombined};
 use crate::controller::state::ControllerState;
 use crate::event::setup_event;
-use crate::{Error, ErrorKind, InternalErrorKind, Result};
+use crate::{Error, Result};
 use std::future::Future;
 use std::sync::Arc;
 use strum::{Display, IntoStaticStr};
@@ -164,7 +164,9 @@ impl ProtocolControl {
 
     // Listen for the protocol control events.
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>> {
-        Event::subscribe(&mut self.event_sub_tx.clone()).await
+        Event::subscribe(&mut self.event_sub_tx.clone())
+            .await
+            .map_err(|err| Error::from(err))
     }
 
     // Wait for the internal tasks to exit completely.
@@ -185,7 +187,7 @@ impl ProtocolControlTask {
         loop {
             if let Some(orig) = rx.recv().await {
                 let evt = match orig {
-                    protocol::Event::Error(err) => Event::Warning(err),
+                    protocol::Event::Error(err) => Event::Warning(err.into()),
                     protocol::Event::Log(log) => Event::Log(LogType::ProtocolInner(log)),
                 };
                 let _ = msg_tx.send(evt);

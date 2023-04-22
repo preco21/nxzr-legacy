@@ -5,7 +5,6 @@ use crate::{Error, ErrorKind, InternalErrorKind, Result};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use strum::{Display, IntoStaticStr};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::sleep;
@@ -40,7 +39,7 @@ impl Transport {
                     match res {
                         Ok(_) => {}
                         Err(err) => {
-                            let err = Error::new(ErrorKind::TransportMonitorLock(err));
+                            let err = Error::new(ErrorKind::TransportMonitorLock);
                             let _ = msg_tx.send(Event::Error(err));
                         }
                     }
@@ -57,7 +56,7 @@ impl Transport {
                     match res {
                         Ok(_) => {}
                         Err(err) => {
-                            let err = Error::new(ErrorKind::TransportMonitorWindow(err));
+                            let err = Error::new(ErrorKind::TransportMonitorWindow);
                             let _ = msg_tx.send(Event::Error(err));
                         }
                     }

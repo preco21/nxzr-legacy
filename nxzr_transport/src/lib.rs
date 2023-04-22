@@ -1,6 +1,5 @@
 use strum::{Display, IntoStaticStr};
 use tokio::sync::AcquireError;
-use transport::TransportErrorKind;
 
 pub mod event;
 pub mod semaphore;
@@ -23,8 +22,8 @@ pub enum ErrorKind {
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum TransportErrorKind {
     OperationWhileClosing,
-    MonitorLock(Error),
-    MonitorWindow(Error),
+    MonitorLock,
+    MonitorWindow,
 }
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]

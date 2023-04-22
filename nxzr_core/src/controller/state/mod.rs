@@ -1,10 +1,22 @@
 use super::{spi_flash::SpiFlash, ControllerType};
-use crate::{Error, ErrorKind, Result, StateErrorKind};
 use button::ButtonState;
 use stick::{StickCalibration, StickState, StickStateConfig};
+use strum::{Display, IntoStaticStr};
 
 pub mod button;
 pub mod stick;
+
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+pub enum StateError {
+    // Invalid value range has been entered.
+    InvalidRange,
+    // There is no calibration data available.
+    NoCalibrationDataAvailable,
+    // The button is not available for the controller of choice.
+    ButtonNotAvailable,
+}
+
+impl std::error::Error for StateError {}
 
 #[derive(Debug, Default)]
 pub struct ControllerStateConfig {
@@ -25,7 +37,7 @@ impl ControllerState {
         Self::with_config(Default::default()).unwrap()
     }
 
-    pub fn with_config(config: ControllerStateConfig) -> Result<Self> {
+    pub fn with_config(config: ControllerStateConfig) -> Result<Self, StateError> {
         match config.spi_flash {
             Some(spi_flash) => {
                 let Some(l_calibration) = StickCalibration::with_left_stick_bytes(
@@ -34,7 +46,7 @@ impl ControllerState {
                         None => spi_flash.factory_l_stick_calibration(),
                     },
                 ) else {
-                    return Err(Error::new(ErrorKind::State(StateErrorKind::NoCalibrationDataAvailable)));
+                    return Err(StateError::NoCalibrationDataAvailable);
                 };
                 let mut l_stick_state = StickState::with_config(StickStateConfig {
                     calibration: Some(l_calibration),
@@ -47,7 +59,7 @@ impl ControllerState {
                         None => spi_flash.factory_r_stick_calibration(),
                     },
                 ) else {
-                    return Err(Error::new(ErrorKind::State(StateErrorKind::NoCalibrationDataAvailable)));
+                    return Err(StateError::NoCalibrationDataAvailable);
                 };
                 let mut r_stick_state = StickState::with_config(StickStateConfig {
                     calibration: Some(r_calibration),

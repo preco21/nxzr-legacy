@@ -1,6 +1,5 @@
-use super::subcommand::Subcommand;
+use super::{subcommand::Subcommand, ReportError};
 use crate::controller::ControllerType;
-use crate::{Error, ErrorKind, ReportErrorKind, Result};
 use strum::Display;
 
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
@@ -73,12 +72,12 @@ impl InputReport {
         Self { buf }
     }
 
-    pub fn with_raw(data: &[u8]) -> Result<Self> {
+    pub fn with_raw(data: &[u8]) -> Result<Self, ReportError> {
         if data.len() < REPORT_MIN_LEN {
-            return Err(Error::new(ErrorKind::Report(ReportErrorKind::TooShort)));
+            return Err(ReportError::TooShort);
         }
         let [0xA1, ..] = data else {
-            return Err(Error::new(ErrorKind::Report(ReportErrorKind::Malformed)));
+            return Err(ReportError::Malformed);
         };
         Ok(Self { buf: data.to_vec() })
     }
@@ -176,9 +175,9 @@ impl InputReport {
     }
 
     // Returns `true` if the total data length matches 313
-    pub fn set_ir_nfc_data(&mut self, data: &[u8]) -> Result<bool> {
+    pub fn set_ir_nfc_data(&mut self, data: &[u8]) -> Result<bool, ReportError> {
         if data.len() > 313 {
-            return Err(Error::new(ErrorKind::Report(ReportErrorKind::OutOfBounds)));
+            return Err(ReportError::OutOfBounds);
         }
         self.buf[50..50 + data.len()].copy_from_slice(data);
         Ok(data.len() == 313)
@@ -197,7 +196,7 @@ impl InputReport {
         mac_addr: [u8; 6],
         fm_version: Option<[u8; 2]>,
         controller_type: ControllerType,
-    ) -> Result<()> {
+    ) -> Result<(), ReportError> {
         let fm_version = fm_version.unwrap_or([0x04, 0x00]);
         self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo);
         self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version);
@@ -209,9 +208,14 @@ impl InputReport {
         Ok(())
     }
 
-    pub fn sub_0x10_spi_flash_read(&mut self, offset: u32, size: u8, data: &[u8]) -> Result<()> {
+    pub fn sub_0x10_spi_flash_read(
+        &mut self,
+        offset: u32,
+        size: u8,
+        data: &[u8],
+    ) -> Result<(), ReportError> {
         if size > 0x1D || data.len() != size.into() {
-            return Err(Error::new(ErrorKind::Report(ReportErrorKind::OutOfBounds)));
+            return Err(ReportError::OutOfBounds);
         }
         // Creates input report data with spi flash read subcommand
         self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead);
@@ -229,7 +233,7 @@ impl InputReport {
     pub fn sub_0x04_trigger_buttons_elapsed_time(
         &mut self,
         commands: &[TriggerButtonsElapsedTimeCommand],
-    ) -> Result<()> {
+    ) -> Result<(), ReportError> {
         const MAX_MS: u32 = 10 * 0xFFFF;
         let mut set = |offset: usize, ms: u32| {
             let value = (ms / 10) as u16;
@@ -240,43 +244,43 @@ impl InputReport {
             match *command {
                 TriggerButtonsElapsedTimeCommand::LeftTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
+                        return Err(ReportError::Invariant);
                     }
                     set(0, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::RightTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
+                        return Err(ReportError::Invariant);
                     }
                     set(2, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::ZLeftTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
+                        return Err(ReportError::Invariant);
                     }
                     set(4, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::ZRightTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
+                        return Err(ReportError::Invariant);
                     }
                     set(6, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::SLeftTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
+                        return Err(ReportError::Invariant);
                     }
                     set(8, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::SRightTrigger(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
+                        return Err(ReportError::Invariant);
                     }
                     set(10, ms);
                 }
                 TriggerButtonsElapsedTimeCommand::Home(ms) => {
                     if ms > MAX_MS {
-                        return Err(Error::new(ErrorKind::Report(ReportErrorKind::Invariant)));
+                        return Err(ReportError::Invariant);
                     }
                     set(12, ms);
                 }
