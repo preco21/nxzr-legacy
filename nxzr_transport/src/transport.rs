@@ -66,23 +66,21 @@ pub struct Transport {
 
 impl Transport {
     pub async fn register(
+        itr_sock: l2cap::SeqPacket,
+        ctl_sock: l2cap::SeqPacket,
         config: TransportConfig,
     ) -> Result<(Self, TransportHandle), TransportError> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let inner = Arc::new(TransportInner::new(config, closed_tx).await?);
-        let (msg_tx, msg_rx) = mpsc::unbounded_channel();
-        let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
-        Event::handle_events(msg_rx, event_sub_rx)?;
+        let inner = Arc::new(TransportInner::new(itr_sock, ctl_sock, config, closed_tx).await?);
         let mut set = JoinSet::new();
         // Handle writer lock timing.
         set.spawn({
             let inner = inner.clone();
-            let msg_tx = msg_tx.clone();
             async move {
                 loop {
                     if let Err(err) = inner.monitor_lock().await {
-                        let _ = msg_tx.send(Event::Error(err));
+                        let _ = inner.dispatch_event(Event::Error(err));
                     }
                 }
             }
@@ -90,11 +88,10 @@ impl Transport {
         // Handle writer window timing.
         set.spawn({
             let inner = inner.clone();
-            let msg_tx = msg_tx.clone();
             async move {
                 loop {
                     if let Err(err) = inner.monitor_window().await {
-                        let _ = msg_tx.send(Event::Error(err));
+                        let _ = inner.dispatch_event(Event::Error(err));
                     }
                 }
             }
@@ -182,6 +179,7 @@ pub(crate) struct TransportInner {
     read_buf_size: usize,
     closed_tx: mpsc::Sender<()>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
+    msg_tx: mpsc::UnboundedSender<Event>,
 }
 
 impl TransportInner {
@@ -220,10 +218,11 @@ impl TransportInner {
             ctl_sock,
             running_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
-            closed_tx,
-            event_sub_tx,
             write_sem: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
             read_buf_size,
+            closed_tx,
+            event_sub_tx,
+            msg_tx,
         })
     }
 
@@ -300,6 +299,10 @@ impl TransportInner {
         Ok(Event::subscribe(&mut self.event_sub_tx.clone()).await?)
     }
 
+    pub fn dispatch_event(&self, event: Event) {
+        let _ = self.msg_tx.send(event);
+    }
+
     fn is_closed(&self) -> bool {
         self.closed_tx.is_closed()
     }
@@ -316,7 +319,7 @@ pub enum Event {
 }
 
 #[derive(Debug)]
-pub(crate) struct SubscriptionReq {
+pub struct SubscriptionReq {
     tx: mpsc::UnboundedSender<Event>,
     ready_tx: oneshot::Sender<()>,
 }

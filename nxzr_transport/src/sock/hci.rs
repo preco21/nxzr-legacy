@@ -1,6 +1,6 @@
 use super::sys::{hci_filter, HCI_FILTER, SOL_HCI};
 use crate::sock::{
-    self, sock_priv,
+    self, sock_priv_mini,
     sys::{sockaddr_hci, BTPROTO_HCI},
     OwnedFd,
 };
@@ -140,7 +140,7 @@ impl Socket {
         })
     }
 
-    sock_priv!();
+    sock_priv_mini!();
 }
 
 impl AsRawFd for Socket {

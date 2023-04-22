@@ -1,7 +1,5 @@
 use crate::sock::{self, l2cap::LazySeqPacketListener};
 use bluer::l2cap::{self, SocketAddr};
-use std::os::fd::AsRawFd;
-use strum::{Display, IntoStaticStr};
 use thiserror::Error;
 
 const DEFAULT_CTL_PSM: u32 = 17;
@@ -9,7 +7,22 @@ const DEFAULT_ITR_PSM: u32 = 19;
 
 #[derive(Clone, Error, Debug)]
 pub enum SessionError {
+    #[error("unknown")]
     Unknown,
+    #[error("internal error: {0}")]
+    Internal(SessionInternalError),
+}
+
+#[derive(Clone, Error, Debug)]
+pub enum SessionInternalError {
+    #[error("io: {0}")]
+    Io(std::io::ErrorKind),
+}
+
+impl From<std::io::Error> for SessionError {
+    fn from(err: std::io::Error) -> Self {
+        Self::Internal(SessionInternalError::Io(err.kind()))
+    }
 }
 
 #[derive(Debug, Default)]
@@ -44,7 +57,7 @@ impl Session {
         // SO_SNDBUF
     }
 
-    pub fn bind() -> Result<()> {}
+    // pub fn bind() -> Result<()> {}
 
-    pub fn listen() -> Result<()> {}
+    // pub fn listen() -> Result<()> {}
 }
