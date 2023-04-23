@@ -1,6 +1,7 @@
 use thiserror::Error;
 use transport::TransportError;
 
+pub mod device;
 pub mod semaphore;
 pub mod session;
 pub mod sock;
