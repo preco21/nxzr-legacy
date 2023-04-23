@@ -43,9 +43,9 @@ pub struct SessionListener {
 
 #[derive(Debug)]
 struct SessionAddressDef {
+    addr: Address,
     ctl_psm: u16,
     itr_psm: u16,
-    addr: Address,
 }
 
 impl SessionListener {
