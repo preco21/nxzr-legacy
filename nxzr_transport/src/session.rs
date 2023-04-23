@@ -9,8 +9,8 @@ const DEFAULT_ITR_PSM: u16 = 19;
 
 #[derive(Clone, Error, Debug)]
 pub enum SessionError {
-    #[error("unknown")]
-    Unknown,
+    #[error("control/interrupt socket address must match with each other")]
+    CtlItrSocketAddrMismatch,
     #[error("internal error: {0}")]
     Internal(SessionInternalError),
 }
@@ -97,11 +97,30 @@ impl SessionListener {
         self.itr_sock.listen(1).await?;
         Ok(())
     }
-
+    #[tracing::instrument(target = "session")]
     pub async fn accept(&self) -> Result<PairedSession, SessionError> {
-        let ctl_pair = self.ctl_sock.accept().await?;
-        let itr_pair = self.itr_sock.accept().await?;
-        Ok(PairedSession::from_socket(ctl_pair, itr_pair))
+        tracing::info!("start accepting incoming connection for `control` socket");
+        let (ctl_client, ctl_sa) = self.ctl_sock.accept().await?;
+        tracing::info!(
+            "accepted connection for `control` socket at psm {} from {:?}",
+            self.addr_def.ctl_psm,
+            ctl_sa,
+        );
+        tracing::info!("start accepting incoming connection for `interrupt` socket");
+        let (itr_client, itr_sa) = self.itr_sock.accept().await?;
+        tracing::info!(
+            "accepted connection for `interrupt` socket at psm {} from {:?}",
+            self.addr_def.itr_psm,
+            itr_sa,
+        );
+        if ctl_sa != itr_sa {
+            tracing::error!("assertion failed, control/interrupt socket address didn't match");
+            return Err(SessionError::CtlItrSocketAddrMismatch);
+        }
+        Ok(PairedSession::from_socket(
+            (ctl_client, ctl_sa),
+            (itr_client, itr_sa),
+        ))
     }
 }
 
