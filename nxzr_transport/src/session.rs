@@ -29,9 +29,9 @@ impl From<std::io::Error> for SessionError {
 
 #[derive(Debug, Default)]
 pub struct SessionConfig {
+    address: Option<Address>,
     control_psm: Option<u16>,
     interrupt_psm: Option<u16>,
-    device_address: Option<Address>,
 }
 
 #[derive(Debug)]
@@ -43,9 +43,9 @@ pub struct SessionListener {
 
 #[derive(Debug)]
 struct SessionAddressDef {
-    control_psm: u16,
-    interrupt_psm: u16,
-    device_address: Address,
+    ctl_psm: u16,
+    itr_psm: u16,
+    addr: Address,
 }
 
 impl SessionListener {
@@ -62,9 +62,9 @@ impl SessionListener {
             ctl_sock,
             itr_sock,
             addr_def: SessionAddressDef {
-                control_psm,
-                interrupt_psm,
-                device_address: config.device_address.unwrap_or(Address::default()),
+                ctl_psm: control_psm,
+                itr_psm: interrupt_psm,
+                addr: config.address.unwrap_or(Address::default()),
             },
         })
     }
@@ -74,15 +74,15 @@ impl SessionListener {
         tracing::info!("binding the session");
         self.ctl_sock
             .bind(SocketAddr {
-                addr: self.addr_def.device_address,
-                psm: self.addr_def.control_psm,
+                addr: self.addr_def.addr,
+                psm: self.addr_def.ctl_psm,
                 ..Default::default()
             })
             .await?;
         self.itr_sock
             .bind(SocketAddr {
-                addr: self.addr_def.device_address,
-                psm: self.addr_def.interrupt_psm,
+                addr: self.addr_def.addr,
+                psm: self.addr_def.itr_psm,
                 ..Default::default()
             })
             .await?;
@@ -105,6 +105,13 @@ impl SessionListener {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct PairedSessionConfig {
+    reconnect_address: Address,
+    control_psm: Option<u16>,
+    interrupt_psm: Option<u16>,
+}
+
 #[derive(Debug)]
 pub struct PairedSession {
     ctl_client: l2cap::SeqPacket,
@@ -114,16 +121,16 @@ pub struct PairedSession {
 }
 
 impl PairedSession {
-    pub async fn connect(config: SessionConfig) -> Result<Self, SessionError> {
+    pub async fn connect(config: PairedSessionConfig) -> Result<Self, SessionError> {
         let control_psm = config.control_psm.unwrap_or(DEFAULT_CTL_PSM);
         let interrupt_psm = config.interrupt_psm.unwrap_or(DEFAULT_ITR_PSM);
         let ctl_addr = SocketAddr {
-            addr: config.device_address.unwrap_or(Address::default()),
+            addr: config.reconnect_address,
             psm: control_psm,
             ..Default::default()
         };
         let itr_addr = SocketAddr {
-            addr: config.device_address.unwrap_or(Address::default()),
+            addr: config.reconnect_address,
             psm: interrupt_psm,
             ..Default::default()
         };
