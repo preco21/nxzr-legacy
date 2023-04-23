@@ -1,4 +1,5 @@
 use crate::semaphore::BoundedSemaphore;
+use crate::session::PairedSession;
 use crate::sock::{hci, l2cap};
 use bytes::{Bytes, BytesMut};
 use std::future::Future;
@@ -59,13 +60,12 @@ pub struct Transport {
 impl Transport {
     #[tracing::instrument(target = "transport")]
     pub async fn register(
-        itr_client: l2cap::SeqPacket,
-        ctl_client: l2cap::SeqPacket,
+        paired_session: PairedSession,
         config: TransportConfig,
     ) -> Result<(Self, TransportHandle), TransportError> {
         let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let inner = Arc::new(TransportInner::new(itr_client, ctl_client, config, closed_tx).await?);
+        let inner = Arc::new(TransportInner::new(paired_session, config, closed_tx).await?);
         let mut set = JoinSet::new();
         // Handle writer lock timing.
         set.spawn({
@@ -165,9 +165,8 @@ impl Drop for TransportHandle {
 pub(crate) struct TransportInner {
     write_window: hci::Datagram,
     write_lock: hci::Datagram,
-    itr_client: l2cap::SeqPacket,
-    // Control socket must always be dropped with interrupt socket like a pair.
-    _ctl_client: l2cap::SeqPacket,
+    // Control socket must always be dropped with interrupt socket like a pair even if it's unused.
+    session: PairedSession,
     running_tx: watch::Sender<bool>,
     writing_tx: watch::Sender<bool>,
     write_sem: Arc<BoundedSemaphore>,
@@ -178,15 +177,14 @@ pub(crate) struct TransportInner {
 impl TransportInner {
     #[tracing::instrument]
     pub async fn new(
-        itr_client: l2cap::SeqPacket,
-        ctl_client: l2cap::SeqPacket,
+        paired_session: PairedSession,
         config: TransportConfig,
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
         tracing::info!("initiating a transport");
         // Reset `SO_SNDBUF` of the given client sockets.
-        itr_client.reset_sndbuf()?;
-        ctl_client.reset_sndbuf()?;
+        paired_session.itr_client().reset_sndbuf()?;
+        paired_session.ctl_client().reset_sndbuf()?;
         // Device ids must be targeting to the local machine.
         let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
         // 0x04 = HCI_EVT; 0x13 = Number of completed packets
@@ -209,8 +207,7 @@ impl TransportInner {
         Ok(Self {
             write_window,
             write_lock,
-            itr_client,
-            _ctl_client: ctl_client,
+            session,
             running_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
             write_sem: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
@@ -244,7 +241,7 @@ impl TransportInner {
         }
         self.running().await;
         let mut buf = BytesMut::with_capacity(self.read_buf_size);
-        self.itr_client.recv(&mut buf).await?;
+        self.session.itr_client().recv(&mut buf).await?;
         Ok(buf.freeze())
     }
 
@@ -257,7 +254,7 @@ impl TransportInner {
         self.writable().await;
         // Writing a buffer in length more than MTU may fail, however, L2CAP's
         // `SeqPacket` socket seems allows writing buf regardless of the length.
-        self.itr_client.send(&buf).await?;
+        self.session.itr_client().send(&buf).await?;
         Ok(())
     }
 
