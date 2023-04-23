@@ -1,4 +1,3 @@
-use crate::event::{setup_event, EventError};
 use crate::semaphore::BoundedSemaphore;
 use crate::sock::{hci, l2cap};
 use bytes::{Bytes, BytesMut};
@@ -6,9 +5,10 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
 use tokio::time::sleep;
+use tracing::Instrument;
 
 const DEFAULT_FLOW_CONTROL_PERMITS: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
@@ -29,8 +29,6 @@ pub enum TransportError {
 pub enum TransportInternalError {
     #[error("io: {0}")]
     Io(std::io::ErrorKind),
-    #[error("event: {0}")]
-    Event(EventError),
     #[error("semaphore acquire failed")]
     SemaphoreFailed,
 }
@@ -38,12 +36,6 @@ pub enum TransportInternalError {
 impl From<std::io::Error> for TransportError {
     fn from(err: std::io::Error) -> Self {
         Self::Internal(TransportInternalError::Io(err.kind()))
-    }
-}
-
-impl From<EventError> for TransportError {
-    fn from(err: EventError) -> Self {
-        Self::Internal(TransportInternalError::Event(err))
     }
 }
 
@@ -65,6 +57,7 @@ pub struct Transport {
 }
 
 impl Transport {
+    #[tracing::instrument(target = "transport")]
     pub async fn register(
         itr_client: l2cap::SeqPacket,
         ctl_client: l2cap::SeqPacket,
@@ -80,10 +73,11 @@ impl Transport {
             async move {
                 loop {
                     if let Err(err) = inner.monitor_lock().await {
-                        let _ = inner.dispatch_event(Event::Error(err));
+                        tracing::error!("failed to receive data from write lock socket: {}", err);
                     }
                 }
             }
+            .instrument(tracing::info_span!("transport_worker"))
         });
         // Handle writer window timing.
         set.spawn({
@@ -91,22 +85,26 @@ impl Transport {
             async move {
                 loop {
                     if let Err(err) = inner.monitor_window().await {
-                        let _ = inner.dispatch_event(Event::Error(err));
+                        tracing::error!("failed to receive data from write window socket: {}", err);
                     }
                 }
             }
+            .instrument(tracing::info_span!("transport_worker"))
         });
         tokio::spawn({
             let inner = inner.clone();
             async move {
                 close_tx.closed().await;
+                tracing::info!("close signal received, terminating transport");
                 // Generally, it's recommended to pause from caller before it
                 // gets ended up here. We are assuming the user may not be able
                 // to `.pause()` it anyway.
                 inner.pause();
                 set.shutdown().await;
+                tracing::info!("transport terminated");
                 drop(closed_rx);
             }
+            .instrument(tracing::info_span!("transport_worker"))
         });
         Ok((
             Self { inner },
@@ -142,10 +140,6 @@ impl Transport {
         self.inner.resume();
     }
 
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, TransportError> {
-        self.inner.events().await
-    }
-
     pub fn closed(&self) -> impl Future<Output = ()> {
         self.inner.closed()
     }
@@ -179,17 +173,17 @@ pub(crate) struct TransportInner {
     write_sem: Arc<BoundedSemaphore>,
     read_buf_size: usize,
     closed_tx: mpsc::Sender<()>,
-    event_sub_tx: mpsc::Sender<SubscriptionReq>,
-    msg_tx: mpsc::UnboundedSender<Event>,
 }
 
 impl TransportInner {
+    #[tracing::instrument]
     pub async fn new(
         itr_client: l2cap::SeqPacket,
         ctl_client: l2cap::SeqPacket,
         config: TransportConfig,
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
+        tracing::info!("initiating a transport");
         // Reset `SO_SNDBUF` of the given client sockets.
         itr_client.reset_sndbuf()?;
         ctl_client.reset_sndbuf()?;
@@ -212,9 +206,6 @@ impl TransportInner {
             .num_flow_control
             .unwrap_or(DEFAULT_FLOW_CONTROL_PERMITS);
         let read_buf_size = config.read_buf_size.unwrap_or(DEFAULT_READ_BUF_SIZE);
-        let (msg_tx, msg_rx) = mpsc::unbounded_channel();
-        let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
-        Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
             write_window,
             write_lock,
@@ -225,8 +216,6 @@ impl TransportInner {
             write_sem: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
             read_buf_size,
             closed_tx,
-            event_sub_tx,
-            msg_tx,
         })
     }
 
@@ -302,14 +291,6 @@ impl TransportInner {
         self.writing_tx.send_replace(true);
     }
 
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, TransportError> {
-        Ok(Event::subscribe(&mut self.event_sub_tx.clone()).await?)
-    }
-
-    pub fn dispatch_event(&self, event: Event) {
-        let _ = self.msg_tx.send(event);
-    }
-
     fn is_closed(&self) -> bool {
         self.closed_tx.is_closed()
     }
@@ -318,19 +299,4 @@ impl TransportInner {
         let closed_tx = self.closed_tx.clone();
         async move { closed_tx.closed().await }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum Event {
-    Error(TransportError),
-}
-
-#[derive(Debug)]
-pub struct SubscriptionReq {
-    tx: mpsc::UnboundedSender<Event>,
-    ready_tx: oneshot::Sender<()>,
-}
-
-impl Event {
-    setup_event!();
 }
