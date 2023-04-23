@@ -1,6 +1,6 @@
 use crate::semaphore::BoundedSemaphore;
 use crate::session::PairedSession;
-use crate::sock::{hci, l2cap};
+use crate::sock::hci;
 use bytes::{Bytes, BytesMut};
 use std::future::Future;
 use std::sync::Arc;
@@ -207,7 +207,7 @@ impl TransportInner {
         Ok(Self {
             write_window,
             write_lock,
-            session,
+            session: paired_session,
             running_tx: watch::channel(true).0,
             writing_tx: watch::channel(true).0,
             write_sem: Arc::new(BoundedSemaphore::new(num_flow_control, num_flow_control)),
