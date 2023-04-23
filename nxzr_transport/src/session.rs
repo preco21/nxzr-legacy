@@ -102,18 +102,18 @@ impl SessionListener {
         tracing::info!("start accepting incoming connection for `control` socket");
         let (ctl_client, ctl_sa) = self.ctl_sock.accept().await?;
         tracing::info!(
-            "accepted connection for `control` socket at psm {} from {:?}",
-            self.addr_def.ctl_psm,
-            ctl_sa,
+            "accepted connection for `control` socket at psm {} from {}",
+            ctl_sa.psm,
+            ctl_sa.addr,
         );
         tracing::info!("start accepting incoming connection for `interrupt` socket");
         let (itr_client, itr_sa) = self.itr_sock.accept().await?;
         tracing::info!(
-            "accepted connection for `interrupt` socket at psm {} from {:?}",
-            self.addr_def.itr_psm,
-            itr_sa,
+            "accepted connection for `interrupt` socket at psm {} from {}",
+            itr_sa.psm,
+            itr_sa.addr,
         );
-        if ctl_sa != itr_sa {
+        if ctl_sa.addr != itr_sa.addr {
             tracing::error!("assertion failed, control/interrupt socket address didn't match");
             return Err(SessionError::CtlItrSocketAddrMismatch);
         }
