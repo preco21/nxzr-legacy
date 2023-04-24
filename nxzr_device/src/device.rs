@@ -30,15 +30,16 @@ impl From<bluer::Error> for DeviceError {
 
 #[derive(Debug)]
 pub struct Device {
-    session: bluer::Session,
     adapter: bluer::Adapter,
+    session: bluer::Session,
 }
 
 impl Device {
     pub async fn new() -> Result<Self, DeviceError> {
         let session = bluer::Session::new().await?;
+        // FIXME: allow user to select other adapters
         let adapter = session.default_adapter().await?;
-        Ok(Self { session, adapter })
+        Ok(Self { adapter, session })
     }
 
     pub fn address(&self) {}
@@ -49,10 +50,17 @@ impl Device {
 
     pub fn unpair_path(&self) {}
 
-    pub fn powered(&self) {}
+    pub async fn start_advertise(&self) -> Result<(), DeviceError> {
+        self.adapter.set_powered(true).await?;
+        self.adapter.set_pairable(true).await?;
+        // TODO: set name
+        // TODO: ...
+        Ok(())
+    }
 
-    pub async fn set_discoverable(&self, flag: bool) -> Result<(), DeviceError> {
-        self.adapter.set_discoverable(flag).await?;
+    pub async fn stop_advertise(&self) -> Result<(), DeviceError> {
+        self.adapter.set_discoverable(false).await?;
+        self.adapter.set_pairable(false).await?;
         Ok(())
     }
 
