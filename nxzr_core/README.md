@@ -1,3 +1,3 @@
 # nxzr_core
 
-> the core module
+> NXZR project: The core module

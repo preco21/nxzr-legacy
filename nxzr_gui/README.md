@@ -1,3 +1,3 @@
 # nxzr_gui
 
-> host gui application
+> NXZR project: Host GUI application

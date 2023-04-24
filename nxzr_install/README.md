@@ -1,3 +1,3 @@
 # nxzr_server
 
-> the installer modules
+> NXZR project: Installer helpers

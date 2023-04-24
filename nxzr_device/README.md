@@ -1,6 +1,6 @@
 # nxzr_device
 
-> device and transport modules
+> NXZR project: A collection of tools, actual transport layer and connection helpers
 
 ## Tracing & Logging
 
