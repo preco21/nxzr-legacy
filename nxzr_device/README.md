@@ -1,6 +1,6 @@
-# nxzr_transport
+# nxzr_device
 
-> 니 스위치 쩔드라
+> device and transport modules
 
 ## Tracing & Logging
 

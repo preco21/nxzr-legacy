@@ -5,7 +5,7 @@
 ## Project structure
 
 - [nxzr_core](./nxzr_core/): The NXZR core modules
-- [nxzr_transport](./nxzr_transport/): Transport modules for working with unix sockets
+- [nxzr_device](./nxzr_device/): Device and transport modules for working with unix sockets
 - [nxzr_server](./nxzr_server/): Server daemon application that runs on the guest side
 - [nxzr_gui](./nxzr_gui/): Host GUI application that interacts with `nxzr_server`
 
@@ -37,7 +37,7 @@ Make sure the [Docker daemon](https://www.docker.com/) is running on your system
 Then, open a project directly to work with `cross`:
 
 ```shell
-code nxzr_transport
+code nxzr_device
 ```
 
 Tracking issues:

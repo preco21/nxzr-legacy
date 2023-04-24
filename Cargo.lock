@@ -420,6 +420,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "nxzr_device"
+version = "0.1.0"
+dependencies = [
+ "bluer",
+ "bytes",
+ "dbus",
+ "libc",
+ "macaddr",
+ "num-derive",
+ "num-traits",
+ "strum",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "nxzr_gui"
 version = "0.1.0"
 dependencies = [
@@ -434,23 +451,6 @@ dependencies = [
  "log",
  "nxzr_core",
  "tokio",
-]
-
-[[package]]
-name = "nxzr_transport"
-version = "0.1.0"
-dependencies = [
- "bluer",
- "bytes",
- "dbus",
- "libc",
- "macaddr",
- "num-derive",
- "num-traits",
- "strum",
- "thiserror",
- "tokio",
- "tracing",
 ]
 
 [[package]]

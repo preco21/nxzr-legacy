@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use nxzr_transport::semaphore::BoundedSemaphore;
+use nxzr_device::semaphore::BoundedSemaphore;
 use tokio::time::sleep;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

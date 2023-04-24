@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use nxzr_transport::sock::hci::{Datagram, Filter, SocketAddr};
+use nxzr_device::sock::hci::{Datagram, Filter, SocketAddr};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     time::sleep,
