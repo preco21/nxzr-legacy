@@ -11,7 +11,7 @@ publish = false
 
 [dependencies]
 # Making these dependencies optional allows cross-platform development on
-# platforms other than `linux`.
+# platforms other than `linux`, while it's not buildable though.
 bluer = { version = "0.15.7", features = [
     "bluetoothd",
     "rfcomm",
@@ -26,6 +26,7 @@ thiserror = "1.0.40"
 tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
 tracing = "0.1.37"
 
+# FIXME: revisit: make it only enabled when Cross is used
 [target.'cfg(target_os = "linux")'.dependencies]
 bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
 dbus = { version = "0.9.7", features = ["vendored"] }
