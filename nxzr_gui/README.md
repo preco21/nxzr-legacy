@@ -28,4 +28,9 @@ rustup target add x86_64-pc-windows-msvc
 rustup target add i686-pc-windows-msvc
 ```
 
-Check for the config in `msvc-linker/config.sh` if necessary.
+Install [msvc-wsl-rust](https://github.com/strickczq/msvc-wsl-rust) and make an edit for the config in `msvc-linker/config.sh` if necessary.
+
+```shell
+git clone https://github.com/strickczq/msvc-wsl-rust.git msvc-linker
+chmod a+x msvc-linker/*.sh
+```
