@@ -20,17 +20,8 @@ thiserror = "1.0.40"
 tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
 tracing = "0.1.37"
 
-[target.'cfg(linux)'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
-
-# Making these dependencies optional allows cross-platform development on
-# platforms other than `linux`, while it's not buildable though.
-[target.'cfg(not(linux))'.dependencies]
-bluer = { version = "0.15.7", features = [
-    "bluetoothd",
-    "rfcomm",
-], optional = true }
-dbus = { version = "0.9.7", features = ["vendored"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.25.0", features = ["full"] }
