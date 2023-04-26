@@ -10,7 +10,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
 bytes = "1.4.0"
 libc = "0.2.140"
 macaddr = "1.0.1"
@@ -20,6 +19,9 @@ strum = { version = "0.24.1", features = ["derive"] }
 thiserror = "1.0.40"
 tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
 tracing = "0.1.37"
+
+[target.'cfg(linux)'.dependencies]
+bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
 
 # Making these dependencies optional allows cross-platform development on
 # platforms other than `linux`, while it's not buildable though.
