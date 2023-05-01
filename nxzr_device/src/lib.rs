@@ -1,3 +1,5 @@
+use device::DeviceError;
+use session::SessionError;
 use thiserror::Error;
 use transport::TransportError;
 
@@ -11,6 +13,10 @@ pub mod transport;
 pub enum Error {
     #[error(transparent)]
     Transport(#[from] TransportError),
+    #[error(transparent)]
+    Session(#[from] SessionError),
+    #[error(transparent)]
+    Device(#[from] DeviceError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
