@@ -1,15 +1,17 @@
 use thiserror::Error;
 
+use crate::sock::Address;
+
 const HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
 #[derive(Clone, Error, Debug)]
 pub enum DeviceError {
     #[error("internal error: {0}")]
-    Internal(SessionInternalError),
+    Internal(DeviceInternalError),
 }
 
 #[derive(Clone, Error, Debug)]
-pub enum SessionInternalError {
+pub enum DeviceInternalError {
     #[error("io: {0}")]
     Io(std::io::ErrorKind),
     #[error("bluer: {0}")]
@@ -18,14 +20,26 @@ pub enum SessionInternalError {
 
 impl From<std::io::Error> for DeviceError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(SessionInternalError::Io(err.kind()))
+        Self::Internal(DeviceInternalError::Io(err.kind()))
     }
 }
 
 impl From<bluer::Error> for DeviceError {
     fn from(err: bluer::Error) -> Self {
-        Self::Internal(SessionInternalError::Bluer(err.kind))
+        Self::Internal(DeviceInternalError::Bluer(err.kind))
     }
+}
+
+#[derive(Debug, Default)]
+pub struct DeviceConfig {
+    // Name of the bluetooth adapter to use.
+    //
+    // In form of a raw string that matches the adapter name, which is
+    // generally represented in the hci* notation. (e.g. hci0, hci1, ...)
+    //
+    // If None, it will automatically choose the first one by sorting adapter
+    // names in lexicographic order.
+    pub id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -35,10 +49,18 @@ pub struct Device {
 }
 
 impl Device {
-    pub async fn new() -> Result<Self, DeviceError> {
+    pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
         let session = bluer::Session::new().await?;
-        // FIXME: allow user to select other adapters
-        let adapter = session.default_adapter().await?;
+        let adapter = match config.id {
+            Some(adapter_name) => {
+                for name in session.adapter_names().await? {
+                    if name == adapter_name {
+                        return session.adapter(&adapter_name);
+                    }
+                }
+            }
+            None => session.default_adapter().await?,
+        };
         Ok(Self { adapter, session })
     }
 
