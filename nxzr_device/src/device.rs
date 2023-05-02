@@ -55,7 +55,7 @@ impl Device {
             Some(adapter_name) => {
                 for name in session.adapter_names().await? {
                     if name == adapter_name {
-                        return session.adapter(&adapter_name);
+                        return session.adapter(&adapter_name)?;
                     }
                 }
             }
