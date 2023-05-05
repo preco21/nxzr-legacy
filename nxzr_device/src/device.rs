@@ -1,6 +1,8 @@
+use crate::{
+    helper::{self, HelperError},
+    sock::Address,
+};
 use thiserror::Error;
-
-use crate::sock::Address;
 
 const HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
@@ -54,17 +56,17 @@ impl Device {
     pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
         let session = bluer::Session::new().await?;
         let adapter = match config.id {
-            Some(adapter_id) => {
+            Some(adapter_name) => {
                 let mut found_adapter = None;
                 for name in session.adapter_names().await? {
-                    if name == adapter_id {
-                        found_adapter = Some(session.adapter(&adapter_id)?);
+                    if name == adapter_name {
+                        found_adapter = Some(session.adapter(&adapter_name)?);
                         break;
                     }
                 }
                 match found_adapter {
                     Some(adapter) => adapter,
-                    None => return Err(DeviceError::NoSuchAdapterExists(adapter_id)),
+                    None => return Err(DeviceError::NoSuchAdapterExists(adapter_name)),
                 }
             }
             None => session.default_adapter().await?,
@@ -72,30 +74,32 @@ impl Device {
         Ok(Self { adapter, session })
     }
 
-    pub fn address(&self) {}
+    pub async fn address(&self) -> Result<Address, DeviceError> {
+        let addr = self.adapter.address().await?;
+        Ok(addr.into())
+    }
 
     pub fn set_address(&self) {}
 
     pub fn paired_switches(&self) {}
 
-    pub fn unpair_path(&self) {}
-
-    pub async fn start_advertise(&self) -> Result<(), DeviceError> {
-        self.adapter.set_powered(true).await?;
-        self.adapter.set_pairable(true).await?;
-        // TODO: set name
-        // TODO: ...
+    pub async fn unpair_path(&self, address: Address) -> Result<(), DeviceError> {
+        self.adapter.remove_device(addr.into()).await?;
         Ok(())
     }
 
-    pub async fn stop_advertise(&self) -> Result<(), DeviceError> {
-        self.adapter.set_discoverable(false).await?;
-        self.adapter.set_pairable(false).await?;
+    pub async fn set_powered(&self, flag: bool) -> Result<(), DeviceError> {
+        self.adapter.set_powered(flag).await?;
         Ok(())
     }
 
     pub async fn set_pairable(&self, flag: bool) -> Result<(), DeviceError> {
         self.adapter.set_pairable(flag).await?;
+        Ok(())
+    }
+
+    pub async fn set_discoverable(&self, flag: bool) -> Result<(), DeviceError> {
+        self.adapter.set_discoverable(flag).await?;
         Ok(())
     }
 
