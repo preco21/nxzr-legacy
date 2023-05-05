@@ -231,7 +231,7 @@ impl Device {
         Ok(())
     }
 
-    pub async fn set_product_name(&self, name: String) -> Result<(), DeviceError> {
+    pub async fn set_alias(&self, name: String) -> Result<(), DeviceError> {
         self.adapter.set_alias(name).await?;
         Ok(())
     }

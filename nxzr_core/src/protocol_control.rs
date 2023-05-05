@@ -12,6 +12,9 @@ pub trait Transport: TransportCombined + Clone + Send + Sync + 'static {
     fn pause(&self);
 }
 
+pub use crate::controller::protocol::TransportRead;
+pub use crate::controller::protocol::TransportWrite;
+
 #[derive(Debug)]
 pub(crate) struct StateSendReq {
     ready_tx: oneshot::Sender<()>,

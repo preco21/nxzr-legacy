@@ -64,7 +64,7 @@ pub async fn set_adapter_address(
     })
     .await?;
     // Restart bluetooth service.
-    systemctl::restart("bluetooth.service")?;
+    restart_bluetooth_service()?;
     Ok(())
 }
 
@@ -83,6 +83,11 @@ pub async fn set_device_class(adapter_name: &str, class: u32) -> Result<u32, Hel
     })
     .await?;
     Ok(class)
+}
+
+pub fn restart_bluetooth_service() -> Result<(), HelperError> {
+    systemctl::restart("bluetooth.service")?;
+    Ok(())
 }
 
 pub async fn run_command(mut command: Command) -> Result<(), HelperError> {

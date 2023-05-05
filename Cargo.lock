@@ -427,6 +427,7 @@ dependencies = [
  "macaddr",
  "num-derive",
  "num-traits",
+ "nxzr_core",
  "strum",
  "systemctl",
  "thiserror",

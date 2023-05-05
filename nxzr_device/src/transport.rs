@@ -57,6 +57,24 @@ pub struct Transport {
     inner: Arc<TransportInner>,
 }
 
+impl nxzr_core::protocol_control::TransportCombined for Transport {
+    fn pause(&self) {
+        self.pause();
+    }
+}
+
+impl nxzr_core::protocol_control::TransportRead for Transport {
+    async fn read(&self) -> std::io::Result<&[u8]> {
+        self.read().await
+    }
+}
+
+impl nxzr_core::protocol_control::TransportWrite for Transport {
+    async fn write(&self, buf: &[u8]) -> std::io::Result<()> {
+        self.write(buf).await
+    }
+}
+
 impl Transport {
     #[tracing::instrument(target = "transport")]
     pub async fn register(
