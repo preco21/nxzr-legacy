@@ -1,9 +1,7 @@
-use crate::{
-    helper::{self, HelperError},
-    sock::Address,
-};
+use crate::sock::Address;
 use thiserror::Error;
 
+const SWITCH_DEVICE_NAME: &str = "Nintendo Switch";
 const HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
 #[derive(Clone, Error, Debug)]
@@ -81,10 +79,21 @@ impl Device {
 
     pub fn set_address(&self) {}
 
-    pub fn paired_switches(&self) {}
+    pub async fn paired_devices(&self) -> Result<Vec<bluer::Device>, DeviceError> {
+        let mut devices = vec![];
+        for addr in self.adapter.device_addresses().await? {
+            let dev = self.adapter.device(addr)?;
+            if let Some(name) = dev.name().await? {
+                if name == SWITCH_DEVICE_NAME {
+                    devices.push(dev);
+                }
+            }
+        }
+        Ok(devices)
+    }
 
-    pub async fn unpair_path(&self, address: Address) -> Result<(), DeviceError> {
-        self.adapter.remove_device(addr.into()).await?;
+    pub async fn remove_device(&self, address: Address) -> Result<(), DeviceError> {
+        self.adapter.remove_device(address.into()).await?;
         Ok(())
     }
 
