@@ -6,6 +6,8 @@ const HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
 #[derive(Clone, Error, Debug)]
 pub enum DeviceError {
+    #[error("no such adapter name: {0}")]
+    NoSuchAdapterExists(String),
     #[error("internal error: {0}")]
     Internal(DeviceInternalError),
 }
@@ -52,11 +54,17 @@ impl Device {
     pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
         let session = bluer::Session::new().await?;
         let adapter = match config.id {
-            Some(adapter_name) => {
+            Some(adapter_id) => {
+                let mut found_adapter = None;
                 for name in session.adapter_names().await? {
-                    if name == adapter_name {
-                        return session.adapter(&adapter_name)?;
+                    if name == adapter_id {
+                        found_adapter = Some(session.adapter(&adapter_id)?);
+                        break;
                     }
+                }
+                match found_adapter {
+                    Some(adapter) => adapter,
+                    None => return Err(DeviceError::NoSuchAdapterExists(adapter_id)),
                 }
             }
             None => session.default_adapter().await?,
