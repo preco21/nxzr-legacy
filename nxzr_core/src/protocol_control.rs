@@ -55,7 +55,6 @@ impl ProtocolControl {
             ProtocolControlTask::setup_events_relay(protocol.clone(), msg_tx.clone()),
             internal_close_tx.clone(),
         );
-
         // Setup protocol reader task
         let protocol_reader_fut = create_task(
             ProtocolControlTask::setup_reader(transport.clone(), protocol.clone()),

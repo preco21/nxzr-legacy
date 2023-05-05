@@ -1,3 +1,3 @@
 # nxzr_server
 
-> server demon application
+> server daemon application

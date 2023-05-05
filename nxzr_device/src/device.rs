@@ -132,7 +132,7 @@ impl Device {
     }
 
     #[tracing::instrument(target = "device")]
-    pub async fn check_paired_switches(&self, disconnect: bool) -> Result<(), DeviceError> {
+    pub async fn check_paired_devices(&self, disconnect: bool) -> Result<(), DeviceError> {
         let Some(uuids) = self.uuids().await? else {
             return Ok(())
         };
