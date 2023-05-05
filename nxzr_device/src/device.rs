@@ -72,6 +72,10 @@ impl Device {
         Ok(Self { adapter, session })
     }
 
+    pub fn adapter_name(&self) -> &str {
+        self.adapter.name()
+    }
+
     pub async fn address(&self) -> Result<Address, DeviceError> {
         let addr = self.adapter.address().await?;
         Ok(addr.into())
@@ -112,7 +116,9 @@ impl Device {
         Ok(())
     }
 
-    pub fn set_class(&self) {}
+    pub fn set_class(&self) {
+        self.adapter.class()
+    }
 
     pub fn set_name(&self) {}
 
