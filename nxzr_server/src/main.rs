@@ -1,118 +1,100 @@
-#[macro_use]
-extern crate log;
-
-use nxzr_core::controller::protocol::Protocol;
-use std::time::Duration;
-use tokio::{
-    io::{AsyncBufReadExt, BufReader},
-    join, select,
-    sync::mpsc,
-    time::sleep,
+use nxzr_core::{
+    controller::{
+        protocol::{Protocol, ProtocolConfig, TransportRead},
+        ControllerType,
+    },
+    protocol::{ProtocolControl, Transport as ProtocolTransport},
 };
+use nxzr_device::{
+    device::{Device, DeviceConfig},
+    helper,
+    session::{SessionConfig, SessionListener},
+    syscheck,
+    transport::{Transport, TransportConfig},
+};
+use std::{error::Error, time::Duration};
+use tokio::time::sleep;
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    env_logger::init();
+async fn main() -> Result<(), Box<dyn Error>> {
+    syscheck::check_system_requirements().await?;
 
     let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
-    let (cmd_tx, cmd_rx) = mpsc::channel(1);
-    let session = Session::new();
-    let ctrl = ProtocolControl::new(session, shutdown_tx); // transport 생성, protocol 루프 돌리기, accepted 이후 작동
-                                                           // ㄴ 1. poll read/write
-                                                           // ㄴ 2. wait for first connection
 
+    tracing_subscriber::fmt::init();
+
+    // FIXME: accept device id here
+    let mut device = Device::new(DeviceConfig::default())
+        .await?
+        .ensure_adapter_address_switch()
+        .await?;
+
+    // FIXME: implement reconnect, currently connecting from scratch only supported
+    device.check_paired_devices(true).await?;
+
+    let session = SessionListener::new(SessionConfig {
+        address: Some(device.address().await?.into()),
+        ..Default::default()
+    })?;
+
+    if let Err(err) = session.bind().await {
+        tracing::warn!("{:?}", err);
+        tracing::warn!("fallback: restarting the bluetooth session due to incompatibilities with the bluez `input` plugin, disable this plugin to avoid issues.");
+        tracing::info!("restarting bluetooth service...");
+        helper::restart_bluetooth_service()?;
+        sleep(Duration::from_millis(1000)).await;
+        // FIXME: accept device id here
+        device = Device::new(DeviceConfig::default()).await?;
+        session.bind().await?;
+    };
+
+    session.listen().await?;
+
+    device.set_powered(true).await?;
+    device.set_pairable(true).await?;
+
+    // FIXME: make it customizable
+    device
+        .set_alias(ControllerType::ProController.name())
+        .await?;
+
+    tracing::info!("advertising the bluetooth SDP record...");
+
+    // FIXME: allow ignoring errors
+    device.register_sdp_record().await?;
+
+    device.set_discoverable(true).await?;
+    device.set_class().await?;
+
+    tracing::info!("waiting for Switch to connect...");
+
+    let paired_session = session.accept().await?;
+    device.set_discoverable(false).await?;
+    device.set_pairable(false).await?;
+
+    let (transport, transport_handle) =
+        Transport::register(paired_session, TransportConfig::default()).await?;
+    // FIXME: allow customizing config
+    let (protocol, protocol_handle) =
+        ProtocolControl::connect(transport, ProtocolConfig::default())?;
+
+    let event_rx = protocol.events().await?;
+
+    // FIXME:
     tokio::spawn(async move {
-        ctrl.connected().await;
-        loop {
-            select! {
-                cmd = cmd_rx.recv() => ctrl.process_cmd(cmd),
-                _ = shutdown_tx.closed() => break,
-            }
+        while let Some(evt) = event_rx.recv().await {
+            tracing::info!("{:?}", evt);
         }
     });
 
-    // run and waits for the connection to lost
-    ctrl.run().await;
+    select! {
+        _ = transport.closed() => break,
+        _ = protocol.closed() => break,
+        _ = shutdown_tx.closed() => break,
+    }
+
+    drop(protocol_handle);
+    drop(transport_handle);
 
     Ok(())
-}
-
-struct ProtocolControl {}
-
-impl ProtocolControl {
-    async fn run(&self) {
-        let (transport, transport_handle) = Transport::register();
-        let protocol = Protocol::new();
-
-        let handle_error = async || {
-            transport.pause();
-            // log error
-            // shutdown_rx
-        };
-
-        let read_loop_handle = tokio::spawn(async move {
-            // maybe wait_for_response?
-            protocol.connected().await;
-            loop {
-                select! {
-                    res = protocol.process_read() => {},
-                    _ = shutdown_tx.closed() => break,
-                }
-            }
-        });
-        let write_loop_handle = tokio::spawn(async move {
-            protocol.connected().await;
-            loop {
-                select! {
-                    _ = protocol.process_write() => {},
-                    _ = shutdown_tx.closed() => break,
-                }
-            }
-        });
-        let cmd_loop_handle = tokio::spawn(async move {
-            protocol.connected().await;
-            loop {
-                select! {
-                    // 흠... cmd를 통째로 받기 보다는 여기서 cmd를 받아서 protocol의 x 함수를 호출하는 식으로 해도 될 듯
-                    // protocol.send_controller_state() 같은...
-                    _ = protocol.process_cmd() => {},
-                    _ = shutdown_tx.closed() => break,
-                }
-            }
-        });
-
-        let connection_handle = tokio::spawn(async move {
-            // spawn this
-            protocol.write_empty_report();
-
-            // then wait
-            protocol.wait_for_connection();
-        });
-
-        // 위에 로직 다 감싸서 Listener::run() 함수로 만들고 여기선 shutdown_fut + run select 돌리고
-        // 여기선 shutdown_rx 날린 후, shutdown_complete_rx(closed 함수로 대체 가능?) await 하게 하는 방법도 있을 듯
-
-        // transport.pause 해야 하는 부분은 cleanup 함수를 받도록 하거나 shutdown_rx 날리면 그때 함께 처리하는 식으로...
-        // join_all 부분은 각 스레드에 shutdown_complete_* 를 주거나,
-
-        // 메인 shutdown
-        shutdown_fut.await;
-        // 받으면 일단 transport pause
-        transport.pause();
-
-        // then initiate close sequence by sending shutdown signal to each thread
-        drop(shutdown_rx);
-        // 또는 .send(())
-
-        // wait for all thread to exit
-        // 이건 어째든 필요한데... shutdown_fut랑 함께 select 되어야 함
-        join_all([run_loop_handle, write_loop_handle, connection_handle]).await;
-
-        // finally drop transport
-        drop(transport_handle);
-        // wait for transport to close
-        self.transport.closed().await;
-
-        // after this, protocol, transport will drop
-    }
 }

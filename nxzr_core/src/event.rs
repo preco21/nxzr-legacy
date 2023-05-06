@@ -19,7 +19,7 @@ macro_rules! setup_event {
                 let mut subs: Vec<Subscription> = vec![];
                 loop {
                     tokio::select! {
-                        msg = msg_rx.recv(), if subs.len() > 0 => {
+                        msg = msg_rx.recv(), if !subs.is_empty() => {
                             match msg {
                                 Some(evt) => {
                                     subs.retain(|sub| sub.tx.send(evt.clone()).is_ok());

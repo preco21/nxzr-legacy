@@ -4,7 +4,7 @@ use thiserror::Error;
 
 pub mod controller;
 pub mod event;
-pub mod protocol_control;
+pub mod protocol;
 
 #[derive(Clone, Error, Debug)]
 pub enum Error {

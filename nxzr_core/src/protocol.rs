@@ -12,6 +12,9 @@ pub trait Transport: TransportCombined + Clone + Send + Sync + 'static {
     fn pause(&self);
 }
 
+pub use crate::controller::protocol::TransportRead;
+pub use crate::controller::protocol::TransportWrite;
+
 #[derive(Debug)]
 pub(crate) struct StateSendReq {
     ready_tx: oneshot::Sender<()>,
@@ -55,7 +58,6 @@ impl ProtocolControl {
             ProtocolControlTask::setup_events_relay(protocol.clone(), msg_tx.clone()),
             internal_close_tx.clone(),
         );
-
         // Setup protocol reader task
         let protocol_reader_fut = create_task(
             ProtocolControlTask::setup_reader(transport.clone(), protocol.clone()),
@@ -205,15 +207,27 @@ impl ProtocolControlTask {
     ) -> Result<()> {
         protocol.ready_for_write().await;
         loop {
-            let ctrl_state_ready_tx = match ctrl_state_send_req_rx.try_recv() {
-                Ok(StateSendReq { ready_tx }) => Some(async move {
-                    let _ = ready_tx.send(());
-                }),
-                Err(_) => None,
+            // Collect all pending waiters before proceed to write for batching.
+            let mut pending_subs: Vec<oneshot::Sender<()>> = vec![];
+            loop {
+                match ctrl_state_send_req_rx.try_recv() {
+                    Ok(StateSendReq { ready_tx }) => {
+                        pending_subs.push(ready_tx);
+                    }
+                    Err(mpsc::error::TryRecvError::Empty) => break,
+                    Err(_) => {}
+                };
+            }
+            let ready_fut = if !pending_subs.is_empty() {
+                Some(async move {
+                    for ready_tx in pending_subs {
+                        let _ = ready_tx.send(());
+                    }
+                })
+            } else {
+                None
             };
-            protocol
-                .process_write(&transport, ctrl_state_ready_tx)
-                .await?;
+            protocol.process_write(&transport, ready_fut).await?;
         }
     }
 }
