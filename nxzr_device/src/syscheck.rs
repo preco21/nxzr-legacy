@@ -26,6 +26,7 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
             "bluetooth service is not active".to_owned(),
         ));
     }
+    // FIXME: maybe this is not platform agnostic
     // Check if the `dbus` service is active
     if !systemctl::exists("dbus.service").map_err(|_| SysCheckError::SysctlFailed) {
         return Err(SysCheckError::DBusFailed(
@@ -45,6 +46,7 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     })
     .await
     .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()));
+    // FIXME: maybe this is not platform agnostic
     // Check if `bdaddr` exists
     helper::run_command({
         let mut cmd = Command::new("bdaddr");
