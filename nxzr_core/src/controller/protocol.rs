@@ -198,7 +198,6 @@ impl Protocol {
     ) -> Result<(), ProtocolError> {
         self.handle_write(transport_write, InputReport::new())
             .await?;
-        time::sleep(Duration::from_millis(1000)).await;
         Ok(())
     }
 

@@ -4,9 +4,11 @@ use crate::event::setup_event;
 use crate::{Error, Result};
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 use strum::{Display, IntoStaticStr};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
+use tokio::time;
 
 pub trait Transport:
     TransportRead + TransportWrite + TransportPause + Clone + Send + Sync + 'static
@@ -77,6 +79,7 @@ impl ProtocolControl {
         let protocol_conn_handler_fut = {
             let transport = transport.clone();
             let protocol = protocol.clone();
+            let msg_tx = msg_tx.clone();
             let mut internal_close_rx = internal_close_tx.subscribe();
             async move {
                 let (connected_tx, connected_rx) = mpsc::channel::<()>(1);
@@ -86,7 +89,16 @@ impl ProtocolControl {
                         // Send empty input reports 10 times up until the host decides to reply.
                         for _ in 0..10 {
                             tokio::select! {
-                                _ = protocol.send_empty_input_report(&transport) => {},
+                                res = protocol.send_empty_input_report(&transport) => {
+                                    if let Err(err) = res {
+                                        // NOTE: Sending empty input report may fail if there's some socket options
+                                        // that are misconfigured like `SO_SNDBUF` to `0`.
+                                        //
+                                        // In such a case, we simply dispatch warnings to events then continue.
+                                        let _ = msg_tx.send(Event::Warning(Error::Protocol(err)));
+                                    }
+                                    time::sleep(Duration::from_millis(1000)).await;
+                                },
                                 _ = connected_tx.closed() => break,
                             }
                         }
