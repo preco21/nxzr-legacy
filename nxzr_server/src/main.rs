@@ -9,6 +9,7 @@ use nxzr_device::{
     device::{Device, DeviceConfig},
     helper,
     session::{SessionConfig, SessionListener},
+    syscheck,
     transport::{Transport, TransportConfig},
 };
 use std::{error::Error, time::Duration};
@@ -16,6 +17,8 @@ use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    syscheck::check_system_requirements().await?;
+
     let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
 
     tracing_subscriber::fmt::init();
