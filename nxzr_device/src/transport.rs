@@ -63,7 +63,7 @@ impl nxzr_core::protocol::Transport for Transport {}
 #[async_trait]
 impl nxzr_core::protocol::TransportRead for Transport {
     async fn read(&self) -> std::io::Result<Bytes> {
-        self.read().await?.as_ref()
+        self.read().await
     }
 }
 
@@ -155,7 +155,7 @@ impl Transport {
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "transport error"))
     }
 
-    pub async fn pause(&self) {
+    pub fn pause(&self) {
         self.inner.pause();
     }
 

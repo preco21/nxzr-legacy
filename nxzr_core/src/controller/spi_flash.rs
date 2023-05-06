@@ -1,15 +1,15 @@
-use bytes::Bytes;
+use bytes::BytesMut;
 
 #[derive(Debug, Default)]
 pub struct SpiFlashConfig {
-    pub buffer: Option<Bytes>,
+    pub buffer: Option<BytesMut>,
     pub size: Option<usize>,
     pub reset: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct SpiFlash {
-    buf: Bytes,
+    buf: BytesMut,
 }
 
 impl SpiFlash {
@@ -35,7 +35,9 @@ impl SpiFlash {
             }
             None => {
                 should_reset = true;
-                vec![0xFF; size].into()
+                let mut buf = BytesMut::with_capacity(size);
+                buf.resize(size, 0xFF);
+                buf
             }
         };
         if should_reset {
@@ -88,6 +90,6 @@ impl SpiFlash {
     }
 
     pub fn data(&self) -> &[u8] {
-        &self.buf[..]
+        self.buf.as_ref()
     }
 }

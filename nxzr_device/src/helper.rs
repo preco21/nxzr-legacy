@@ -77,7 +77,7 @@ pub(crate) async fn set_device_class(adapter_name: &str, class: u32) -> Result<u
     Ok(class)
 }
 
-pub(crate) fn restart_bluetooth_service() -> Result<(), HelperError> {
+pub fn restart_bluetooth_service() -> Result<(), HelperError> {
     systemctl::restart("bluetooth.service")?;
     Ok(())
 }

@@ -12,7 +12,7 @@ use super::{
 };
 use crate::event::{setup_event, EventError};
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use std::{future::Future, sync::Mutex, time::Duration};
 use strum::{Display, IntoStaticStr};
 use thiserror::Error;
@@ -210,7 +210,7 @@ impl Protocol {
         // FIXME: receive addr
         self.notify_data_received.notify_waiters();
         let buf = transport.read().await?;
-        let output_report = match OutputReport::with_raw(buf) {
+        let output_report = match OutputReport::with_raw(BytesMut::from(buf.as_ref())) {
             Ok(output_report) => output_report,
             Err(_) => {
                 self.dispatch_event(Event::Error(ProtocolError::OutputReportParseFailed));
@@ -321,7 +321,9 @@ impl Protocol {
         if self.is_paused() {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
         }
-        transport_write.write(input_report.data()).await?;
+        transport_write
+            .write(Bytes::copy_from_slice(input_report.data()))
+            .await?;
         Ok(())
     }
 

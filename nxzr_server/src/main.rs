@@ -1,9 +1,6 @@
 use nxzr_core::{
-    controller::{
-        protocol::{Protocol, ProtocolConfig, TransportRead},
-        ControllerType,
-    },
-    protocol::{ProtocolControl, Transport as ProtocolTransport},
+    controller::{protocol::ProtocolConfig, ControllerType},
+    protocol::ProtocolControl,
 };
 use nxzr_device::{
     device::{Device, DeviceConfig},
@@ -12,14 +9,14 @@ use nxzr_device::{
     syscheck,
     transport::{Transport, TransportConfig},
 };
-use std::{error::Error, time::Duration};
-use tokio::time::sleep;
+use std::time::Duration;
+use tokio::{sync::mpsc, time::sleep};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> anyhow::Result<()> {
     syscheck::check_system_requirements().await?;
 
-    let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+    let (shutdown_tx, _shutdown_rx) = mpsc::channel::<()>(1);
 
     tracing_subscriber::fmt::init();
 
@@ -76,9 +73,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Transport::register(paired_session, TransportConfig::default()).await?;
     // FIXME: allow customizing config
     let (protocol, protocol_handle) =
-        ProtocolControl::connect(transport, ProtocolConfig::default())?;
+        ProtocolControl::connect(transport.clone(), ProtocolConfig::default())?;
 
-    let event_rx = protocol.events().await?;
+    let mut event_rx = protocol.events().await?;
 
     // FIXME:
     tokio::spawn(async move {
@@ -87,10 +84,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    select! {
-        _ = transport.closed() => break,
-        _ = protocol.closed() => break,
-        _ = shutdown_tx.closed() => break,
+    tokio::select! {
+        _ = transport.closed() => {},
+        _ = protocol.closed() => {},
+        _ = shutdown_tx.closed() => {},
     }
 
     drop(protocol_handle);

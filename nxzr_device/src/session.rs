@@ -29,9 +29,9 @@ impl From<std::io::Error> for SessionError {
 
 #[derive(Debug, Default)]
 pub struct SessionConfig {
-    address: Option<Address>,
-    control_psm: Option<u16>,
-    interrupt_psm: Option<u16>,
+    pub address: Option<Address>,
+    pub control_psm: Option<u16>,
+    pub interrupt_psm: Option<u16>,
 }
 
 #[derive(Debug)]

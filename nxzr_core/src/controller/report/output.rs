@@ -1,5 +1,5 @@
 use super::{subcommand::Subcommand, ReportError};
-use bytes::Bytes;
+use bytes::BytesMut;
 use strum::Display;
 
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#output-reports
@@ -34,17 +34,18 @@ const REPORT_MIN_LEN: usize = 11;
 // Processes incoming messages from the host (Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct OutputReport {
-    buf: Bytes,
+    buf: BytesMut,
 }
 
 impl OutputReport {
     pub fn new() -> Self {
-        let mut buf: Vec<u8> = vec![0x00; 50];
+        let mut buf = BytesMut::with_capacity(50);
+        buf.resize(50, 0x00);
         buf[0] = 0xA2;
-        Self { buf: buf.into() }
+        Self { buf }
     }
 
-    pub fn with_raw(data: Bytes) -> Result<Self, ReportError> {
+    pub fn with_raw(data: BytesMut) -> Result<Self, ReportError> {
         if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
@@ -115,6 +116,6 @@ impl OutputReport {
     }
 
     pub fn data(&self) -> &[u8] {
-        &self.buf[..]
+        self.buf.as_ref()
     }
 }

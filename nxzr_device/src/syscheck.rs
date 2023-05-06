@@ -1,6 +1,7 @@
 use thiserror::Error;
+use tokio::process::Command;
 
-use crate::helper::HelperError;
+use crate::helper;
 
 #[derive(Clone, Error, Debug)]
 pub enum SysCheckError {
@@ -22,24 +23,24 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
         return Err(SysCheckError::RootPrivilegeRequired);
     }
     // Check if the `bluetooth` service is active.
-    if !systemctl::exists("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed) {
+    if !systemctl::exists("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::BluetoothFailed(
             "bluetooth service does not exist".to_owned(),
         ));
     };
-    if !systemctl::is_active("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed) {
+    if !systemctl::is_active("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::BluetoothFailed(
             "bluetooth service is not active".to_owned(),
         ));
     }
     // FIXME: maybe this is not platform agnostic
     // Check if the `dbus` service is active
-    if !systemctl::exists("dbus.service").map_err(|_| SysCheckError::SysctlFailed) {
+    if !systemctl::exists("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::DBusFailed(
             "dbus service does not exist".to_owned(),
         ));
     };
-    if !systemctl::is_active("dbus.service").map_err(|_| SysCheckError::SysctlFailed) {
+    if !systemctl::is_active("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::DBusFailed(
             "dbus service is not active".to_owned(),
         ));
@@ -51,7 +52,7 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
         cmd
     })
     .await
-    .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()));
+    .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()))?;
     // FIXME: maybe this is not platform agnostic
     // Check if `bdaddr` exists
     helper::run_command({
@@ -60,6 +61,6 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
         cmd
     })
     .await
-    .map_err(|_| SysCheckError::CliToolFailed("bdaddr".to_owned()));
+    .map_err(|_| SysCheckError::CliToolFailed("bdaddr".to_owned()))?;
     Ok(())
 }
