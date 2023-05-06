@@ -1,6 +1,6 @@
 use crate::sock::{
     l2cap::{self, LazySeqPacketListener, SocketAddr},
-    Address,
+    Address, AddressType,
 };
 use thiserror::Error;
 
@@ -76,6 +76,7 @@ impl SessionListener {
             .bind(SocketAddr {
                 addr: self.addr_def.addr,
                 psm: self.addr_def.ctl_psm,
+                addr_type: AddressType::BrEdr,
                 ..Default::default()
             })
             .await?;
@@ -83,10 +84,10 @@ impl SessionListener {
             .bind(SocketAddr {
                 addr: self.addr_def.addr,
                 psm: self.addr_def.itr_psm,
+                addr_type: AddressType::BrEdr,
                 ..Default::default()
             })
             .await?;
-        // FIXME: implement a fallback when bluez input plugin is enabled
         Ok(())
     }
 

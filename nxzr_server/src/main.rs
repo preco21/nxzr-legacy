@@ -51,6 +51,10 @@ async fn main() -> anyhow::Result<()> {
     device.set_pairable(true).await?;
 
     // FIXME: make it customizable
+    tracing::info!(
+        "setting device alias to {}",
+        ControllerType::ProController.name()
+    );
     device
         .set_alias(ControllerType::ProController.name())
         .await?;
@@ -58,10 +62,10 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("advertising the bluetooth SDP record...");
 
     // FIXME: allow ignoring errors
-    device.register_sdp_record().await?;
+    let record = device.register_sdp_record().await?;
 
     device.set_discoverable(true).await?;
-    device.set_class().await?;
+    device.ensure_device_class().await?;
 
     tracing::info!("waiting for Switch to connect...");
 
@@ -90,6 +94,7 @@ async fn main() -> anyhow::Result<()> {
         _ = shutdown_tx.closed() => {},
     }
 
+    drop(record);
     drop(protocol_handle);
     drop(transport_handle);
 

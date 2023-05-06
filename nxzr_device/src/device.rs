@@ -118,8 +118,9 @@ impl Device {
                 id: Some(adapter_name.to_owned()),
             })
             .await?;
-            if new_self.address().await? != new_addr {
-                tracing::error!("failed to change MAC address of the bluetooth adapter.");
+            let cur_addr = new_self.address().await?;
+            if cur_addr != new_addr {
+                tracing::error!("failed to change MAC address of the bluetooth adapter: current={:?} desired={:?}", cur_addr, new_addr);
                 return Err(DeviceError::MacAddrChangeFailed);
             }
             tracing::info!(
@@ -138,9 +139,7 @@ impl Device {
         };
         if uuids.len() > 3 {
             tracing::warn!("there's too many SDP-records active, Switch might refuse connection.");
-            tracing::warn!(
-                "try to disable `input` plugin by modifying\"/lib/systemd/system/bluetooth.service.\""
-            );
+            tracing::warn!("try modifying \"/lib/systemd/system/bluetooth.service\" file.");
             if disconnect {
                 for dev in self.paired_devices().await? {
                     tracing::info!("unpairing device of address: {}", dev.address());
@@ -184,8 +183,9 @@ impl Device {
         Ok(devices)
     }
 
-    pub async fn register_sdp_record(&self) -> Result<(), DeviceError> {
-        self.session
+    pub async fn register_sdp_record(&self) -> Result<bluer::rfcomm::ProfileHandle, DeviceError> {
+        let handle = self
+            .session
             .register_profile(bluer::rfcomm::Profile {
                 uuid: uuid::Uuid::new_v4(),
                 service: Some(uuid::Uuid::from_str(SWITCH_HID_UUID)?),
@@ -196,10 +196,10 @@ impl Device {
                 ..Default::default()
             })
             .await?;
-        Ok(())
+        Ok(handle)
     }
 
-    pub async fn set_class(&self) -> Result<(), DeviceError> {
+    pub async fn ensure_device_class(&self) -> Result<(), DeviceError> {
         // If current adapter's device class is same as expected, do nothing.
         if self.adapter.class().await? == DEVICE_CLASS {
             return Ok(());
