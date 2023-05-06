@@ -73,7 +73,7 @@ impl From<ReportError> for ProtocolError {
 
 #[async_trait]
 pub trait TransportRead {
-    async fn read(&self) -> std::io::Result<Bytes>;
+    async fn read(&self) -> std::io::Result<BytesMut>;
 }
 
 #[async_trait]
@@ -209,7 +209,7 @@ impl Protocol {
         // FIXME: receive addr
         self.notify_data_received.notify_waiters();
         let buf = transport.read().await?;
-        let output_report = match OutputReport::with_raw(BytesMut::from(buf.as_ref())) {
+        let output_report = match OutputReport::with_raw(buf) {
             Ok(output_report) => output_report,
             Err(_) => {
                 self.dispatch_event(Event::Error(ProtocolError::OutputReportParseFailed));

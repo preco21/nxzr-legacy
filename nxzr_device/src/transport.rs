@@ -62,7 +62,7 @@ impl nxzr_core::protocol::Transport for Transport {}
 
 #[async_trait]
 impl nxzr_core::protocol::TransportRead for Transport {
-    async fn read(&self) -> std::io::Result<Bytes> {
+    async fn read(&self) -> std::io::Result<BytesMut> {
         self.read().await
     }
 }
@@ -140,7 +140,7 @@ impl Transport {
     // FIXME: Better way to handle errors? is there any instead of std::io::Error?
     // We are exposing `Result<T, std::io::Error>` type here in order to
     // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
-    pub async fn read(&self) -> Result<Bytes, std::io::Error> {
+    pub async fn read(&self) -> Result<BytesMut, std::io::Error> {
         self.inner
             .read()
             .await
@@ -260,7 +260,7 @@ impl TransportInner {
         Ok(())
     }
 
-    pub async fn read(&self) -> Result<Bytes, TransportError> {
+    pub async fn read(&self) -> Result<BytesMut, TransportError> {
         if self.is_closed() {
             return Err(TransportError::OperationWhileClosed);
         }
@@ -268,7 +268,7 @@ impl TransportInner {
         let mut buf = BytesMut::with_capacity(self.read_buf_size);
         buf.resize(self.read_buf_size, 0);
         self.session.itr_client().recv(&mut buf).await?;
-        Ok(buf.freeze())
+        Ok(buf)
     }
 
     pub async fn write(&self, buf: Bytes) -> Result<(), TransportError> {
