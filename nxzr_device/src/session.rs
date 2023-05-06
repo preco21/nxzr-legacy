@@ -100,14 +100,12 @@ impl SessionListener {
     }
     #[tracing::instrument(target = "session")]
     pub async fn accept(&self) -> Result<PairedSession, SessionError> {
-        tracing::info!("start accepting incoming connection for `control` socket.");
         let (ctl_client, ctl_sa) = self.ctl_sock.accept().await?;
         tracing::info!(
             "accepted connection for `control` socket at psm \"{}\" from \"{}\".",
             ctl_sa.psm,
             ctl_sa.addr,
         );
-        tracing::info!("start accepting incoming connection for `interrupt` socket");
         let (itr_client, itr_sa) = self.itr_sock.accept().await?;
         tracing::info!(
             "accepted connection for `interrupt` socket at psm \"{}\" from \"{}\".",
