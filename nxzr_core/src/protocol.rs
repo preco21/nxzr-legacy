@@ -208,19 +208,19 @@ impl ProtocolControlTask {
         protocol.ready_for_write().await;
         loop {
             // Collect all pending waiters before proceed to write for batching.
-            let mut pending_ready_entries: Vec<oneshot::Sender<()>> = vec![];
+            let mut pending_subs: Vec<oneshot::Sender<()>> = vec![];
             loop {
                 match ctrl_state_send_req_rx.try_recv() {
                     Ok(StateSendReq { ready_tx }) => {
-                        pending_ready_entries.push(ready_tx);
+                        pending_subs.push(ready_tx);
                     }
                     Err(mpsc::error::TryRecvError::Empty) => break,
                     Err(_) => {}
                 };
             }
-            let ready_fut = if !pending_ready_entries.is_empty() {
+            let ready_fut = if !pending_subs.is_empty() {
                 Some(async move {
-                    for ready_tx in pending_ready_entries {
+                    for ready_tx in pending_subs {
                         let _ = ready_tx.send(());
                     }
                 })
