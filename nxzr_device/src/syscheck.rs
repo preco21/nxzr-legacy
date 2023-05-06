@@ -55,12 +55,12 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()))?;
     // FIXME: maybe this is not platform agnostic
     // Check if `bdaddr` exists
-    helper::run_command({
-        let mut cmd = Command::new("bdaddr");
-        cmd.args(&["-h"]);
-        cmd
-    })
-    .await
-    .map_err(|_| SysCheckError::CliToolFailed("bdaddr".to_owned()))?;
+    // helper::run_command({
+    //     let mut cmd = Command::new("bdaddr");
+    //     cmd.args(&["-h"]);
+    //     cmd
+    // })
+    // .await
+    // .map_err(|_| SysCheckError::CliToolFailed("bdaddr".to_owned()))?;
     Ok(())
 }

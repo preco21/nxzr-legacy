@@ -288,7 +288,7 @@ impl Protocol {
                     Some(delay) => state.send_delay = delay,
                     None => {
                         self.dispatch_event(Event::Error(ProtocolError::Invariant(format!(
-                            "unknown delay for report mode `{mode:?}`, assuming it as 1/15.",
+                            "unknown delay for report mode \"{mode:?}\", assuming it as 1/15.",
                         ))));
                         state.send_delay = 1.0 / 15.0;
                     }
@@ -433,7 +433,7 @@ impl Protocol {
             }
             unsupported_subcommand => {
                 self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
-                    "unsupported subcommand: `{unsupported_subcommand}`, ignoring.",
+                    "unsupported subcommand: \"{unsupported_subcommand}\", ignoring.",
                 ))));
                 return Ok(());
             }
@@ -565,7 +565,7 @@ impl Protocol {
             }
             _ => {
                 self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
-                    "command `{command}` for Subcommand NFC IR is not implemented.",
+                    "command \"{command}\" for Subcommand NFC IR is not implemented.",
                 ))));
             }
         }

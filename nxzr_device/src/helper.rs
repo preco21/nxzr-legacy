@@ -35,7 +35,7 @@ pub(crate) async fn set_adapter_address(
     address: bluer::Address,
 ) -> Result<(), HelperError> {
     tracing::info!(
-        "resetting the bluetooth adapter ({:?}) with address `{:?}`",
+        "resetting the bluetooth adapter ({}) with address \"{:?}\".",
         adapter_name,
         address
     );
@@ -64,7 +64,7 @@ pub(crate) async fn set_adapter_address(
 pub(crate) async fn set_device_class(adapter_name: &str, class: u32) -> Result<u32, HelperError> {
     let str_class: String = format!("0x{:X}", class);
     tracing::info!(
-        "setting device class of adapter {} to {}",
+        "setting device class of adapter {:?} to {:?}.",
         adapter_name,
         str_class.as_str()
     );

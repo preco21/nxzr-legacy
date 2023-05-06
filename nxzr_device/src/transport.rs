@@ -118,7 +118,7 @@ impl Transport {
             let inner = inner.clone();
             async move {
                 close_tx.closed().await;
-                tracing::info!("close signal received, terminating transport");
+                tracing::info!("close signal received, terminating transport.");
                 // Generally, it's recommended to pause from caller before it
                 // gets ended up here. We are assuming the user may not be able
                 // to `.pause()` it anyway.
@@ -204,7 +204,7 @@ impl TransportInner {
         config: TransportConfig,
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
-        tracing::info!("initiating a transport");
+        tracing::info!("initializing a transport.");
         // Reset `SO_SNDBUF` of the given client sockets.
         paired_session.itr_client().reset_sndbuf()?;
         paired_session.ctl_client().reset_sndbuf()?;

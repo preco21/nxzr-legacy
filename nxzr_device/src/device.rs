@@ -102,7 +102,7 @@ impl Device {
     #[tracing::instrument(target = "device")]
     pub async fn ensure_adapter_address_switch(self) -> Result<Self, DeviceError> {
         tracing::info!(
-            "attempting to change MAC address of the bluetooth adapter to Switch compatible one"
+            "attempting to change MAC address of the bluetooth adapter to target compatible one."
         );
         let addr = self.address().await?;
         if &addr.as_ref()[..3] != SWITCH_MAC_PREFIX {
@@ -119,11 +119,11 @@ impl Device {
             })
             .await?;
             if new_self.address().await? != new_addr {
-                tracing::error!("failed to change MAC address of the bluetooth adapter");
+                tracing::error!("failed to change MAC address of the bluetooth adapter.");
                 return Err(DeviceError::MacAddrChangeFailed);
             }
             tracing::info!(
-                "successfully changed MAC address of the bluetooth adapter to {}",
+                "successfully changed MAC address of the bluetooth adapter to {}.",
                 new_addr
             );
             return Ok(new_self);
@@ -139,7 +139,7 @@ impl Device {
         if uuids.len() > 3 {
             tracing::warn!("there's too many SDP-records active, Switch might refuse connection.");
             tracing::warn!(
-                "try to disable `input` plugin by modifying /lib/systemd/system/bluetooth.service"
+                "try to disable `input` plugin by modifying\"/lib/systemd/system/bluetooth.service.\""
             );
             if disconnect {
                 for dev in self.paired_devices().await? {

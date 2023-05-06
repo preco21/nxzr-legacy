@@ -51,7 +51,7 @@ struct SessionAddressDef {
 impl SessionListener {
     #[tracing::instrument(target = "session")]
     pub fn new(config: SessionConfig) -> Result<Self, SessionError> {
-        tracing::info!("initiating a session");
+        tracing::info!("starting a session.");
         let control_psm = config.control_psm.unwrap_or(DEFAULT_CTL_PSM);
         let interrupt_psm = config.interrupt_psm.unwrap_or(DEFAULT_ITR_PSM);
         let ctl_sock = LazySeqPacketListener::new()?;
@@ -71,7 +71,7 @@ impl SessionListener {
 
     #[tracing::instrument(target = "session")]
     pub async fn bind(&self) -> Result<(), SessionError> {
-        tracing::info!("binding the session");
+        tracing::info!("binding the session.");
         self.ctl_sock
             .bind(SocketAddr {
                 addr: self.addr_def.addr,
@@ -92,29 +92,29 @@ impl SessionListener {
 
     #[tracing::instrument(target = "session")]
     pub async fn listen(&self) -> Result<(), SessionError> {
-        tracing::info!("start listening on the session");
+        tracing::info!("start listening on the session.");
         self.ctl_sock.listen(1).await?;
         self.itr_sock.listen(1).await?;
         Ok(())
     }
     #[tracing::instrument(target = "session")]
     pub async fn accept(&self) -> Result<PairedSession, SessionError> {
-        tracing::info!("start accepting incoming connection for `control` socket");
+        tracing::info!("start accepting incoming connection for `control` socket.");
         let (ctl_client, ctl_sa) = self.ctl_sock.accept().await?;
         tracing::info!(
-            "accepted connection for `control` socket at psm {} from {}",
+            "accepted connection for `control` socket at psm \"{}\" from \"{}\".",
             ctl_sa.psm,
             ctl_sa.addr,
         );
         tracing::info!("start accepting incoming connection for `interrupt` socket");
         let (itr_client, itr_sa) = self.itr_sock.accept().await?;
         tracing::info!(
-            "accepted connection for `interrupt` socket at psm {} from {}",
+            "accepted connection for `interrupt` socket at psm \"{}\" from \"{}\".",
             itr_sa.psm,
             itr_sa.addr,
         );
         if ctl_sa.addr != itr_sa.addr {
-            tracing::error!("assertion failed, control/interrupt socket address didn't match");
+            tracing::error!("assertion failed, control/interrupt socket address didn't match.");
             return Err(SessionError::CtlItrSocketAddrMismatch);
         }
         Ok(PairedSession::from_socket(
