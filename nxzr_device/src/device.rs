@@ -18,8 +18,6 @@ pub enum DeviceError {
     DeviceClassSettingFailed,
     #[error("no such adapter name: {0}")]
     NoSuchAdapterExists(String),
-    #[error("helper error: {0}")]
-    Helper(HelperError),
     #[error("internal error: {0}")]
     Internal(DeviceInternalError),
 }
@@ -32,12 +30,8 @@ pub enum DeviceInternalError {
     Bluer(bluer::ErrorKind),
     #[error("uuid: {0}")]
     Uuid(uuid::Error),
-}
-
-impl From<HelperError> for DeviceError {
-    fn from(err: HelperError) -> Self {
-        Self::Helper(err)
-    }
+    #[error("helper: {0}")]
+    Helper(HelperError),
 }
 
 impl From<std::io::Error> for DeviceError {
@@ -55,6 +49,12 @@ impl From<bluer::Error> for DeviceError {
 impl From<uuid::Error> for DeviceError {
     fn from(err: uuid::Error) -> Self {
         Self::Internal(DeviceInternalError::Uuid(err))
+    }
+}
+
+impl From<HelperError> for DeviceError {
+    fn from(err: HelperError) -> Self {
+        Self::Internal(DeviceInternalError::Helper(err))
     }
 }
 
