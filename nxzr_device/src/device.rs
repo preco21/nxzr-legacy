@@ -7,7 +7,7 @@ const DEVICE_CLASS: u32 = 0x002508;
 
 const SWITCH_DEVICE_NAME: &str = "Nintendo Switch";
 const SWITCH_MAC_PREFIX: &[u8] = &[0x94, 0x59, 0xCB];
-const SWITCH_SDP_RECORD_STRING: &'static str = include_str!("sdp/switch-controller.xml");
+const SWITCH_SDP_RECORD_STRING: &str = include_str!("sdp/switch-controller.xml");
 const SWITCH_HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
 #[derive(Clone, Error, Debug)]
