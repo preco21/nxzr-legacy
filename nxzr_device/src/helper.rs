@@ -15,8 +15,6 @@ pub enum HelperInternalError {
     Utf8Error(std::str::Utf8Error),
     #[error("io: {0}")]
     Io(std::io::ErrorKind),
-    #[error("bluer: {0}")]
-    Bluer(bluer::ErrorKind),
 }
 
 impl From<std::str::Utf8Error> for HelperError {
@@ -31,14 +29,8 @@ impl From<std::io::Error> for HelperError {
     }
 }
 
-impl From<bluer::Error> for HelperError {
-    fn from(err: bluer::Error) -> Self {
-        Self::Internal(HelperInternalError::Bluer(err.kind))
-    }
-}
-
 #[tracing::instrument(target = "helper")]
-pub async fn set_adapter_address(
+pub(crate) async fn set_adapter_address(
     adapter_name: &str,
     address: bluer::Address,
 ) -> Result<(), HelperError> {
@@ -69,7 +61,7 @@ pub async fn set_adapter_address(
 }
 
 #[tracing::instrument(target = "helper")]
-pub async fn set_device_class(adapter_name: &str, class: u32) -> Result<u32, HelperError> {
+pub(crate) async fn set_device_class(adapter_name: &str, class: u32) -> Result<u32, HelperError> {
     let str_class: String = format!("0x{:X}", class);
     tracing::info!(
         "setting device class of adapter {} to {}",
@@ -85,12 +77,12 @@ pub async fn set_device_class(adapter_name: &str, class: u32) -> Result<u32, Hel
     Ok(class)
 }
 
-pub fn restart_bluetooth_service() -> Result<(), HelperError> {
+pub(crate) fn restart_bluetooth_service() -> Result<(), HelperError> {
     systemctl::restart("bluetooth.service")?;
     Ok(())
 }
 
-pub async fn run_command(mut command: Command) -> Result<(), HelperError> {
+pub(crate) async fn run_command(mut command: Command) -> Result<(), HelperError> {
     let output = command.output().await?;
     if !output.status.success() {
         return Err(HelperError::CommandFailed(

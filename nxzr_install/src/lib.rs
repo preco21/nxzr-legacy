@@ -1,3 +1,12 @@
+
+#[derive(Clone, thiserror::Error, Debug)]
+pub enum Error {
+    #[error("transparent")]
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+
 pub async fn prepare_for_prerequisites() {
     // check wsl installed
     // check if system can run wsl -> vm requirements
@@ -24,7 +33,8 @@ pub async fn prepare_for_prerequisites() {
 pub async fn check_prerequisites() {
 
 }
-'pub async fn check_system_requirements() {
+pub async fn check_system_requirements() {
+    systemctl::exists("bluetooth.service")
     // check systemctl is ready
 
     // check dbus, bluetooth systemctl is ready
@@ -33,4 +43,14 @@ pub async fn check_prerequisites() {
     // ㄴ if misconfigured, set config and start the service
 
     // check bluetooth related tool, bdaddr, hcitool is ready
+}
+
+pub async fn run_command(mut command: Command) -> Result<(), HelperError> {
+    let output = command.output().await?;
+    if !output.status.success() {
+        return Err(HelperError::CommandFailed(
+            std::str::from_utf8(output.stderr.as_ref())?.to_owned(),
+        ));
+    }
+    Ok(())
 }

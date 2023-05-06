@@ -448,6 +448,8 @@ name = "nxzr_install"
 version = "0.1.0"
 dependencies = [
  "sudo",
+ "systemctl",
+ "thiserror",
 ]
 
 [[package]]

@@ -11,3 +11,5 @@ publish = false
 
 [dependencies]
 sudo = "0.6.0"
+systemctl = "0.1.9"
+thiserror = "1.0.40"
