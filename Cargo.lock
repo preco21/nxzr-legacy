@@ -429,6 +429,7 @@ dependencies = [
  "num-traits",
  "nxzr_core",
  "strum",
+ "sudo",
  "systemctl",
  "thiserror",
  "tokio",

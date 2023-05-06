@@ -1,13 +1,10 @@
-
 #[derive(Clone, thiserror::Error, Debug)]
 pub enum Error {
-    #[error("transparent")]
+    #[error("foobar")]
+    Foobar,
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-
-pub async fn prepare_for_prerequisites() {
+pub async fn prepare_system_requirements() -> Result<(), Error> {
     // check wsl installed
     // check if system can run wsl -> vm requirements
     // check usbipd installed -> maybe just include the binary
@@ -28,29 +25,5 @@ pub async fn prepare_for_prerequisites() {
     // ㄴ sudo update-alternatives --install /usr/local/bin/usbip usbip `ls /usr/lib/linux-tools/*/usbip | tail -n1` 20
 
     // setup bdaddr, hcitool, stuffs...
-}
-
-pub async fn check_prerequisites() {
-
-}
-pub async fn check_system_requirements() {
-    systemctl::exists("bluetooth.service")
-    // check systemctl is ready
-
-    // check dbus, bluetooth systemctl is ready
-    // ㄴ if not installed, bail
-    // ㄴ if installed, start the service
-    // ㄴ if misconfigured, set config and start the service
-
-    // check bluetooth related tool, bdaddr, hcitool is ready
-}
-
-pub async fn run_command(mut command: Command) -> Result<(), HelperError> {
-    let output = command.output().await?;
-    if !output.status.success() {
-        return Err(HelperError::CommandFailed(
-            std::str::from_utf8(output.stderr.as_ref())?.to_owned(),
-        ));
-    }
     Ok(())
 }

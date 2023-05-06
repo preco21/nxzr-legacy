@@ -4,6 +4,8 @@ use crate::helper::HelperError;
 
 #[derive(Clone, Error, Debug)]
 pub enum SysCheckError {
+    #[error("privilege error, the program is required to run as root user")]
+    RootPrivilegeRequired,
     #[error("systemctl check failed")]
     SysctlFailed,
     #[error("bluetooth service check failed: {0}")]
@@ -15,6 +17,9 @@ pub enum SysCheckError {
 }
 
 pub async fn check_system_requirements() -> Result<(), SysCheckError> {
+    if sudo::check() != sudo::RunningAs::Root {
+        return Err(SysCheckError::RootPrivilegeRequired);
+    }
     // Check if the `bluetooth` service is active.
     if !systemctl::exists("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed) {
         return Err(SysCheckError::BluetoothFailed(
