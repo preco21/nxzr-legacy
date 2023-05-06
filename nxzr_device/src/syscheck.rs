@@ -17,6 +17,7 @@ pub enum SysCheckError {
 }
 
 pub async fn check_system_requirements() -> Result<(), SysCheckError> {
+    // Check if the program has been run as root.
     if sudo::check() != sudo::RunningAs::Root {
         return Err(SysCheckError::RootPrivilegeRequired);
     }
