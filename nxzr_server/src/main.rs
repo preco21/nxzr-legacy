@@ -3,7 +3,7 @@ use nxzr_core::{
         protocol::{Protocol, ProtocolConfig, TransportRead},
         ControllerType,
     },
-    protocol_control::{ProtocolControl, Transport as ProtocolTransport},
+    protocol::{ProtocolControl, Transport as ProtocolTransport},
 };
 use nxzr_device::{
     device::{Device, DeviceConfig},

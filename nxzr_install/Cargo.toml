@@ -10,3 +10,4 @@ edition = "2021"
 publish = false
 
 [dependencies]
+sudo = "0.6.0"

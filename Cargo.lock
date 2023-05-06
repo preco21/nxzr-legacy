@@ -444,6 +444,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "nxzr_install"
+version = "0.1.0"
+dependencies = [
+ "sudo",
+]
+
+[[package]]
 name = "nxzr_server"
 version = "0.1.0"
 dependencies = [
@@ -690,6 +697,16 @@ dependencies = [
  "quote 1.0.26",
  "rustversion",
  "syn 1.0.102",
+]
+
+[[package]]
+name = "sudo"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88bd84d4c082e18e37fef52c0088e4407dabcef19d23a607fb4b5ee03b7d5b83"
+dependencies = [
+ "libc",
+ "log",
 ]
 
 [[package]]
