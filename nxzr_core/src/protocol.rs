@@ -192,7 +192,7 @@ impl ProtocolControlTask {
             if let Some(orig) = rx.recv().await {
                 let evt = match orig {
                     protocol::Event::Error(err) => Event::Warning(err.into()),
-                    protocol::Event::Log(log) => Event::Log(LogType::ProtocolInner(log)),
+                    protocol::Event::Log(log) => Event::Log(log),
                 };
                 let _ = msg_tx.send(evt);
             }
@@ -259,16 +259,9 @@ fn create_task(
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Log(LogType),
+    Log(protocol::LogType),
     Warning(Error),
     Critical(Error),
-}
-
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
-pub enum LogType {
-    None,
-    // Internal protocol logs are simply forwarded
-    ProtocolInner(protocol::LogType),
 }
 
 #[derive(Debug)]
