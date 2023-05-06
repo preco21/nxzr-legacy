@@ -1,6 +1,7 @@
 use crate::semaphore::BoundedSemaphore;
 use crate::session::PairedSession;
 use crate::sock::hci;
+use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use std::future::Future;
 use std::sync::Arc;
@@ -57,21 +58,25 @@ pub struct Transport {
     inner: Arc<TransportInner>,
 }
 
-impl nxzr_core::protocol::TransportCombined for Transport {
+impl nxzr_core::protocol::Transport for Transport {}
+
+#[async_trait]
+impl nxzr_core::protocol::TransportRead for Transport {
+    async fn read(&self) -> std::io::Result<Bytes> {
+        self.read().await?.as_ref()
+    }
+}
+
+#[async_trait]
+impl nxzr_core::protocol::TransportWrite for Transport {
+    async fn write(&self, buf: Bytes) -> std::io::Result<()> {
+        self.write(buf).await
+    }
+}
+
+impl nxzr_core::protocol::TransportPause for Transport {
     fn pause(&self) {
         self.pause();
-    }
-}
-
-impl nxzr_core::protocol::TransportRead for Transport {
-    async fn read(&self) -> std::io::Result<&[u8]> {
-        self.read().await
-    }
-}
-
-impl nxzr_core::protocol::TransportWrite for Transport {
-    async fn write(&self, buf: &[u8]) -> std::io::Result<()> {
-        self.write(buf).await
     }
 }
 

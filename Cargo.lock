@@ -411,6 +411,7 @@ name = "nxzr_core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "strum",
  "thiserror",
  "tokio",
@@ -420,6 +421,7 @@ dependencies = [
 name = "nxzr_device"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bluer",
  "bytes",
  "dbus",

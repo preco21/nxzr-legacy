@@ -1,4 +1,4 @@
-use crate::controller::protocol::{self, Protocol, ProtocolConfig, TransportCombined};
+use crate::controller::protocol::{self, Protocol, ProtocolConfig};
 use crate::controller::state::ControllerState;
 use crate::event::setup_event;
 use crate::{Error, Result};
@@ -8,12 +8,17 @@ use strum::{Display, IntoStaticStr};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
 
-pub trait Transport: TransportCombined + Clone + Send + Sync + 'static {
-    fn pause(&self);
+pub trait Transport:
+    TransportRead + TransportWrite + TransportPause + Clone + Send + Sync + 'static
+{
 }
 
 pub use crate::controller::protocol::TransportRead;
 pub use crate::controller::protocol::TransportWrite;
+
+pub trait TransportPause {
+    fn pause(&self);
+}
 
 #[derive(Debug)]
 pub(crate) struct StateSendReq {

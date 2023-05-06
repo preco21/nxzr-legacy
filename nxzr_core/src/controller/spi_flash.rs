@@ -1,13 +1,15 @@
+use bytes::Bytes;
+
 #[derive(Debug, Default)]
 pub struct SpiFlashConfig {
-    pub buffer: Option<Vec<u8>>,
+    pub buffer: Option<Bytes>,
     pub size: Option<usize>,
     pub reset: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct SpiFlash {
-    buf: Vec<u8>,
+    buf: Bytes,
 }
 
 impl SpiFlash {
@@ -33,7 +35,7 @@ impl SpiFlash {
             }
             None => {
                 should_reset = true;
-                vec![0xFF; size]
+                vec![0xFF; size].into()
             }
         };
         if should_reset {

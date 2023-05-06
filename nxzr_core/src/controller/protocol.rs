@@ -12,6 +12,7 @@ use super::{
 };
 use crate::event::{setup_event, EventError};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::{future::Future, sync::Mutex, time::Duration};
 use strum::{Display, IntoStaticStr};
 use thiserror::Error;
@@ -72,15 +73,13 @@ impl From<ReportError> for ProtocolError {
 
 #[async_trait]
 pub trait TransportRead {
-    async fn read(&self) -> std::io::Result<&[u8]>;
+    async fn read(&self) -> std::io::Result<Bytes>;
 }
 
 #[async_trait]
 pub trait TransportWrite {
-    async fn write(&self, buf: &[u8]) -> std::io::Result<()>;
+    async fn write(&self, buf: Bytes) -> std::io::Result<()>;
 }
-
-pub trait TransportCombined: TransportRead + TransportWrite {}
 
 #[derive(Debug)]
 struct Shared {
@@ -204,10 +203,10 @@ impl Protocol {
     }
 
     // Run reader operation using the given transport.
-    pub async fn process_read(
-        &self,
-        transport: &impl TransportCombined,
-    ) -> Result<(), ProtocolError> {
+    pub async fn process_read<T>(&self, transport: &T) -> Result<(), ProtocolError>
+    where
+        T: TransportRead + TransportWrite,
+    {
         // FIXME: receive addr
         self.notify_data_received.notify_waiters();
         let buf = transport.read().await?;

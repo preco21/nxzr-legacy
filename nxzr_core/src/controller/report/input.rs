@@ -1,5 +1,6 @@
 use super::{subcommand::Subcommand, ReportError};
 use crate::controller::ControllerType;
+use bytes::Bytes;
 use strum::Display;
 
 // Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/bluetooth_hid_notes.md#input-reports
@@ -62,24 +63,24 @@ const SUBCOMMAND_OFFSET: usize = 16;
 // Processes outgoing messages from the controller to the host(Nintendo Switch).
 #[derive(Clone, Debug)]
 pub struct InputReport {
-    buf: Vec<u8>,
+    buf: Bytes,
 }
 
 impl InputReport {
     pub fn new() -> Self {
-        let mut buf: Vec<u8> = vec![0x00; 363];
+        let mut buf: Bytes = vec![0x00; 363].into();
         buf[0] = 0xA1;
         Self { buf }
     }
 
-    pub fn with_raw(data: &[u8]) -> Result<Self, ReportError> {
+    pub fn with_raw(data: Bytes) -> Result<Self, ReportError> {
         if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
-        let [0xA1, ..] = data else {
+        let [0xA1, ..] = data.as_ref() else {
             return Err(ReportError::Malformed);
         };
-        Ok(Self { buf: data.to_vec() })
+        Ok(Self { buf: data })
     }
 
     pub fn fill_default_report(&mut self, controller_type: ControllerType) {
