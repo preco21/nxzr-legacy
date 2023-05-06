@@ -206,9 +206,10 @@ impl TransportInner {
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
         tracing::info!("initializing a transport.");
+        // FIXME: disabled due to invalid value os error 22
         // Reset `SO_SNDBUF` of the given client sockets.
-        paired_session.itr_client().reset_sndbuf()?;
-        paired_session.ctl_client().reset_sndbuf()?;
+        // paired_session.itr_client().reset_sndbuf()?;
+        // paired_session.ctl_client().reset_sndbuf()?;
         // Device ids must be targeting to the local machine.
         let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
         // 0x04 = HCI_EVT; 0x13 = Number of completed packets
@@ -265,6 +266,7 @@ impl TransportInner {
         }
         self.running().await;
         let mut buf = BytesMut::with_capacity(self.read_buf_size);
+        buf.resize(self.read_buf_size, 0);
         self.session.itr_client().recv(&mut buf).await?;
         Ok(buf.freeze())
     }
@@ -277,7 +279,7 @@ impl TransportInner {
         self.write_sem.acquire_forget().await?;
         self.writable().await;
         // Writing a buffer in length more than MTU may fail, however, L2CAP's
-        // `SeqPacket` socket seems allows writing buf regardless of the length.
+        // `SeqPacket` socket seems allows writing buf regardless of the MTU length.
         self.session.itr_client().send(&buf).await?;
         Ok(())
     }
