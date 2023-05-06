@@ -309,7 +309,7 @@ impl Protocol {
         transport_write: &impl TransportWrite,
         input_report: InputReport,
     ) -> Result<(), ProtocolError> {
-        let mut pairing_bytes: [u8; 4] = [0x00; 4];
+        let mut pairing_bytes: [u8; 4] = [0; 4];
         pairing_bytes[1..4].copy_from_slice(&input_report.data()[4..7]);
         let close_pairing_mask = self.controller.close_pairing_masks();
         let state = self.state.get();
@@ -481,7 +481,7 @@ impl Protocol {
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
             }
             None => {
-                let spi_flash_data = vec![0x00; size as usize];
+                let spi_flash_data = vec![0; size as usize];
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
             }
         }
