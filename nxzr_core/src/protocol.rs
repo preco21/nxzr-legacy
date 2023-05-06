@@ -207,15 +207,27 @@ impl ProtocolControlTask {
     ) -> Result<()> {
         protocol.ready_for_write().await;
         loop {
-            let ctrl_state_ready_tx = match ctrl_state_send_req_rx.try_recv() {
-                Ok(StateSendReq { ready_tx }) => Some(async move {
-                    let _ = ready_tx.send(());
-                }),
-                Err(_) => None,
+            // Collect all pending waiters before proceed to write for batching.
+            let mut pending_ready_entries: Vec<oneshot::Sender<()>> = vec![];
+            loop {
+                match ctrl_state_send_req_rx.try_recv() {
+                    Ok(StateSendReq { ready_tx }) => {
+                        pending_ready_entries.push(ready_tx);
+                    }
+                    Err(mpsc::error::TryRecvError::Empty) => break,
+                    Err(_) => {}
+                };
+            }
+            let ready_fut = if !pending_ready_entries.is_empty() {
+                Some(async move {
+                    for ready_tx in pending_ready_entries {
+                        let _ = ready_tx.send(());
+                    }
+                })
+            } else {
+                None
             };
-            protocol
-                .process_write(&transport, ctrl_state_ready_tx)
-                .await?;
+            protocol.process_write(&transport, ready_fut).await?;
         }
     }
 }
