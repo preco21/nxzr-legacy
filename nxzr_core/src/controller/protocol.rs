@@ -584,6 +584,20 @@ impl Protocol {
         }
     }
 
+    // FIXME: change name to ready_to_write
+    fn set_ready_for_write(&self) {
+        // FIXME: change the channel name also
+        let _ = self.ready_for_write_tx.send_replace(true);
+    }
+
+    // FIXME: change name to unpaused
+    async fn wait_for_continue(&self) {
+        let mut rx = self.paused_tx.subscribe();
+        while *rx.borrow() {
+            rx.changed().await.unwrap();
+        }
+    }
+
     // Mark the protocol in paused state.
     pub fn pause(&self) {
         let _ = self.paused_tx.send_replace(false);
@@ -596,17 +610,6 @@ impl Protocol {
 
     fn is_paused(&self) -> bool {
         *self.paused_tx.borrow()
-    }
-
-    async fn wait_for_continue(&self) {
-        let mut rx = self.paused_tx.subscribe();
-        while *rx.borrow() {
-            rx.changed().await.unwrap();
-        }
-    }
-
-    fn set_ready_for_write(&self) {
-        let _ = self.ready_for_write_tx.send_replace(true);
     }
 
     // Listen for the protocol events.

@@ -137,6 +137,7 @@ impl Transport {
         ))
     }
 
+    // FIXME: Better way to handle errors? is there any instead of std::io::Error?
     // We are exposing `Result<T, std::io::Error>` type here in order to
     // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
     pub async fn read(&self) -> Result<Bytes, std::io::Error> {

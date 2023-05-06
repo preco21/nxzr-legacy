@@ -911,6 +911,7 @@ impl SeqPacket {
         socket.connect(addr).await
     }
 
+    // FIXME: this does not work
     /// Resets `SO_SNDBUF` value to `0`
     pub fn reset_sndbuf(&self) -> Result<()> {
         // Resetting socket option `SO_SNDBUF` to `0` let the OS to set the
