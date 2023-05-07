@@ -12,6 +12,8 @@ const SWITCH_HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
 #[derive(Clone, Error, Debug)]
 pub enum DeviceError {
+    #[error("failed to create a session, maybe Bluetooth is disabled?; bluer: {0}")]
+    SessionCreationFailed(bluer::ErrorKind),
     #[error("failed to change MAC address")]
     MacAddrChangeFailed,
     #[error("failed to set device class")]
@@ -60,7 +62,7 @@ impl From<HelperError> for DeviceError {
 
 #[derive(Debug, Default)]
 pub struct DeviceConfig {
-    // Name of the bluetooth adapter to use.
+    // Name of Bluetooth adapter to use.
     //
     // In form of a raw string that matches the adapter name, which is
     // generally represented in the hci* notation. (e.g. hci0, hci1, ...)
@@ -79,13 +81,23 @@ pub struct Device {
 impl Device {
     #[tracing::instrument(target = "device")]
     pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
-        let session = bluer::Session::new().await?;
+        let session = bluer::Session::new()
+            .await
+            .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?;
         let adapter = match config.id {
             Some(adapter_name) => {
                 let mut found_adapter = None;
-                for name in session.adapter_names().await? {
+                for name in session
+                    .adapter_names()
+                    .await
+                    .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?
+                {
                     if name == adapter_name {
-                        found_adapter = Some(session.adapter(&adapter_name)?);
+                        found_adapter = Some(
+                            session
+                                .adapter(&adapter_name)
+                                .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?,
+                        );
                         break;
                     }
                 }
@@ -94,7 +106,10 @@ impl Device {
                     None => return Err(DeviceError::NoSuchAdapterExists(adapter_name)),
                 }
             }
-            None => session.default_adapter().await?,
+            None => session
+                .default_adapter()
+                .await
+                .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?,
         };
         Ok(Self { adapter, session })
     }
@@ -102,7 +117,7 @@ impl Device {
     #[tracing::instrument(target = "device")]
     pub async fn ensure_adapter_address_switch(self) -> Result<Self, DeviceError> {
         tracing::info!(
-            "attempting to change MAC address of the bluetooth adapter to target compatible one."
+            "attempting to change MAC address of Bluetooth adapter to target compatible one."
         );
         let addr = self.address().await?;
         if &addr.as_ref()[..3] != SWITCH_MAC_PREFIX {
@@ -120,11 +135,15 @@ impl Device {
             .await?;
             let cur_addr = new_self.address().await?;
             if cur_addr != new_addr {
-                tracing::error!("failed to change MAC address of the bluetooth adapter: current={:?} desired={:?}", cur_addr, new_addr);
+                tracing::error!(
+                    "failed to change MAC address of Bluetooth adapter: current={:?} desired={:?}",
+                    cur_addr,
+                    new_addr
+                );
                 return Err(DeviceError::MacAddrChangeFailed);
             }
             tracing::info!(
-                "successfully changed MAC address of the bluetooth adapter to {}.",
+                "successfully changed MAC address of Bluetooth adapter to {}.",
                 new_addr
             );
             return Ok(new_self);
