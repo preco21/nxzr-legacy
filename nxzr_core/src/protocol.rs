@@ -258,13 +258,12 @@ fn create_task(
     let mut close_rx = close_tx.subscribe();
     async move {
         tokio::select! {
-            res = fut => match res {
-                Ok(_) => {},
-                Err(err) => {
+            res = fut => {
+                if let Err(err) = res {
                     let _ = close_tx.send(());
                     return Err(err)
                 }
-            },
+            }
             _ = close_rx.recv() => {},
         }
         Ok(())
