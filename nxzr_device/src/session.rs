@@ -70,7 +70,7 @@ impl SessionListener {
     pub async fn bind(&self) -> Result<(), SessionError> {
         tracing::info!("binding the session.");
         self.ctl_sock
-            .bind(SocketAddr {
+            .bind(l2cap::SocketAddr {
                 addr: self.addr_def.addr,
                 psm: self.addr_def.ctl_psm,
                 addr_type: AddressType::BrEdr,
@@ -78,7 +78,7 @@ impl SessionListener {
             })
             .await?;
         self.itr_sock
-            .bind(SocketAddr {
+            .bind(l2cap::SocketAddr {
                 addr: self.addr_def.addr,
                 psm: self.addr_def.itr_psm,
                 addr_type: AddressType::BrEdr,
