@@ -131,13 +131,14 @@ impl ProtocolControl {
                         transport.pause();
                     },
                 }
-                // This will allow the support methods to get notified when the
-                // actual close happens on either of shutdown channels resolved.
+                // This will allow the tasks to get first notified when the
+                // actual close happens on any of shutdown channels resolved.
                 drop(term_rx);
                 while let Some(res) = set.join_next().await {
                     if let Ok(inner) = res {
                         if let Err(err) = inner {
                             let _ = msg_tx.send(Event::Critical(err));
+                            // FIXME: drop closed rx
                         }
                     }
                 }

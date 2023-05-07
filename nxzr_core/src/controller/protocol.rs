@@ -206,7 +206,7 @@ impl Protocol {
     where
         T: TransportRead + TransportWrite,
     {
-        // FIXME: receive addr
+        // FIXME: receive addr for subcommand
         self.notify_data_received.notify_waiters();
         let buf = transport.read().await?;
         let output_report = match OutputReport::with_raw(buf) {
