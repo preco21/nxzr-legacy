@@ -1,7 +1,4 @@
-use crate::sock::{
-    l2cap::{self, LazySeqPacketListener, SocketAddr},
-    Address, AddressType,
-};
+use crate::sock::{l2cap, Address, AddressType};
 use thiserror::Error;
 
 const DEFAULT_CTL_PSM: u16 = 17;
@@ -36,8 +33,8 @@ pub struct SessionConfig {
 
 #[derive(Debug)]
 pub struct SessionListener {
-    ctl_sock: LazySeqPacketListener,
-    itr_sock: LazySeqPacketListener,
+    ctl_sock: l2cap::LazySeqPacketListener,
+    itr_sock: l2cap::LazySeqPacketListener,
     addr_def: SessionAddressDef,
 }
 
@@ -54,9 +51,9 @@ impl SessionListener {
         tracing::info!("starting a session.");
         let control_psm = config.control_psm.unwrap_or(DEFAULT_CTL_PSM);
         let interrupt_psm = config.interrupt_psm.unwrap_or(DEFAULT_ITR_PSM);
-        let ctl_sock = LazySeqPacketListener::new()?;
+        let ctl_sock = l2cap::LazySeqPacketListener::new()?;
         ctl_sock.enable_reuse_addr()?;
-        let itr_sock = LazySeqPacketListener::new()?;
+        let itr_sock = l2cap::LazySeqPacketListener::new()?;
         itr_sock.enable_reuse_addr()?;
         Ok(Self {
             ctl_sock,
@@ -142,14 +139,16 @@ impl PairedSession {
     pub async fn connect(config: PairedSessionConfig) -> Result<Self, SessionError> {
         let control_psm = config.control_psm.unwrap_or(DEFAULT_CTL_PSM);
         let interrupt_psm = config.interrupt_psm.unwrap_or(DEFAULT_ITR_PSM);
-        let ctl_addr = SocketAddr {
+        let ctl_addr = l2cap::SocketAddr {
             addr: config.reconnect_address,
             psm: control_psm,
+            addr_type: AddressType::BrEdr,
             ..Default::default()
         };
-        let itr_addr = SocketAddr {
+        let itr_addr = l2cap::SocketAddr {
             addr: config.reconnect_address,
             psm: interrupt_psm,
+            addr_type: AddressType::BrEdr,
             ..Default::default()
         };
         Ok(Self {
