@@ -5,7 +5,6 @@ use crate::{Error, Result};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use strum::{Display, IntoStaticStr};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
 use tokio::time;
