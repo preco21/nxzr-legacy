@@ -120,8 +120,8 @@ impl Transport {
                 close_tx.closed().await;
                 tracing::info!("close signal received, terminating transport.");
                 // Generally, it's recommended to pause from caller before it
-                // gets ended up here. We are assuming the user may not be able
-                // to `.pause()` it anyway.
+                // ended up here. We are assuming the user may not be able to
+                // `.pause()` it anyway.
                 inner.pause();
                 set.shutdown().await;
                 tracing::info!("transport terminated");
