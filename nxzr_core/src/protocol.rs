@@ -109,7 +109,7 @@ impl ProtocolControl {
                     _ = internal_close_rx.recv() => {},
                 }
                 drop(connected_rx);
-                empty_report_sender.await.unwrap();
+                empty_report_sender.await?;
                 Result::<()>::Ok(())
             }
         };
@@ -251,6 +251,7 @@ impl ProtocolControlTask {
     }
 }
 
+// FIXME: when panic occurred, this handler may not be able to send close signal at all.
 fn create_task(
     fut: impl Future<Output = Result<()>>,
     close_tx: broadcast::Sender<()>,
