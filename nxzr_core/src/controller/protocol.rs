@@ -646,7 +646,7 @@ pub enum LogType {
 }
 
 #[derive(Debug)]
-struct SubscriptionReq {
+pub struct SubscriptionReq {
     tx: mpsc::UnboundedSender<Event>,
     ready_tx: oneshot::Sender<()>,
 }

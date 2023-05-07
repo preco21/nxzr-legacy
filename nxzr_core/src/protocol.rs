@@ -1,3 +1,6 @@
+pub use crate::controller::protocol::ControllerProtocolConfig as ProtocolConfig;
+pub use crate::controller::protocol::TransportRead;
+pub use crate::controller::protocol::TransportWrite;
 use crate::controller::protocol::{
     self, ControllerProtocol, ControllerProtocolConfig, ControllerProtocolError,
 };
@@ -48,9 +51,6 @@ pub trait Transport:
     TransportRead + TransportWrite + TransportPause + Clone + Send + Sync + 'static
 {
 }
-
-pub use crate::controller::protocol::TransportRead;
-pub use crate::controller::protocol::TransportWrite;
 
 pub trait TransportPause {
     fn pause(&self);
@@ -342,7 +342,7 @@ pub enum LogType {
 }
 
 #[derive(Debug)]
-struct SubscriptionReq {
+pub struct SubscriptionReq {
     tx: mpsc::UnboundedSender<Event>,
     ready_tx: oneshot::Sender<()>,
 }
