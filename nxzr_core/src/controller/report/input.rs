@@ -212,7 +212,7 @@ impl InputReport {
 
     pub fn sub_0x10_spi_flash_read(
         &mut self,
-        offset: u32,
+        offset: u64,
         size: u8,
         data: &[u8],
     ) -> Result<(), ReportError> {

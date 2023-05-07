@@ -475,11 +475,10 @@ impl ControllerProtocol {
         subcommand_reply_data: &[u8],
     ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x90);
-        let mut offset: u32 = 0;
-        let mut place: u32 = 1;
+        let mut offset: u64 = 0;
+        let mut place: u64 = 1;
         for i in 0..4 {
-            offset += subcommand_reply_data[i] as u32 * place;
-            // FIXME: boom
+            offset += subcommand_reply_data[i] as u64 * place;
             place *= 0x100;
         }
         let size = subcommand_reply_data[4];
@@ -487,7 +486,7 @@ impl ControllerProtocol {
         match state.spi_flash {
             Some(spi_flash) => {
                 let spi_flash_data =
-                    &spi_flash.data()[(offset as usize)..(offset + size as u32) as usize];
+                    &spi_flash.data()[(offset as usize)..(offset + size as u64) as usize];
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
             }
             None => {
