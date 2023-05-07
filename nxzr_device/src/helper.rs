@@ -35,11 +35,11 @@ pub(crate) async fn set_adapter_address(
     address: bluer::Address,
 ) -> Result<(), HelperError> {
     tracing::info!(
-        "resetting the bluetooth adapter ({}) with address \"{:?}\".",
+        "resetting Bluetooth adapter ({}) with address \"{:?}\".",
         adapter_name,
         address
     );
-    // Set the bluetooth adapter address by adapter name.
+    // Set Bluetooth adapter address by adapter name.
     //
     // The user will need to install `apt-get install bluez-utils`.
     run_command({
@@ -55,7 +55,7 @@ pub(crate) async fn set_adapter_address(
         cmd
     })
     .await?;
-    // Restart bluetooth service.
+    // Restart Bluetooth service.
     restart_bluetooth_service()?;
     Ok(())
 }

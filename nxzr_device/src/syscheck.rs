@@ -9,7 +9,7 @@ pub enum SysCheckError {
     RootPrivilegeRequired,
     #[error("systemctl check failed")]
     SysctlFailed,
-    #[error("bluetooth service check failed: {0}")]
+    #[error("Bluetooth service check failed: {0}")]
     BluetoothFailed(String),
     #[error("dbus service check failed: {0}")]
     DBusFailed(String),
@@ -22,15 +22,15 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     if sudo::check() != sudo::RunningAs::Root {
         return Err(SysCheckError::RootPrivilegeRequired);
     }
-    // Check if the `bluetooth` service is active.
+    // Check if the Bluetooth service is active.
     if !systemctl::exists("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::BluetoothFailed(
-            "bluetooth service does not exist".to_owned(),
+            "Bluetooth service does not exist".to_owned(),
         ));
     };
     if !systemctl::is_active("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::BluetoothFailed(
-            "bluetooth service is not active".to_owned(),
+            "Bluetooth service is not active".to_owned(),
         ));
     }
     // FIXME: maybe this is not platform agnostic

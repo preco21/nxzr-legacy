@@ -36,8 +36,8 @@ async fn main() -> anyhow::Result<()> {
 
     if let Err(err) = session.bind().await {
         tracing::warn!("{:?}", err);
-        tracing::warn!("fallback: restarting the bluetooth session due to incompatibilities with the bluez `input` plugin, disable this plugin to avoid issues.");
-        tracing::info!("restarting bluetooth service...");
+        tracing::warn!("fallback: restarting Bluetooth session due to incompatibilities with the bluez `input` plugin, disable this plugin to avoid issues.");
+        tracing::info!("restarting Bluetooth service...");
         helper::restart_bluetooth_service()?;
         sleep(Duration::from_millis(1000)).await;
         // FIXME: accept device id here
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .set_alias(ControllerType::ProController.name())
         .await?;
 
-    tracing::info!("advertising the bluetooth SDP record...");
+    tracing::info!("advertising Bluetooth SDP record...");
 
     // FIXME: allow ignoring errors
     let record = device.register_sdp_record().await?;
