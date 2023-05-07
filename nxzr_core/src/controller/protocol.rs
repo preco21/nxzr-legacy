@@ -34,7 +34,7 @@ pub enum ControllerProtocolError {
     #[error("unknown report mode is used for generating input report")]
     UnknownInputReportMode,
     #[error("write operation is slower than usual: {0:?}, ignoring")]
-    WriteTooSlow(Duration),
+    DelayedWrites(Duration),
     #[error("not implemented: {0}")]
     NotImplemented(String),
     #[error("invariant violation: {0}")]
@@ -262,7 +262,7 @@ impl ControllerProtocol {
                 Some(delay) => delay,
                 None => {
                     let slow_duration = elapsed - send_delay;
-                    self.dispatch_event(Event::Error(ControllerProtocolError::WriteTooSlow(
+                    self.dispatch_event(Event::Error(ControllerProtocolError::DelayedWrites(
                         slow_duration,
                     )));
                     return Ok(());
