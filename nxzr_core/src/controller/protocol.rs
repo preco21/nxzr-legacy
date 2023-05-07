@@ -22,7 +22,7 @@ use tokio::{
 };
 
 #[derive(Clone, Error, Debug)]
-pub enum ProtocolError {
+pub enum ControllerProtocolError {
     #[error("failed to parse output report from raw buffer, ignoring")]
     OutputReportParseFailed,
     #[error("failed to parse `id` from output report (maybe unknown?), ignoring")]
@@ -40,11 +40,11 @@ pub enum ProtocolError {
     #[error("invariant violation: {0}")]
     Invariant(String),
     #[error("internal error: {0}")]
-    Internal(ProtocolInternalError),
+    Internal(ControllerProtocolInternalError),
 }
 
 #[derive(Clone, Error, Debug)]
-pub enum ProtocolInternalError {
+pub enum ControllerProtocolInternalError {
     #[error("io: {0}")]
     Io(std::io::ErrorKind),
     #[error("event: {0}")]
@@ -53,21 +53,21 @@ pub enum ProtocolInternalError {
     Report(ReportError),
 }
 
-impl From<std::io::Error> for ProtocolError {
+impl From<std::io::Error> for ControllerProtocolError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(ProtocolInternalError::Io(err.kind()))
+        Self::Internal(ControllerProtocolInternalError::Io(err.kind()))
     }
 }
 
-impl From<EventError> for ProtocolError {
+impl From<EventError> for ControllerProtocolError {
     fn from(err: EventError) -> Self {
-        Self::Internal(ProtocolInternalError::Event(err))
+        Self::Internal(ControllerProtocolInternalError::Event(err))
     }
 }
 
-impl From<ReportError> for ProtocolError {
+impl From<ReportError> for ControllerProtocolError {
     fn from(err: ReportError) -> Self {
-        Self::Internal(ProtocolInternalError::Report(err))
+        Self::Internal(ControllerProtocolInternalError::Report(err))
     }
 }
 
@@ -135,13 +135,13 @@ impl Shared {
 }
 
 #[derive(Debug, Default)]
-pub struct ProtocolConfig {
+pub struct ControllerProtocolConfig {
     controller: ControllerType,
     controller_state: ControllerState,
 }
 
 #[derive(Debug)]
-pub struct Protocol {
+pub struct ControllerProtocol {
     state: Shared,
     controller: ControllerType,
     notify_data_received: Notify,
@@ -152,8 +152,8 @@ pub struct Protocol {
     msg_tx: mpsc::UnboundedSender<Event>,
 }
 
-impl Protocol {
-    pub fn new(config: ProtocolConfig) -> Result<Self, ProtocolError> {
+impl ControllerProtocol {
+    pub fn new(config: ControllerProtocolConfig) -> Result<Self, ControllerProtocolError> {
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
@@ -195,14 +195,14 @@ impl Protocol {
     pub async fn send_empty_input_report(
         &self,
         transport_write: &impl TransportWrite,
-    ) -> Result<(), ProtocolError> {
+    ) -> Result<(), ControllerProtocolError> {
         self.handle_write(transport_write, InputReport::new())
             .await?;
         Ok(())
     }
 
     // Run reader operation using the given transport.
-    pub async fn process_read<T>(&self, transport: &T) -> Result<(), ProtocolError>
+    pub async fn process_read<T>(&self, transport: &T) -> Result<(), ControllerProtocolError>
     where
         T: TransportRead + TransportWrite,
     {
@@ -212,12 +212,14 @@ impl Protocol {
         let output_report = match OutputReport::with_raw(buf) {
             Ok(output_report) => output_report,
             Err(_) => {
-                self.dispatch_event(Event::Error(ProtocolError::OutputReportParseFailed));
+                self.dispatch_event(Event::Error(
+                    ControllerProtocolError::OutputReportParseFailed,
+                ));
                 return Ok(());
             }
         };
         let Some(output_report_id) = output_report.output_report_id() else {
-            self.dispatch_event(Event::Error(ProtocolError::OutputReportIdParseFailed));
+            self.dispatch_event(Event::Error(ControllerProtocolError::OutputReportIdParseFailed));
             return Ok(());
         };
         match output_report_id {
@@ -229,7 +231,7 @@ impl Protocol {
             }
             OutputReportId::RequestIrNfcMcu => {
                 self.dispatch_event(Event::Error(
-                    ProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring".to_owned()
+                    ControllerProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring".to_owned()
                 )));
             }
         }
@@ -242,7 +244,7 @@ impl Protocol {
         transport: &impl TransportWrite,
         // NOTE: Write hook may be used to notify controller state updater loop to continue.
         write_hook: Option<impl Future<Output = ()>>,
-    ) -> Result<(), ProtocolError> {
+    ) -> Result<(), ControllerProtocolError> {
         self.wait_for_continue().await;
         let now = time::Instant::now();
         let input_report = self.generate_input_report(None)?;
@@ -260,7 +262,9 @@ impl Protocol {
                 Some(delay) => delay,
                 None => {
                     let slow_duration = elapsed - send_delay;
-                    self.dispatch_event(Event::Error(ProtocolError::WriteTooSlow(slow_duration)));
+                    self.dispatch_event(Event::Error(ControllerProtocolError::WriteTooSlow(
+                        slow_duration,
+                    )));
                     return Ok(());
                 }
             };
@@ -272,7 +276,7 @@ impl Protocol {
     fn set_report_mode(&self, mode: Option<u8>, is_pairing: Option<bool>) {
         if let Some(mode) = mode {
             if mode == 0x21 {
-                self.dispatch_event(Event::Error(ProtocolError::Invariant(
+                self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
                     "unexpectedly setting report mode for standard input reports.".to_owned(),
                 )));
             }
@@ -286,9 +290,11 @@ impl Protocol {
                 match delay {
                     Some(delay) => state.send_delay = delay,
                     None => {
-                        self.dispatch_event(Event::Error(ProtocolError::Invariant(format!(
-                            "unknown delay for report mode \"{mode:?}\", assuming it as 1/15.",
-                        ))));
+                        self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
+                            format!(
+                                "unknown delay for report mode \"{mode:?}\", assuming it as 1/15.",
+                            ),
+                        )));
                         state.send_delay = 1.0 / 15.0;
                     }
                 };
@@ -308,7 +314,7 @@ impl Protocol {
         &self,
         transport_write: &impl TransportWrite,
         input_report: InputReport,
-    ) -> Result<(), ProtocolError> {
+    ) -> Result<(), ControllerProtocolError> {
         let mut pairing_bytes: [u8; 4] = [0; 4];
         pairing_bytes[1..4].copy_from_slice(&input_report.data()[4..7]);
         let close_pairing_mask = self.controller.close_pairing_masks();
@@ -326,7 +332,10 @@ impl Protocol {
         Ok(())
     }
 
-    fn generate_input_report(&self, mode: Option<u8>) -> Result<InputReport, ProtocolError> {
+    fn generate_input_report(
+        &self,
+        mode: Option<u8>,
+    ) -> Result<InputReport, ControllerProtocolError> {
         let state = self.state.get();
         let mode = match mode {
             Some(_) => mode,
@@ -334,15 +343,15 @@ impl Protocol {
         };
         if self.controller != state.controller_state.controller() {
             return Err(
-                ProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one passed on `Protocol` init.".to_owned())
+                ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one passed on `Protocol` init.".to_owned())
             );
         }
         let Some(mode) = mode else {
-            return Err(ProtocolError::NoInputReportModeSupplied);
+            return Err(ControllerProtocolError::NoInputReportModeSupplied);
         };
         let mut input_report = InputReport::new();
         let Some(id) = InputReportId::from_byte(mode) else {
-            return Err(ProtocolError::UnknownInputReportMode);
+            return Err(ControllerProtocolError::UnknownInputReportMode);
         };
         input_report.set_input_report_id(id);
         match id {
@@ -384,15 +393,15 @@ impl Protocol {
         &self,
         transport_write: &impl TransportWrite,
         output_report: &OutputReport,
-    ) -> Result<(), ProtocolError> {
+    ) -> Result<(), ControllerProtocolError> {
         let Some(subcommand) = output_report.subcommand() else {
             self.dispatch_event(Event::Error(
-                ProtocolError::NotImplemented("unknown subcommand received.".to_owned())
+                ControllerProtocolError::NotImplemented("unknown subcommand received.".to_owned())
             ));
             return Ok(())
         };
         if let Subcommand::Empty = subcommand {
-            self.dispatch_event(Event::Error(ProtocolError::Invariant(
+            self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
                 "received output report does not contain a subcommand".to_owned(),
             )));
         }
@@ -431,9 +440,9 @@ impl Protocol {
                 self.command_enable_vibration(&mut response_report);
             }
             unsupported_subcommand => {
-                self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
-                    "unsupported subcommand: \"{unsupported_subcommand}\", ignoring.",
-                ))));
+                self.dispatch_event(Event::Error(ControllerProtocolError::NotImplemented(
+                    format!("unsupported subcommand: \"{unsupported_subcommand}\", ignoring.",),
+                )));
                 return Ok(());
             }
         }
@@ -444,7 +453,7 @@ impl Protocol {
     fn command_request_device_info(
         &self,
         input_report: &mut InputReport,
-    ) -> Result<(), ProtocolError> {
+    ) -> Result<(), ControllerProtocolError> {
         // FIXME: receive addr: implement
         // address = self.transport.get_extra_info('sockname')
         // assert address is not None
@@ -464,12 +473,13 @@ impl Protocol {
         &self,
         input_report: &mut InputReport,
         subcommand_reply_data: &[u8],
-    ) -> Result<(), ProtocolError> {
+    ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x90);
         let mut offset: u32 = 0;
         let mut place: u32 = 1;
         for i in 0..4 {
             offset += subcommand_reply_data[i] as u32 * place;
+            // FIXME: boom
             place *= 0x100;
         }
         let size = subcommand_reply_data[4];
@@ -508,7 +518,7 @@ impl Protocol {
     fn command_trigger_buttons_elapsed_time(
         &self,
         input_report: &mut InputReport,
-    ) -> Result<(), ProtocolError> {
+    ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x83);
         input_report.set_reply_to_subcommand_id(Subcommand::TriggerButtonsElapsedTime);
         // HACK: We assume this command is only used during pairing, sets values
@@ -563,9 +573,9 @@ impl Protocol {
                 input_report.set_reply_to_subcommand_id(Subcommand::SetNfcIrMcuState);
             }
             _ => {
-                self.dispatch_event(Event::Error(ProtocolError::NotImplemented(format!(
-                    "command \"{command}\" for Subcommand NFC IR is not implemented.",
-                ))));
+                self.dispatch_event(Event::Error(ControllerProtocolError::NotImplemented(
+                    format!("command \"{command}\" for Subcommand NFC IR is not implemented.",),
+                )));
             }
         }
     }
@@ -612,7 +622,7 @@ impl Protocol {
     }
 
     // Listen for the protocol events.
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, ProtocolError> {
+    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, ControllerProtocolError> {
         Ok(Event::subscribe(&mut self.event_sub_tx.clone()).await?)
     }
 
@@ -624,10 +634,10 @@ impl Protocol {
 #[derive(Debug, Clone)]
 pub enum Event {
     Log(LogType),
-    Error(ProtocolError),
+    Error(ControllerProtocolError),
 }
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
+#[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum LogType {
     PairingSuccessful,
     WriteWhilePaused,
@@ -636,7 +646,7 @@ pub enum LogType {
 }
 
 #[derive(Debug)]
-pub struct SubscriptionReq {
+struct SubscriptionReq {
     tx: mpsc::UnboundedSender<Event>,
     ready_tx: oneshot::Sender<()>,
 }
