@@ -335,7 +335,7 @@ pub enum Event {
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            Self::Log(log) => write!(f, "event log: {}", log),
+            Self::Log(log) => write!(f, "event log: {:?}", log),
             Self::Warning(err) => write!(f, "event warn: {}", err.to_string()),
             Self::Critical(err) => write!(f, "event critical: {}", err.to_string()),
         }
