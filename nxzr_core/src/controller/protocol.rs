@@ -34,7 +34,7 @@ pub enum ControllerProtocolError {
     #[error("unknown report mode is used for generating input report")]
     UnknownInputReportMode,
     #[error("write operation is slower than usual: {0:?}, ignoring")]
-    DelayedWrites(Duration),
+    LaggedWrites(Duration),
     #[error("not implemented: {0}")]
     NotImplemented(String),
     #[error("invariant violation: {0}")]
@@ -262,7 +262,7 @@ impl ControllerProtocol {
                 Some(delay) => delay,
                 None => {
                     let slow_duration = elapsed - send_delay;
-                    self.dispatch_event(Event::Error(ControllerProtocolError::DelayedWrites(
+                    self.dispatch_event(Event::Error(ControllerProtocolError::LaggedWrites(
                         slow_duration,
                     )));
                     return Ok(());
@@ -494,6 +494,7 @@ impl ControllerProtocol {
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
             }
         }
+        println!("spi flash read {:?}", input_report.data());
         Ok(())
     }
 
