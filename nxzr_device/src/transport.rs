@@ -143,14 +143,13 @@ impl Transport {
         ))
     }
 
-    // FIXME: Better way to handle errors? is there any instead of std::io::Error?
     // We are exposing `Result<T, std::io::Error>` type here in order to
     // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
     pub async fn read(&self) -> Result<BytesMut, std::io::Error> {
         self.inner
             .read()
             .await
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "transport error"))
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err.to_string()))
     }
 
     // We are exposing `Result<T, std::io::Error>` type here in order to
@@ -159,7 +158,7 @@ impl Transport {
         self.inner
             .write(buf)
             .await
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "transport error"))
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err.to_string()))
     }
 
     pub fn pause(&self) {
