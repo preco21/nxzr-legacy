@@ -14,13 +14,19 @@ pub enum SessionError {
 
 #[derive(Clone, Error, Debug)]
 pub enum SessionInternalError {
-    #[error("io: {0}")]
-    Io(std::io::ErrorKind),
+    #[error("io: {kind} {message}")]
+    Io {
+        kind: std::io::ErrorKind,
+        message: String,
+    },
 }
 
 impl From<std::io::Error> for SessionError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(SessionInternalError::Io(err.kind()))
+        Self::Internal(SessionInternalError::Io {
+            kind: err.kind(),
+            message: err.to_string(),
+        })
     }
 }
 

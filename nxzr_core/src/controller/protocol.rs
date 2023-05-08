@@ -45,8 +45,11 @@ pub enum ControllerProtocolError {
 
 #[derive(Clone, Error, Debug)]
 pub enum ControllerProtocolInternalError {
-    #[error("io: {0}")]
-    Io(std::io::ErrorKind),
+    #[error("io: {kind} {message}")]
+    Io {
+        kind: std::io::ErrorKind,
+        message: String,
+    },
     #[error("event: {0}")]
     Event(EventError),
     #[error("report: {0}")]
@@ -55,7 +58,10 @@ pub enum ControllerProtocolInternalError {
 
 impl From<std::io::Error> for ControllerProtocolError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(ControllerProtocolInternalError::Io(err.kind()))
+        Self::Internal(ControllerProtocolInternalError::Io {
+            kind: err.kind(),
+            message: err.to_string(),
+        })
     }
 }
 

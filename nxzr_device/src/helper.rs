@@ -13,8 +13,11 @@ pub enum HelperError {
 pub enum HelperInternalError {
     #[error("utf8: {0}")]
     Utf8Error(std::str::Utf8Error),
-    #[error("io: {0}")]
-    Io(std::io::ErrorKind),
+    #[error("io: {kind} {message}")]
+    Io {
+        kind: std::io::ErrorKind,
+        message: String,
+    },
 }
 
 impl From<std::str::Utf8Error> for HelperError {
@@ -25,7 +28,10 @@ impl From<std::str::Utf8Error> for HelperError {
 
 impl From<std::io::Error> for HelperError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(HelperInternalError::Io(err.kind()))
+        Self::Internal(HelperInternalError::Io {
+            kind: err.kind(),
+            message: err.to_string(),
+        })
     }
 }
 

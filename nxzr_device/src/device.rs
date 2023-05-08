@@ -13,7 +13,7 @@ const SWITCH_HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 #[derive(Clone, Error, Debug)]
 pub enum DeviceError {
     #[error("failed to create a session, maybe Bluetooth is disabled?; bluer: {0}")]
-    SessionCreationFailed(bluer::ErrorKind),
+    SessionCreationFailed(bluer::Error),
     #[error("failed to change MAC address")]
     MacAddrChangeFailed,
     #[error("failed to set device class")]
@@ -26,10 +26,13 @@ pub enum DeviceError {
 
 #[derive(Clone, Error, Debug)]
 pub enum DeviceInternalError {
-    #[error("io: {0}")]
-    Io(std::io::ErrorKind),
+    #[error("io: {kind} {message}")]
+    Io {
+        kind: std::io::ErrorKind,
+        message: String,
+    },
     #[error("bluer: {0}")]
-    Bluer(bluer::ErrorKind),
+    Bluer(bluer::Error),
     #[error("uuid: {0}")]
     Uuid(uuid::Error),
     #[error("helper: {0}")]
@@ -38,13 +41,16 @@ pub enum DeviceInternalError {
 
 impl From<std::io::Error> for DeviceError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(DeviceInternalError::Io(err.kind()))
+        Self::Internal(DeviceInternalError::Io {
+            kind: err.kind(),
+            message: err.to_string(),
+        })
     }
 }
 
 impl From<bluer::Error> for DeviceError {
     fn from(err: bluer::Error) -> Self {
-        Self::Internal(DeviceInternalError::Bluer(err.kind))
+        Self::Internal(DeviceInternalError::Bluer(err))
     }
 }
 
@@ -83,20 +89,20 @@ impl Device {
     pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
         let session = bluer::Session::new()
             .await
-            .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?;
+            .map_err(|err| DeviceError::SessionCreationFailed(err))?;
         let adapter = match config.id {
             Some(adapter_name) => {
                 let mut found_adapter = None;
                 for name in session
                     .adapter_names()
                     .await
-                    .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?
+                    .map_err(|err| DeviceError::SessionCreationFailed(err))?
                 {
                     if name == adapter_name {
                         found_adapter = Some(
                             session
                                 .adapter(&adapter_name)
-                                .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?,
+                                .map_err(|err| DeviceError::SessionCreationFailed(err))?,
                         );
                         break;
                     }
@@ -109,7 +115,7 @@ impl Device {
             None => session
                 .default_adapter()
                 .await
-                .map_err(|err| DeviceError::SessionCreationFailed(err.kind))?,
+                .map_err(|err| DeviceError::SessionCreationFailed(err))?,
         };
         Ok(Self { adapter, session })
     }

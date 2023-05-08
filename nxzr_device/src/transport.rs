@@ -29,15 +29,21 @@ pub enum TransportError {
 
 #[derive(Clone, Error, Debug)]
 pub enum TransportInternalError {
-    #[error("io: {0}")]
-    Io(std::io::ErrorKind),
+    #[error("io: {kind} {message}")]
+    Io {
+        kind: std::io::ErrorKind,
+        message: String,
+    },
     #[error("semaphore acquire failed")]
     SemaphoreFailed,
 }
 
 impl From<std::io::Error> for TransportError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(TransportInternalError::Io(err.kind()))
+        Self::Internal(TransportInternalError::Io {
+            kind: err.kind(),
+            message: err.to_string(),
+        })
     }
 }
 

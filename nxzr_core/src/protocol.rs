@@ -25,8 +25,6 @@ pub enum ProtocolError {
 
 #[derive(Clone, Error, Debug)]
 pub enum ProtocolInternalError {
-    #[error("io: {0}")]
-    Io(std::io::ErrorKind),
     #[error("task join failed: {0}")]
     JoinError(String),
     #[error("event: {0}")]
