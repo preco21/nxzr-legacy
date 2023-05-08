@@ -31,7 +31,7 @@ pub enum DeviceInternalError {
         kind: std::io::ErrorKind,
         message: String,
     },
-    #[error("bluer: {0}")]
+    #[error("bluer: {} {}", .0.kind, .0.message)]
     Bluer(bluer::Error),
     #[error("uuid: {0}")]
     Uuid(uuid::Error),
