@@ -94,17 +94,17 @@ impl Protocol {
         let mut set = JoinSet::<Result<(), ProtocolError>>::new();
         // Setup protocol events relay
         let events_relay_fut = create_task(
-            ProtocolControlTask::setup_events_relay(protocol.clone(), msg_tx.clone()),
+            ProtocolTask::setup_events_relay(protocol.clone(), msg_tx.clone()),
             internal_close_tx.clone(),
         );
         // Setup protocol reader task
         let protocol_reader_fut = create_task(
-            ProtocolControlTask::setup_reader(transport.clone(), protocol.clone()),
+            ProtocolTask::setup_reader(transport.clone(), protocol.clone()),
             internal_close_tx.clone(),
         );
         // Setup protocol writer task
         let protocol_writer_fut = create_task(
-            ProtocolControlTask::setup_writer(transport.clone(), protocol.clone(), state_send_rx),
+            ProtocolTask::setup_writer(transport.clone(), protocol.clone(), state_send_rx),
             internal_close_tx.clone(),
         );
         // Setup protocol connection handler
@@ -245,9 +245,9 @@ impl Protocol {
     }
 }
 
-pub(crate) struct ProtocolControlTask {}
+pub(crate) struct ProtocolTask {}
 
-impl ProtocolControlTask {
+impl ProtocolTask {
     pub async fn setup_events_relay(
         protocol: Arc<ControllerProtocol>,
         msg_tx: mpsc::UnboundedSender<Event>,

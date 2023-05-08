@@ -144,7 +144,7 @@ impl Transport {
     }
 
     // We are exposing `Result<T, std::io::Error>` type here in order to
-    // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
+    // conveniently interoperate with `Protocol` from `nxzr_core`.
     pub async fn read(&self) -> Result<BytesMut, std::io::Error> {
         self.inner
             .read()
@@ -153,7 +153,7 @@ impl Transport {
     }
 
     // We are exposing `Result<T, std::io::Error>` type here in order to
-    // conveniently interoperate with `ProtocolControl` from `nxzr_core`.
+    // conveniently interoperate with `Protocol` from `nxzr_core`.
     pub async fn write(&self, buf: Bytes) -> Result<(), std::io::Error> {
         self.inner
             .write(buf)
