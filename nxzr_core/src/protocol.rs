@@ -217,7 +217,7 @@ impl Protocol {
         &self,
         f: impl FnOnce(&mut ControllerState),
     ) -> Result<(), ProtocolError> {
-        self.protocol.ready_for_write().await;
+        self.protocol.writer_ready().await;
         let (ready_tx, ready_rx) = oneshot::channel();
         let fut = async {
             self.protocol.modify_controller_state(f).await;
@@ -280,7 +280,7 @@ impl ProtocolControlTask {
         protocol: Arc<ControllerProtocol>,
         mut ctrl_state_send_req_rx: mpsc::Receiver<StateSendReq>,
     ) -> Result<(), ProtocolError> {
-        protocol.ready_for_write().await;
+        protocol.writer_ready().await;
         loop {
             // Collect all pending waiters before proceed to write for batching.
             let mut pending_subs: Vec<oneshot::Sender<()>> = vec![];

@@ -146,7 +146,7 @@ pub struct ControllerProtocol {
     controller: ControllerType,
     notify_data_received: Notify,
     notify_writer_wake: Notify,
-    ready_for_write_tx: watch::Sender<bool>,
+    writer_ready_tx: watch::Sender<bool>,
     paused_tx: watch::Sender<bool>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
     msg_tx: mpsc::UnboundedSender<Event>,
@@ -162,7 +162,7 @@ impl ControllerProtocol {
             controller: config.controller,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
-            ready_for_write_tx: watch::channel(false).0,
+            writer_ready_tx: watch::channel(false).0,
             paused_tx: watch::channel(false).0,
             event_sub_tx,
             msg_tx,
@@ -176,13 +176,13 @@ impl ControllerProtocol {
 
     // Update the controller state by replacing the current one.
     pub async fn set_controller_state(&self, controller_state: ControllerState) {
-        self.wait_for_continue().await;
+        self.unpaused().await;
         self.state.set_controller_state(controller_state);
     }
 
     // Modify the controller state in-place.
     pub async fn modify_controller_state(&self, f: impl FnOnce(&mut ControllerState)) {
-        self.wait_for_continue().await;
+        self.unpaused().await;
         self.state.modify_controller_state(f);
     }
 
@@ -245,7 +245,7 @@ impl ControllerProtocol {
         // NOTE: Write hook may be used to notify controller state updater loop to continue.
         write_hook: Option<impl Future<Output = ()>>,
     ) -> Result<(), ControllerProtocolError> {
-        self.wait_for_continue().await;
+        self.unpaused().await;
         let now = time::Instant::now();
         let input_report = self.generate_input_report(None)?;
         self.handle_write(transport, input_report).await?;
@@ -582,28 +582,18 @@ impl ControllerProtocol {
     fn command_set_player_lights(&self, input_report: &mut InputReport) {
         input_report.set_ack(0x80);
         input_report.set_reply_to_subcommand_id(Subcommand::SetPlayerLights);
-        self.set_ready_for_write();
+        self.set_writer_ready();
     }
 
-    pub async fn ready_for_write(&self) {
-        let mut rx = self.ready_for_write_tx.subscribe();
+    pub async fn writer_ready(&self) {
+        let mut rx = self.writer_ready_tx.subscribe();
         while !*rx.borrow() {
             rx.changed().await.unwrap();
         }
     }
 
-    // FIXME: change name to ready_to_write
-    fn set_ready_for_write(&self) {
-        // FIXME: change the channel name also
-        let _ = self.ready_for_write_tx.send_replace(true);
-    }
-
-    // FIXME: change name to unpaused
-    async fn wait_for_continue(&self) {
-        let mut rx = self.paused_tx.subscribe();
-        while *rx.borrow() {
-            rx.changed().await.unwrap();
-        }
+    fn set_writer_ready(&self) {
+        let _ = self.writer_ready_tx.send_replace(true);
     }
 
     // Mark the protocol in paused state.
@@ -618,6 +608,13 @@ impl ControllerProtocol {
 
     fn is_paused(&self) -> bool {
         *self.paused_tx.borrow()
+    }
+
+    async fn unpaused(&self) {
+        let mut rx = self.paused_tx.subscribe();
+        while *rx.borrow() {
+            rx.changed().await.unwrap();
+        }
     }
 
     // Listen for the protocol events.
