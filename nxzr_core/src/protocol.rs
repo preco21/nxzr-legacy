@@ -332,6 +332,16 @@ pub enum Event {
     Critical(ProtocolError),
 }
 
+impl std::fmt::Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Self::Log(log) => write!(f, "event log: {}", log),
+            Self::Warning(err) => write!(f, "event warn: {}", err.to_string()),
+            Self::Critical(err) => write!(f, "event critical: {}", err.to_string()),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum LogType {
     Closing,

@@ -640,6 +640,15 @@ pub enum Event {
     Error(ControllerProtocolError),
 }
 
+impl std::fmt::Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Self::Log(log) => write!(f, "event log: {}", log),
+            Self::Error(err) => write!(f, "event error: {}", err.to_string()),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum LogType {
     PairingSuccessful,
