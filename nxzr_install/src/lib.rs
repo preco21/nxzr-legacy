@@ -5,6 +5,10 @@ pub enum Error {
 }
 
 pub async fn prepare_system_requirements() -> Result<(), Error> {
+    // change bluez name -> Pro Controller... etc then restart systemctl
+
+    // when [force clean connect] -> clear all settings to initial one
+
     // check wsl installed
     // check if system can run wsl -> vm requirements
     // check usbipd installed -> maybe just include the binary

@@ -53,6 +53,9 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     })
     .await
     .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()))?;
+
+    // FIXME: check for bluetooth ctl?
+
     // FIXME: maybe this is not platform agnostic
     // Check if `bdaddr` exists
     // helper::run_command({
