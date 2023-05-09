@@ -7,7 +7,7 @@ use super::{
         ReportError,
     },
     spi_flash::SpiFlash,
-    state::ControllerState,
+    state::{ControllerState, StateError},
     ControllerType,
 };
 use crate::event::{setup_event, EventError};
@@ -54,6 +54,8 @@ pub enum ControllerProtocolInternalError {
     Event(EventError),
     #[error("report: {0}")]
     Report(ReportError),
+    #[error("state: {0}")]
+    State(StateError),
 }
 
 impl From<std::io::Error> for ControllerProtocolError {
@@ -74,6 +76,12 @@ impl From<EventError> for ControllerProtocolError {
 impl From<ReportError> for ControllerProtocolError {
     fn from(err: ReportError) -> Self {
         Self::Internal(ControllerProtocolInternalError::Report(err))
+    }
+}
+
+impl From<StateError> for ControllerProtocolError {
+    fn from(err: StateError) -> Self {
+        Self::Internal(ControllerProtocolInternalError::State(err))
     }
 }
 
@@ -145,8 +153,6 @@ impl Shared {
 #[derive(Debug, Default)]
 pub struct ControllerProtocolConfig {
     pub controller: ControllerType,
-    pub controller_state: ControllerState,
-    pub spi_flash: SpiFlash,
 }
 
 #[derive(Debug)]
@@ -166,8 +172,13 @@ impl ControllerProtocol {
         let (msg_tx, msg_rx) = mpsc::unbounded_channel();
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
+        let spi_flash = SpiFlash::new();
+        let controller_state = ControllerState::with_config(super::state::ControllerStateConfig {
+            controller: config.controller,
+            spi_flash: Some(spi_flash.clone()),
+        })?;
         Ok(Self {
-            state: Shared::new(config.controller_state, Some(config.spi_flash)),
+            state: Shared::new(controller_state, Some(spi_flash)),
             controller: config.controller,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
@@ -352,7 +363,7 @@ impl ControllerProtocol {
         };
         if self.controller != state.controller_state.controller() {
             return Err(
-                ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one passed on `Protocol` init.".to_owned())
+                ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one that's passed on `Protocol` init.".to_owned())
             );
         }
         let Some(mode) = mode else {
@@ -416,37 +427,37 @@ impl ControllerProtocol {
         }
         self.dispatch_event(Event::Log(LogType::SubcommandReceived(subcommand)));
         let sub_command_data = output_report.subcommand_data()?;
-        let mut response_report = self.generate_input_report(Some(0x21))?;
+        let mut res_input_report = self.generate_input_report(Some(0x21))?;
         match subcommand {
             Subcommand::RequestDeviceInfo => {
-                self.command_request_device_info(&mut response_report)?;
+                self.command_request_device_info(&mut res_input_report)?;
             }
             Subcommand::SetInputReportMode => {
-                self.command_set_input_report_mode(&mut response_report, &sub_command_data);
+                self.command_set_input_report_mode(&mut res_input_report, &sub_command_data);
             }
             Subcommand::TriggerButtonsElapsedTime => {
-                self.command_trigger_buttons_elapsed_time(&mut response_report)?;
+                self.command_trigger_buttons_elapsed_time(&mut res_input_report)?;
             }
             Subcommand::SetShipmentState => {
-                self.command_set_shipment_state(&mut response_report);
+                self.command_set_shipment_state(&mut res_input_report);
             }
             Subcommand::SpiFlashRead => {
-                self.command_spi_flash_read(&mut response_report, &sub_command_data)?;
+                self.command_spi_flash_read(&mut res_input_report, &sub_command_data)?;
             }
             Subcommand::SetNfcIrMcuConfig => {
-                self.command_set_nfc_ir_mcu_config(&mut response_report);
+                self.command_set_nfc_ir_mcu_config(&mut res_input_report);
             }
             Subcommand::SetNfcIrMcuState => {
-                self.command_set_nfc_ir_mcu_state(&mut response_report, &sub_command_data);
+                self.command_set_nfc_ir_mcu_state(&mut res_input_report, &sub_command_data);
             }
             Subcommand::SetPlayerLights => {
-                self.command_set_player_lights(&mut response_report);
+                self.command_set_player_lights(&mut res_input_report);
             }
             Subcommand::Enable6AxisSensor => {
-                self.command_enable_6axis_sensor(&mut response_report);
+                self.command_enable_6axis_sensor(&mut res_input_report);
             }
             Subcommand::EnableVibration => {
-                self.command_enable_vibration(&mut response_report);
+                self.command_enable_vibration(&mut res_input_report);
             }
             unsupported_subcommand => {
                 self.dispatch_event(Event::Error(ControllerProtocolError::NotImplemented(
@@ -455,7 +466,7 @@ impl ControllerProtocol {
                 return Ok(());
             }
         }
-        self.handle_write(transport_write, response_report).await?;
+        self.handle_write(transport_write, res_input_report).await?;
         Ok(())
     }
 
@@ -503,6 +514,7 @@ impl ControllerProtocol {
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
             }
         }
+        println!("spi flash read {:?}", input_report.data());
         Ok(())
     }
 
