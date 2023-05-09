@@ -14,7 +14,7 @@ pub enum InputReportId {
     Imu,
     // 0x31 Standard full mode - input reports with NFC/IR data plus to IMU data
     NfcIrMcu,
-    // 0x32, 0x33 Unknown ids - treats as standard input reports
+    // 0x32, 0x33 Unknown ids - treats as standard full input reports, maybe for handshake?
     Unknown1,
     Unknown2,
 }
