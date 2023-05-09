@@ -194,6 +194,7 @@ impl Protocol {
             }
             // Mark the protocol is fully closed.
             drop(closed_rx);
+            let _ = msg_tx.send(Event::Log(LogType::Closed));
         });
         protocol.establish_connection();
         Ok((
