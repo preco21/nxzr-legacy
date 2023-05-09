@@ -99,11 +99,13 @@ struct State {
     pub report_mode: Option<u8>,
     pub connected_at: Option<time::Instant>,
     pub controller_state: ControllerState,
-    pub spi_flash: SpiFlash,
+    // Internally we allow `spi_flash` to be `None`.
+    // For public api, however, we don't expose these things at the moment.
+    pub spi_flash: Option<SpiFlash>,
 }
 
 impl Shared {
-    pub fn new(controller_state: ControllerState, spi_flash: SpiFlash) -> Self {
+    pub fn new(controller_state: ControllerState, spi_flash: Option<SpiFlash>) -> Self {
         Self {
             state: Mutex::new(State {
                 is_pairing: false,
@@ -144,7 +146,7 @@ impl Shared {
 pub struct ControllerProtocolConfig {
     pub controller: ControllerType,
     pub controller_state: ControllerState,
-    pub spi_flash: Option<SpiFlash>,
+    pub spi_flash: SpiFlash,
 }
 
 #[derive(Debug)]
@@ -165,10 +167,7 @@ impl ControllerProtocol {
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
-            state: Shared::new(
-                config.controller_state,
-                config.spi_flash.unwrap_or_else(|| SpiFlash::new()),
-            ),
+            state: Shared::new(config.controller_state, Some(config.spi_flash)),
             controller: config.controller,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
@@ -504,9 +503,6 @@ impl ControllerProtocol {
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
             }
         }
-        println!("final offset offset={offset} digit={place}");
-        println!("subcommand data {:?}", &subcommand_reply_data);
-        println!("spi flash read {:?}", input_report.data());
         Ok(())
     }
 

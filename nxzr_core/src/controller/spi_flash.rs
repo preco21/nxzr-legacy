@@ -12,6 +12,12 @@ pub struct SpiFlash {
     buf: BytesMut,
 }
 
+impl Default for SpiFlash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpiFlash {
     pub fn new() -> Self {
         Self::with_config(Default::default()).unwrap()
