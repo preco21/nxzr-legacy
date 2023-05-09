@@ -16,6 +16,7 @@ tokio = { version = "1.25.0", features = [
     "sync",
     "time",
     "macros",
+    "signal",
 ] }
 nxzr_core = { path = "../nxzr_core" }
 nxzr_device = { version = "0.1.0", path = "../nxzr_device" }

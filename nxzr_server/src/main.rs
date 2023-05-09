@@ -1,6 +1,6 @@
 use nxzr_core::{
-    controller::{protocol::ProtocolConfig, ControllerType},
-    protocol::ProtocolControl,
+    controller::ControllerType,
+    protocol::{Protocol, ProtocolConfig},
 };
 use nxzr_device::{
     device::{Device, DeviceConfig},
@@ -10,7 +10,7 @@ use nxzr_device::{
     transport::{Transport, TransportConfig},
 };
 use std::time::Duration;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{signal, sync::mpsc, time::sleep};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,8 +22,8 @@ async fn main() -> anyhow::Result<()> {
 
     // FIXME: accept device id here
     let mut device = Device::new(DeviceConfig::default())
-        .await?
-        .ensure_adapter_address_switch()
+        // .await?
+        // .ensure_adapter_address_switch()
         .await?;
 
     // FIXME: implement reconnect, currently connecting from scratch only supported
@@ -84,19 +84,23 @@ async fn main() -> anyhow::Result<()> {
     // FIXME:
     tokio::spawn(async move {
         while let Some(evt) = event_rx.recv().await {
-            tracing::info!("{:?}", evt);
+            tracing::info!("{:?} {}", evt, evt.to_string());
         }
     });
 
     tokio::select! {
-        _ = transport.closed() => {},
+        _ = signal::ctrl_c() => {},
         _ = protocol.closed() => {},
+        _ = transport.closed() => {},
         _ = shutdown_tx.closed() => {},
     }
 
     drop(record);
     drop(protocol_handle);
     drop(transport_handle);
+
+    protocol.closed().await;
+    transport.closed().await;
 
     Ok(())
 }

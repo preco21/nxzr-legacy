@@ -48,13 +48,14 @@ pub(crate) async fn set_adapter_address(
     // Set Bluetooth adapter address by adapter name.
     //
     // The user will need to install `apt-get install bluez-utils`.
-    run_command({
-        let mut cmd = Command::new("bdaddr");
-        cmd.args(&["-i", adapter_name, address.to_string().as_ref()]);
-        cmd
-    })
-    .await?;
-    // Reset the bluetooth adapter by running `hciconfig`.
+    // FIXME: update to not use bdaddr
+    // run_command({
+    //     let mut cmd = Command::new("bdaddr");
+    //     cmd.args(&["-i", adapter_name, address.to_string().as_ref()]);
+    //     cmd
+    // })
+    // .await?;
+    // Reset Bluetooth adapter by running `hciconfig`.
     run_command({
         let mut cmd = Command::new("hciconfig");
         cmd.args(&[adapter_name, "reset"]);
