@@ -496,7 +496,7 @@ impl ControllerProtocol {
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
             }
             None => {
-                let spi_flash_data = vec![0; size as usize];
+                let spi_flash_data: Vec<u8> = vec![0; size as usize];
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
             }
         }

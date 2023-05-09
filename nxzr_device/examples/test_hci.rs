@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
         println!("\nReading for hci socket...");
 
         let buf_size = 10;
-        let mut buf = vec![0; buf_size as _];
+        let mut buf: Vec<u8> = vec![0; buf_size as _];
         tokio::select! {
             n = dg.recv(&mut buf) => {
                 match n {

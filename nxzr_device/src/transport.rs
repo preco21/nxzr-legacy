@@ -247,7 +247,7 @@ impl TransportInner {
     }
 
     async fn monitor_window(&self) -> Result<(), TransportError> {
-        let mut buf = vec![0; 10 as _];
+        let mut buf: Vec<u8> = vec![0; 10 as _];
         self.write_window.recv(&mut buf).await?;
         let permits: u16 = u16::from(buf[6]) + u16::from(buf[7]) * 0x100;
         let _ = self.write_sem.add_permits(permits as usize);
@@ -255,7 +255,7 @@ impl TransportInner {
     }
 
     async fn monitor_lock(&self) -> Result<(), TransportError> {
-        let mut buf = vec![0; 10 as _];
+        let mut buf: Vec<u8> = vec![0; 10 as _];
         self.write_lock.recv(&mut buf).await?;
         if buf[5] < 5 {
             self.pause_write();
