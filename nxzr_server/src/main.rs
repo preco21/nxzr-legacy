@@ -76,8 +76,13 @@ async fn main() -> anyhow::Result<()> {
     let (transport, transport_handle) =
         Transport::register(paired_session, TransportConfig::default()).await?;
     // FIXME: allow customizing config
-    let (protocol, protocol_handle) =
-        ProtocolControl::connect(transport.clone(), ProtocolConfig::default())?;
+    let (protocol, protocol_handle) = Protocol::connect(
+        transport.clone(),
+        ProtocolConfig {
+            spi_flash: Some(SpiFlash::new()),
+            ..Default::default()
+        },
+    )?;
 
     let mut event_rx = protocol.events().await?;
 

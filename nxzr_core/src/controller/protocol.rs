@@ -103,7 +103,7 @@ struct State {
 }
 
 impl Shared {
-    pub fn new(controller_state: ControllerState) -> Self {
+    pub fn new(controller_state: ControllerState, spi_flash: Option<SpiFlash>) -> Self {
         Self {
             state: Mutex::new(State {
                 is_pairing: false,
@@ -111,7 +111,7 @@ impl Shared {
                 report_mode: None,
                 connected_at: None,
                 controller_state,
-                spi_flash: None,
+                spi_flash,
             }),
         }
     }
@@ -142,8 +142,9 @@ impl Shared {
 
 #[derive(Debug, Default)]
 pub struct ControllerProtocolConfig {
-    controller: ControllerType,
-    controller_state: ControllerState,
+    pub controller: ControllerType,
+    pub controller_state: ControllerState,
+    pub spi_flash: Option<SpiFlash>,
 }
 
 #[derive(Debug)]
@@ -164,7 +165,7 @@ impl ControllerProtocol {
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
-            state: Shared::new(config.controller_state),
+            state: Shared::new(config.controller_state, config.spi_flash),
             controller: config.controller,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
@@ -365,8 +366,8 @@ impl ControllerProtocol {
             _ => {
                 let timer: u64 = match state.connected_at {
                     Some(connected_at) => {
-                        let cal = time::Instant::now() - connected_at;
-                        (cal.as_secs_f64() / 0.005).round() as u64
+                        let elapsed = time::Instant::now() - connected_at;
+                        (elapsed.as_secs_f64() / 0.005).round() as u64
                     }
                     None => 0,
                 };
