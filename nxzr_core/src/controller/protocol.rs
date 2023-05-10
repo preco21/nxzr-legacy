@@ -514,7 +514,6 @@ impl ControllerProtocol {
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
             }
         }
-        println!("spi flash read {:?}", input_report.data());
         Ok(())
     }
 
