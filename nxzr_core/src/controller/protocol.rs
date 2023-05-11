@@ -235,6 +235,7 @@ impl ControllerProtocol {
                 self.dispatch_event(Event::Error(
                     ControllerProtocolError::OutputReportParseFailed,
                 ));
+                // Continues silently after error logging.
                 return Ok(());
             }
         };
@@ -247,7 +248,7 @@ impl ControllerProtocol {
                 self.reply_to_subcommand(transport, &output_report).await?;
             }
             OutputReportId::RumbleOnly => {
-                // noop: Rumble
+                // Rumble: noop
             }
             OutputReportId::RequestIrNfcMcu => {
                 self.dispatch_event(Event::Error(

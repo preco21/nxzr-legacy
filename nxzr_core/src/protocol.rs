@@ -181,7 +181,7 @@ impl Protocol {
             while let Some(res) = set.join_next().await {
                 match res {
                     Ok(Err(err)) => {
-                        let _ = msg_tx.send(Event::Critical(err));
+                        let _ = msg_tx.send(Event::Error(err));
                         // Tell all other tasks to close due to other errors.
                         let _ = internal_close_tx.send(());
                     }
@@ -190,7 +190,7 @@ impl Protocol {
                         // so that they can choose what to do next.
                         //
                         // Note that this kind of errors is normally not recoverable.
-                        let _ = msg_tx.send(Event::Critical(ProtocolError::Internal(
+                        let _ = msg_tx.send(Event::Error(ProtocolError::Internal(
                             ProtocolInternalError::JoinError(err.to_string()),
                         )));
                         // Tell all other tasks to close due to join error.
@@ -336,16 +336,16 @@ fn create_task(
 #[derive(Debug, Clone)]
 pub enum Event {
     Log(LogType),
+    Error(ProtocolError),
     Warning(ProtocolError),
-    Critical(ProtocolError),
 }
 
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             Self::Log(log) => write!(f, "event log: {:?}", log),
+            Self::Error(err) => write!(f, "event error: {}", err.to_string()),
             Self::Warning(err) => write!(f, "event warn: {}", err.to_string()),
-            Self::Critical(err) => write!(f, "event critical: {}", err.to_string()),
         }
     }
 }
