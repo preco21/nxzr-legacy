@@ -19,10 +19,14 @@ const DEFAULT_READ_BUF_SIZE: usize = 50;
 pub enum TransportError {
     #[error("operation called when transport is closed")]
     OperationWhileClosed,
-    #[error("failed to receive packets from `monitor lock` hci socket")]
-    MonitorLock,
-    #[error("failed to receive packets from `monitor window` hci socket")]
-    MonitorWindow,
+    #[error("hci socket `monitor lock` has closed by peer")]
+    MonitorLockClosed,
+    #[error("hci socket `monitor window` has closed by peer")]
+    MonitorWindowClosed,
+    #[error("reader remote has closed by peer")]
+    ReaderClosed,
+    #[error("writer remote has closed by peer")]
+    WriterClosed,
     #[error("internal error: {0}")]
     Internal(TransportInternalError),
 }
@@ -248,7 +252,11 @@ impl TransportInner {
 
     async fn monitor_window(&self) -> Result<(), TransportError> {
         let mut buf: Vec<u8> = vec![0; 10 as _];
-        self.write_window.recv(&mut buf).await?;
+        match self.write_window.recv(&mut buf).await {
+            Ok(0) => return Err(TransportError::MonitorWindowClosed),
+            Ok(_) => {}
+            Err(err) => return Err(err.into()),
+        };
         let permits: u16 = u16::from(buf[6]) + u16::from(buf[7]) * 0x100;
         let _ = self.write_sem.add_permits(permits as usize);
         Ok(())
@@ -256,7 +264,11 @@ impl TransportInner {
 
     async fn monitor_lock(&self) -> Result<(), TransportError> {
         let mut buf: Vec<u8> = vec![0; 10 as _];
-        self.write_lock.recv(&mut buf).await?;
+        match self.write_lock.recv(&mut buf).await {
+            Ok(0) => return Err(TransportError::MonitorLockClosed),
+            Ok(_) => {}
+            Err(err) => return Err(err.into()),
+        };
         if buf[5] < 5 {
             self.pause_write();
             sleep(Duration::from_millis(1000)).await;
@@ -272,8 +284,11 @@ impl TransportInner {
         self.running().await;
         let mut buf = BytesMut::with_capacity(self.read_buf_size);
         buf.resize(self.read_buf_size, 0);
-        self.session.itr_client().recv(&mut buf).await?;
-        Ok(buf)
+        match self.session.itr_client().recv(&mut buf).await {
+            Ok(0) => Err(TransportError::ReaderClosed),
+            Ok(_) => Ok(buf),
+            Err(err) => Err(err.into()),
+        }
     }
 
     pub async fn write(&self, buf: Bytes) -> Result<(), TransportError> {
@@ -285,8 +300,11 @@ impl TransportInner {
         self.writable().await;
         // Writing a buffer in length more than MTU may fail, however, L2CAP's
         // `SeqPacket` socket seems allows writing buf regardless of the MTU length.
-        self.session.itr_client().send(&buf).await?;
-        Ok(())
+        match self.session.itr_client().send(&buf).await {
+            Ok(0) => Err(TransportError::WriterClosed),
+            Ok(_) => Ok(()),
+            Err(err) => Err(err.into()),
+        }
     }
 
     pub async fn running(&self) {
