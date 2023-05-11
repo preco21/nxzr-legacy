@@ -45,7 +45,7 @@ pub enum ControllerProtocolError {
 
 #[derive(Clone, Error, Debug)]
 pub enum ControllerProtocolInternalError {
-    #[error("io: {kind} {message}")]
+    #[error("io: {kind}; {message}")]
     Io {
         kind: std::io::ErrorKind,
         message: String,

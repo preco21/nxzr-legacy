@@ -13,7 +13,7 @@ pub enum HelperError {
 pub enum HelperInternalError {
     #[error("utf8: {0}")]
     Utf8Error(std::str::Utf8Error),
-    #[error("io: {kind} {message}")]
+    #[error("io: {kind}; {message}")]
     Io {
         kind: std::io::ErrorKind,
         message: String,
