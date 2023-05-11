@@ -132,7 +132,10 @@ impl Protocol {
                     })
                 };
                 tokio::select! {
-                    _ = protocol.wait_for_connection() => {},
+                    _ = protocol.writer_ready() => {
+                        // Allow `empty_report_sender` to send one last command.
+                        time::sleep(Duration::from_millis(1000)).await;
+                    },
                     _ = internal_close_rx.recv() => {},
                 }
                 // Notifies the sender task to close then wait for it until closed.
