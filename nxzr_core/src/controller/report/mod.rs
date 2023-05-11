@@ -27,9 +27,10 @@ pub enum ReportError {
     // non-existent data than just saying data out-of-bounds.
     #[error("no data available")]
     NoDataAvailable,
-    #[error("failed to set a subcommand")]
-    FailedToSetSubcommand,
-    // Returned if invariant violation happens.
+    #[error("received a buffer that does not contain a subcommand")]
+    SubcommandParseFailed,
+    #[error("unknown subcommand has been supplied")]
+    UnknownSubcommand(u8),
     #[error("invariant error occurred")]
     Invariant,
 }

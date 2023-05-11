@@ -414,17 +414,14 @@ impl ControllerProtocol {
         transport_write: &impl TransportWrite,
         output_report: &OutputReport,
     ) -> Result<(), ControllerProtocolError> {
-        let Some(subcommand) = output_report.subcommand() else {
-            self.dispatch_event(Event::Error(
-                ControllerProtocolError::NotImplemented(format!("unknown subcommand received."))
-            ));
-            return Ok(())
+        let subcommand = match output_report.subcommand() {
+            Ok(subcommand) => subcommand,
+            Err(err) => {
+                self.dispatch_event(Event::Error(ControllerProtocolError::from(err)));
+                // Silently continues the process after error logging.
+                return Ok(());
+            }
         };
-        if let Subcommand::Empty = subcommand {
-            self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
-                "received output report does not contain a subcommand.".to_owned(),
-            )));
-        }
         self.dispatch_event(Event::Log(LogType::SubcommandReceived(subcommand)));
         let sub_command_data = output_report.subcommand_data()?;
         let mut res_input_report = self.generate_input_report(Some(0x21))?;

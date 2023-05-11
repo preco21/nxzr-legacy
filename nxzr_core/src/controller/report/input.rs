@@ -190,10 +190,7 @@ impl InputReport {
     }
 
     pub fn set_response_subcommand(&mut self, id: Subcommand) -> Result<(), ReportError> {
-        let Some(subcommand) = id.to_byte() else {
-            return Err(ReportError::FailedToSetSubcommand);
-        };
-        self.buf[15] = subcommand;
+        self.buf[15] = id.to_byte();
         Ok(())
     }
 
