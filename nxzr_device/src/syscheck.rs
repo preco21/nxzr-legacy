@@ -25,24 +25,24 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     // Check if the Bluetooth service is active.
     if !systemctl::exists("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::BluetoothFailed(
-            "Bluetooth service does not exist".to_owned(),
+            "Bluetooth service does not exist.".to_owned(),
         ));
     };
     if !systemctl::is_active("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::BluetoothFailed(
-            "Bluetooth service is not active".to_owned(),
+            "Bluetooth service is not active.".to_owned(),
         ));
     }
     // FIXME: maybe this is not platform agnostic
     // Check if the `dbus` service is active
     if !systemctl::exists("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::DBusFailed(
-            "dbus service does not exist".to_owned(),
+            "dbus service does not exist.".to_owned(),
         ));
     };
     if !systemctl::is_active("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::DBusFailed(
-            "dbus service is not active".to_owned(),
+            "dbus service is not active.".to_owned(),
         ));
     }
     // Check if `hciconfig` exists
