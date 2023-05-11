@@ -185,12 +185,16 @@ impl InputReport {
         Ok(data.len() == 313)
     }
 
-    pub fn reply_to_subcommand_id(&self) -> Option<Subcommand> {
+    pub fn response_subcommand(&self) -> Option<Subcommand> {
         Subcommand::from_byte(self.buf[15])
     }
 
-    pub fn set_reply_to_subcommand_id(&mut self, id: Subcommand) {
-        self.buf[15] = id.to_byte();
+    pub fn set_response_subcommand(&mut self, id: Subcommand) -> Result<(), ReportError> {
+        let Some(subcommand) = id.to_byte() else {
+            return Err(ReportError::FailedToSetSubcommand);
+        };
+        self.buf[15] = subcommand;
+        Ok(())
     }
 
     pub fn sub_0x02_device_info(
@@ -200,7 +204,7 @@ impl InputReport {
         controller_type: ControllerType,
     ) -> Result<(), ReportError> {
         let fm_version = fm_version.unwrap_or([0x04, 0x00]);
-        self.set_reply_to_subcommand_id(Subcommand::RequestDeviceInfo);
+        self.set_response_subcommand(Subcommand::RequestDeviceInfo)?;
         self.buf[SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 2].copy_from_slice(&fm_version);
         self.buf[SUBCOMMAND_OFFSET + 2] = controller_type.id();
         self.buf[SUBCOMMAND_OFFSET + 3] = 0x02;
@@ -220,7 +224,7 @@ impl InputReport {
             return Err(ReportError::OutOfBounds);
         }
         // Creates input report data with spi flash read subcommand
-        self.set_reply_to_subcommand_id(Subcommand::SpiFlashRead);
+        self.set_response_subcommand(Subcommand::SpiFlashRead)?;
         let mut cur_offset = offset;
         // Write offset to data
         for i in SUBCOMMAND_OFFSET..SUBCOMMAND_OFFSET + 4 {

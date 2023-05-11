@@ -251,7 +251,7 @@ impl ControllerProtocol {
             }
             OutputReportId::RequestIrNfcMcu => {
                 self.dispatch_event(Event::Error(
-                    ControllerProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring".to_owned()
+                    ControllerProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring.".to_owned()
                 )));
             }
         }
@@ -416,13 +416,13 @@ impl ControllerProtocol {
     ) -> Result<(), ControllerProtocolError> {
         let Some(subcommand) = output_report.subcommand() else {
             self.dispatch_event(Event::Error(
-                ControllerProtocolError::NotImplemented("unknown subcommand received.".to_owned())
+                ControllerProtocolError::NotImplemented(format!("unknown subcommand received."))
             ));
             return Ok(())
         };
         if let Subcommand::Empty = subcommand {
             self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
-                "received output report does not contain a subcommand".to_owned(),
+                "received output report does not contain a subcommand.".to_owned(),
             )));
         }
         self.dispatch_event(Event::Log(LogType::SubcommandReceived(subcommand)));
@@ -433,31 +433,31 @@ impl ControllerProtocol {
                 self.command_request_device_info(&mut res_input_report)?;
             }
             Subcommand::SetInputReportMode => {
-                self.command_set_input_report_mode(&mut res_input_report, &sub_command_data);
+                self.command_set_input_report_mode(&mut res_input_report, &sub_command_data)?;
             }
             Subcommand::TriggerButtonsElapsedTime => {
                 self.command_trigger_buttons_elapsed_time(&mut res_input_report)?;
             }
             Subcommand::SetShipmentState => {
-                self.command_set_shipment_state(&mut res_input_report);
+                self.command_set_shipment_state(&mut res_input_report)?;
             }
             Subcommand::SpiFlashRead => {
                 self.command_spi_flash_read(&mut res_input_report, &sub_command_data)?;
             }
             Subcommand::SetNfcIrMcuConfig => {
-                self.command_set_nfc_ir_mcu_config(&mut res_input_report);
+                self.command_set_nfc_ir_mcu_config(&mut res_input_report)?;
             }
             Subcommand::SetNfcIrMcuState => {
-                self.command_set_nfc_ir_mcu_state(&mut res_input_report, &sub_command_data);
+                self.command_set_nfc_ir_mcu_state(&mut res_input_report, &sub_command_data)?;
             }
             Subcommand::SetPlayerLights => {
-                self.command_set_player_lights(&mut res_input_report);
+                self.command_set_player_lights(&mut res_input_report)?;
             }
             Subcommand::Enable6AxisSensor => {
-                self.command_enable_6axis_sensor(&mut res_input_report);
+                self.command_enable_6axis_sensor(&mut res_input_report)?;
             }
             Subcommand::EnableVibration => {
-                self.command_enable_vibration(&mut res_input_report);
+                self.command_enable_vibration(&mut res_input_report)?;
             }
             unsupported_subcommand => {
                 self.dispatch_event(Event::Error(ControllerProtocolError::NotImplemented(
@@ -484,9 +484,13 @@ impl ControllerProtocol {
         Ok(())
     }
 
-    fn command_set_shipment_state(&self, input_report: &mut InputReport) {
+    fn command_set_shipment_state(
+        &self,
+        input_report: &mut InputReport,
+    ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x80);
-        input_report.set_reply_to_subcommand_id(Subcommand::SetShipmentState);
+        input_report.set_response_subcommand(Subcommand::SetShipmentState)?;
+        Ok(())
     }
 
     fn command_spi_flash_read(
@@ -521,7 +525,7 @@ impl ControllerProtocol {
         &self,
         input_report: &mut InputReport,
         subcommand_reply_data: &[u8],
-    ) {
+    ) -> Result<(), ControllerProtocolError> {
         let state = self.state.get();
         let command = subcommand_reply_data[0];
         if let Some(report_mode) = state.report_mode {
@@ -531,7 +535,8 @@ impl ControllerProtocol {
         }
         self.set_report_mode(Some(command), None);
         input_report.set_ack(0x80);
-        input_report.set_reply_to_subcommand_id(Subcommand::SetInputReportMode);
+        input_report.set_response_subcommand(Subcommand::SetInputReportMode)?;
+        Ok(())
     }
 
     fn command_trigger_buttons_elapsed_time(
@@ -539,7 +544,7 @@ impl ControllerProtocol {
         input_report: &mut InputReport,
     ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x83);
-        input_report.set_reply_to_subcommand_id(Subcommand::TriggerButtonsElapsedTime);
+        input_report.set_response_subcommand(Subcommand::TriggerButtonsElapsedTime)?;
         // HACK: We assume this command is only used during pairing, sets values
         // and let the Switch to assign a player number.
         match self.controller {
@@ -559,37 +564,49 @@ impl ControllerProtocol {
         Ok(())
     }
 
-    fn command_enable_6axis_sensor(&self, input_report: &mut InputReport) {
+    fn command_enable_6axis_sensor(
+        &self,
+        input_report: &mut InputReport,
+    ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x80);
-        input_report.set_reply_to_subcommand_id(Subcommand::Enable6AxisSensor);
+        input_report.set_response_subcommand(Subcommand::Enable6AxisSensor)?;
+        Ok(())
     }
 
-    fn command_enable_vibration(&self, input_report: &mut InputReport) {
+    fn command_enable_vibration(
+        &self,
+        input_report: &mut InputReport,
+    ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x80);
-        input_report.set_reply_to_subcommand_id(Subcommand::EnableVibration);
+        input_report.set_response_subcommand(Subcommand::EnableVibration)?;
+        Ok(())
     }
 
-    fn command_set_nfc_ir_mcu_config(&self, input_report: &mut InputReport) {
+    fn command_set_nfc_ir_mcu_config(
+        &self,
+        input_report: &mut InputReport,
+    ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0xA0);
-        input_report.set_reply_to_subcommand_id(Subcommand::SetNfcIrMcuConfig);
+        input_report.set_response_subcommand(Subcommand::SetNfcIrMcuConfig)?;
         input_report.as_mut()[16..50].copy_from_slice(&[
             0x01, 0x00, 0xFF, 0x00, 0x08, 0x00, 0x1B, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0xC8,
         ]);
+        Ok(())
     }
 
     fn command_set_nfc_ir_mcu_state(
         &self,
         input_report: &mut InputReport,
         subcommand_reply_data: &[u8],
-    ) {
+    ) -> Result<(), ControllerProtocolError> {
         let command = subcommand_reply_data[0];
         match command {
             // Resume + Suspend
             0x01 | 0x00 => {
                 input_report.set_ack(0x80);
-                input_report.set_reply_to_subcommand_id(Subcommand::SetNfcIrMcuState);
+                input_report.set_response_subcommand(Subcommand::SetNfcIrMcuState)?;
             }
             _ => {
                 self.dispatch_event(Event::Error(ControllerProtocolError::NotImplemented(
@@ -597,12 +614,17 @@ impl ControllerProtocol {
                 )));
             }
         }
+        Ok(())
     }
 
-    fn command_set_player_lights(&self, input_report: &mut InputReport) {
+    fn command_set_player_lights(
+        &self,
+        input_report: &mut InputReport,
+    ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x80);
-        input_report.set_reply_to_subcommand_id(Subcommand::SetPlayerLights);
+        input_report.set_response_subcommand(Subcommand::SetPlayerLights)?;
         self.set_writer_ready();
+        Ok(())
     }
 
     pub async fn writer_ready(&self) {
