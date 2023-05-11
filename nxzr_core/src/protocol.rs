@@ -233,7 +233,7 @@ impl Protocol {
         tokio::select! {
             _ = fut => {}
             _ = self.term_tx.closed() => {
-                return Err(ProtocolError::ActionAbortedDueToClosing("update_controller_state".to_owned()))
+                return Err(ProtocolError::ActionAbortedDueToClosing("action: update_controller_state".to_owned()))
             },
         }
         Ok(())
