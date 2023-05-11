@@ -19,13 +19,13 @@ const DEFAULT_READ_BUF_SIZE: usize = 50;
 pub enum TransportError {
     #[error("operation called when transport is closed")]
     OperationWhileClosed,
-    #[error("hci socket `monitor lock` has closed by peer")]
+    #[error("hci socket `monitor lock` closed by peer")]
     MonitorLockClosed,
-    #[error("hci socket `monitor window` has closed by peer")]
+    #[error("hci socket `monitor window` closed by peer")]
     MonitorWindowClosed,
-    #[error("reader remote has closed by peer")]
+    #[error("reader remote closed by peer")]
     ReaderClosed,
-    #[error("writer remote has closed by peer")]
+    #[error("writer remote closed by peer")]
     WriterClosed,
     #[error("internal error: {0}")]
     Internal(TransportInternalError),
