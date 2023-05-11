@@ -10,6 +10,7 @@ pub async fn prepare_system_requirements() -> Result<(), Error> {
     // when [force clean connect] -> clear all settings to initial one
 
     // check wsl installed
+    // wsl version check if it's v2
     // check if system can run wsl -> vm requirements
     // check usbipd installed -> maybe just include the binary
 
@@ -20,6 +21,10 @@ pub async fn prepare_system_requirements() -> Result<(), Error> {
     // [internal vm]
     // upgrade apt
     // ㄴ sudo apt upgrade -y
+
+    // disable windows bt
+
+    // bluetoothctl scan off
 
     // install dbus broker
     // https://github.com/bus1/dbus-broker/wiki
