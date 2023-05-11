@@ -135,12 +135,12 @@ impl Shared {
     }
 
     pub fn set_connected_at(&self, connected_at: Option<time::Instant>) {
-        let mut state = self.state.lock().unwrap().clone();
+        let mut state = self.state.lock().unwrap();
         state.connected_at = connected_at;
     }
 
     pub fn set_controller_state(&self, controller_state: ControllerState) {
-        let mut state = self.state.lock().unwrap().clone();
+        let mut state = self.state.lock().unwrap();
         state.controller_state = controller_state;
     }
 
