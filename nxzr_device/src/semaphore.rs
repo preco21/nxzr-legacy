@@ -10,7 +10,7 @@ pub struct BoundedSemaphore {
 impl BoundedSemaphore {
     pub fn new(max_permits: usize, initial_permits: usize) -> Self {
         if max_permits < initial_permits {
-            panic!("`initial_permits` must be lower than `max_permits`.");
+            panic!("`initial_permits` must be less than `max_permits`.");
         }
         BoundedSemaphore {
             sem: Semaphore::new(initial_permits),
