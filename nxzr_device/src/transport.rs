@@ -11,7 +11,7 @@ use tokio::task::JoinSet;
 use tokio::time;
 use tracing::Instrument;
 
-const DEFAULT_FLOW_CONTROL_PERMITS: usize = 4;
+const DEFAULT_FLOW_CONTROL_PERMITS: usize = tokio::sync::Semaphore::MAX_PERMITS;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
 
 #[derive(Clone, Error, Debug)]
