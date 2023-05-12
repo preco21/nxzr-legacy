@@ -16,7 +16,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use std::{future::Future, sync::Mutex, time::Duration};
+use std::{future::Future, sync::Mutex};
 use strum::{Display, IntoStaticStr};
 use thiserror::Error;
 use tokio::{
@@ -37,7 +37,7 @@ pub enum ControllerProtocolError {
     #[error("unknown report mode is used for generating input report")]
     UnknownInputReportMode,
     #[error("write operation is slower than usual: {0:?}, ignoring")]
-    LaggedWrites(Duration),
+    LaggedWrites(time::Duration),
     #[error("not implemented: {0}")]
     NotImplemented(String),
     #[error("invariant violation: {0}")]
@@ -282,7 +282,7 @@ impl ControllerProtocol {
         if state.send_delay == f64::INFINITY {
             self.notify_writer_wake.notified().await
         } else {
-            let send_delay = Duration::from_secs_f64(state.send_delay);
+            let send_delay = time::Duration::from_secs_f64(state.send_delay);
             let elapsed = time::Instant::now() - now;
             let next_delay = match send_delay.checked_sub(elapsed) {
                 Some(delay) => delay,

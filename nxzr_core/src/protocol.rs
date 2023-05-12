@@ -8,7 +8,6 @@ use crate::controller::state::ControllerState;
 use crate::event::{setup_event, EventError};
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
 use strum::{Display, IntoStaticStr};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -128,7 +127,7 @@ impl Protocol {
                                 res = protocol.send_empty_input_report(&transport) => {
                                     // Propagate errors immediately to the caller.
                                     res?;
-                                    time::sleep(Duration::from_millis(1000)).await;
+                                    time::sleep(time::Duration::from_millis(1000)).await;
                                 },
                                 _ = connected_tx.closed() => break,
                             }
@@ -139,7 +138,7 @@ impl Protocol {
                 tokio::select! {
                     _ = protocol.writer_ready() => {
                         // Allow `empty_report_sender` to send one last command.
-                        time::sleep(Duration::from_millis(1000)).await;
+                        time::sleep(time::Duration::from_millis(1000)).await;
                     },
                     _ = internal_close_rx.recv() => {},
                 }

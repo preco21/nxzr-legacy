@@ -1,7 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use nxzr_device::semaphore::BoundedSemaphore;
-use tokio::time::sleep;
+use tokio::time;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
                     return;
                 };
                 println!("Consuming permit: {}", i + 1);
-                sleep(Duration::from_millis(5000)).await;
+                time::sleep(time::Duration::from_millis(5000)).await;
                 println!("Finish processing: {}", i + 1);
             }));
         }
@@ -31,10 +31,10 @@ async fn main() -> Result<()> {
     });
     let bsem3 = bsem.clone();
     let handle2 = tokio::spawn(async move {
-        sleep(Duration::from_millis(2000)).await;
+        time::sleep(time::Duration::from_millis(2000)).await;
         println!("Adding a first permit.");
         bsem3.add_permits(1);
-        sleep(Duration::from_millis(1000)).await;
+        time::sleep(time::Duration::from_millis(1000)).await;
         println!("Adding a second permit.");
         bsem3.add_permits(1);
     });

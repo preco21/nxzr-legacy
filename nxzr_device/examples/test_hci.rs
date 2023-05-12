@@ -1,9 +1,7 @@
-use std::time::Duration;
-
 use nxzr_device::sock::hci::{Datagram, Filter, SocketAddr};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
-    time::sleep,
+    time,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -58,7 +56,7 @@ async fn main() -> Result<()> {
     }
 
     println!("Exiting...");
-    sleep(Duration::from_secs(1)).await;
+    time::sleep(time::Duration::from_secs(1)).await;
 
     Ok(())
 }

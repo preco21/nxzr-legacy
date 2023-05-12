@@ -9,10 +9,9 @@ use nxzr_device::{
     syscheck,
     transport::{Transport, TransportConfig},
 };
-use std::time::Duration;
 use std::{io::Write, sync::Arc};
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
-use tokio::{signal, sync::mpsc, task, time::sleep};
+use tokio::{signal, sync::mpsc, task, time};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -41,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!("fallback: restarting Bluetooth session due to incompatibilities with the bluez `input` plugin, disable this plugin to avoid issues.");
         tracing::info!("restarting Bluetooth service...");
         helper::restart_bluetooth_service()?;
-        sleep(Duration::from_millis(1000)).await;
+        time::sleep(time::Duration::from_millis(1000)).await;
         // FIXME: accept device id here
         device = Device::new(DeviceConfig::default()).await?;
         session.bind().await?;
@@ -103,54 +102,54 @@ async fn main() -> anyhow::Result<()> {
 
     let p = Arc::new(protocol);
     let p2 = p.clone();
-    let handle = task::spawn_blocking(move || {
-        let stdin = std::io::stdin();
-        //setting up stdout and going into raw mode
-        let mut stdout = std::io::stdout().into_raw_mode().unwrap();
-        //printing welcoming message, clearing the screen and going to left top corner with the cursor
-        // write!(stdout, r#"{}{}ctrl + q to exit, ctrl + h to print "Hello world!", alt + t to print "termion is cool""#, termion::cursor::Goto(1, 1), termion::clear::All)
-        // .unwrap();
-        stdout.flush().unwrap();
+    // let handle = task::spawn_blocking(move || {
+    //     let stdin = std::io::stdin();
+    //     //setting up stdout and going into raw mode
+    //     let mut stdout = std::io::stdout().into_raw_mode().unwrap();
+    //     //printing welcoming message, clearing the screen and going to left top corner with the cursor
+    //     // write!(stdout, r#"{}{}ctrl + q to exit, ctrl + h to print "Hello world!", alt + t to print "termion is cool""#, termion::cursor::Goto(1, 1), termion::clear::All)
+    //     // .unwrap();
+    //     stdout.flush().unwrap();
 
-        //detecting keydown events
-        for c in stdin.keys() {
-            //clearing the screen and going to top left corner
-            // write!(
-            //     stdout,
-            //     "{}{}",
-            //     termion::cursor::Goto(1, 1),
-            //     termion::clear::All
-            // )
-            // .unwrap();
+    //     //detecting keydown events
+    //     for c in stdin.keys() {
+    //         //clearing the screen and going to top left corner
+    //         // write!(
+    //         //     stdout,
+    //         //     "{}{}",
+    //         //     termion::cursor::Goto(1, 1),
+    //         //     termion::clear::All
+    //         // )
+    //         // .unwrap();
 
-            let p3 = p2.clone();
-            let handle_key_press = move |key: ButtonKey| {
-                tokio::spawn(async move {
-                    println!("spawned for {}", key);
-                    key_press(p3, key).await;
-                });
-            };
+    //         let p3 = p2.clone();
+    //         let handle_key_press = move |key: ButtonKey| {
+    //             tokio::spawn(async move {
+    //                 println!("spawned for {}", key);
+    //                 key_press(p3, key).await;
+    //             });
+    //         };
 
-            //i reckon this speaks for itself
-            match c.unwrap() {
-                Key::Char('q') => break,
-                Key::Up => {
-                    println!("up");
-                    handle_key_press(ButtonKey::Up);
-                }
-                Key::Down => handle_key_press(ButtonKey::Down),
-                Key::Left => handle_key_press(ButtonKey::Left),
-                Key::Right => handle_key_press(ButtonKey::Right),
-                Key::Char('a') => handle_key_press(ButtonKey::A),
-                Key::Char('b') => handle_key_press(ButtonKey::B),
-                Key::Char('x') => handle_key_press(ButtonKey::X),
-                Key::Char('y') => handle_key_press(ButtonKey::Y),
-                _ => (),
-            }
+    //         //i reckon this speaks for itself
+    //         match c.unwrap() {
+    //             Key::Char('q') => break,
+    //             Key::Up => {
+    //                 println!("up");
+    //                 handle_key_press(ButtonKey::Up);
+    //             }
+    //             Key::Down => handle_key_press(ButtonKey::Down),
+    //             Key::Left => handle_key_press(ButtonKey::Left),
+    //             Key::Right => handle_key_press(ButtonKey::Right),
+    //             Key::Char('a') => handle_key_press(ButtonKey::A),
+    //             Key::Char('b') => handle_key_press(ButtonKey::B),
+    //             Key::Char('x') => handle_key_press(ButtonKey::X),
+    //             Key::Char('y') => handle_key_press(ButtonKey::Y),
+    //             _ => (),
+    //         }
 
-            // stdout.flush().unwrap();
-        }
-    });
+    //         // stdout.flush().unwrap();
+    //     }
+    // });
 
     tokio::select! {
         _ = signal::ctrl_c() => {},
@@ -166,7 +165,7 @@ async fn main() -> anyhow::Result<()> {
     p.closed().await;
     transport.closed().await;
 
-    handle.abort();
+    // handle.abort();
 
     Ok(())
 }
@@ -178,7 +177,7 @@ async fn key_press(p: Arc<Protocol>, key: ButtonKey) {
         })
         .await
         .unwrap();
-    sleep(Duration::from_millis(100)).await;
+    time::sleep(time::Duration::from_millis(100)).await;
     let _ = p
         .update_controller_state(|state| {
             state.button_state_mut().set_button(key, false).unwrap();

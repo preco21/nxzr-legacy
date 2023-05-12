@@ -5,11 +5,10 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
-use tokio::time::sleep;
+use tokio::time;
 use tracing::Instrument;
 
 const DEFAULT_FLOW_CONTROL_PERMITS: usize = 4;
@@ -271,7 +270,7 @@ impl TransportInner {
         };
         if buf[5] < 5 {
             self.pause_write();
-            sleep(Duration::from_millis(1000)).await;
+            time::sleep(time::Duration::from_millis(1000)).await;
             self.resume_write();
         }
         Ok(())
