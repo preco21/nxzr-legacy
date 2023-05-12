@@ -115,9 +115,10 @@ impl Protocol {
             async move {
                 let (connected_tx, connected_rx) = mpsc::channel::<()>(1);
                 // Please note that sending empty reports after the initial
-                // connection until the host to reply is very important because
-                // otherwise, the host will not send any further responses after
-                // last sending `spi_read` command.
+                // connection until the host to finish reply (at `writer_ready`
+                // point) is very important because otherwise, the host will not
+                // send any further responses after last sending `spi_read`
+                // command.
                 let empty_report_sender = {
                     let protocol = protocol.clone();
                     tokio::spawn(async move {
