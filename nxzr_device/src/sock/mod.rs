@@ -132,6 +132,7 @@ impl From<Address> for MacAddr6 {
     }
 }
 
+// FIXME: test if into() is necessary?
 // For `bluer` compatibility
 impl From<bluer::Address> for Address {
     fn from(addr: bluer::Address) -> Self {
