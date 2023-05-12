@@ -1,6 +1,6 @@
-pub struct SendDelay(Option<u8>);
+pub struct SendInterval(Option<u8>);
 
-impl SendDelay {
+impl SendInterval {
     pub fn new(mode: Option<u8>) -> Self {
         Self(mode)
     }

@@ -1,5 +1,5 @@
 use super::{
-    delay::SendDelay,
+    interval::SendInterval,
     report::{
         input::{InputReport, InputReportId, TriggerButtonsElapsedTimeCommand},
         output::{OutputReport, OutputReportId},
@@ -106,7 +106,7 @@ struct Shared {
 #[derive(Debug, Clone)]
 struct State {
     pub is_pairing: bool,
-    pub send_delay: f64,
+    pub send_interval: f64,
     pub report_mode: Option<u8>,
     pub connected_at: Option<time::Instant>,
     pub controller_state: ControllerState,
@@ -120,7 +120,7 @@ impl Shared {
         Self {
             state: Mutex::new(State {
                 is_pairing: false,
-                send_delay: 1.0 / 15.0,
+                send_interval: 1.0 / 15.0,
                 report_mode: None,
                 connected_at: None,
                 controller_state,
@@ -279,22 +279,22 @@ impl ControllerProtocol {
             write_hook.await;
         }
         let state = self.state.get();
-        if state.send_delay == f64::INFINITY {
+        if state.send_interval == f64::INFINITY {
             self.notify_writer_wake.notified().await
         } else {
-            let send_delay = time::Duration::from_secs_f64(state.send_delay);
+            let send_interval = time::Duration::from_secs_f64(state.send_interval);
             let elapsed = time::Instant::now() - now;
-            let next_delay = match send_delay.checked_sub(elapsed) {
+            let shim_delay = match send_interval.checked_sub(elapsed) {
                 Some(delay) => delay,
                 None => {
-                    let slow_duration = elapsed - send_delay;
+                    let slow_duration = elapsed - send_interval;
                     self.dispatch_event(Event::Error(ControllerProtocolError::LaggedWrites(
                         slow_duration,
                     )));
                     return Ok(());
                 }
             };
-            let _ = time::timeout(next_delay, self.notify_writer_wake.notified()).await;
+            let _ = time::timeout(shim_delay, self.notify_writer_wake.notified()).await;
         }
         Ok(())
     }
@@ -310,18 +310,18 @@ impl ControllerProtocol {
         self.state.modify(|state| {
             state.report_mode = mode;
             if is_pairing.unwrap_or(state.is_pairing) {
-                state.send_delay = 1.0 / 15.0;
+                state.send_interval = 1.0 / 15.0;
             } else {
-                let delay = SendDelay::new(mode).to_byte();
-                match delay {
-                    Some(delay) => state.send_delay = delay,
+                let interval = SendInterval::new(mode).to_byte();
+                match interval {
+                    Some(interval) => state.send_interval = interval,
                     None => {
                         self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
                             format!(
-                                "unknown delay for report mode \"{mode:?}\", assuming it as 1/15.",
+                            "unknown interval for report mode \"{mode:?}\", assuming it as 1/15.",
                             ),
                         )));
-                        state.send_delay = 1.0 / 15.0;
+                        state.send_interval = 1.0 / 15.0;
                     }
                 };
             }
