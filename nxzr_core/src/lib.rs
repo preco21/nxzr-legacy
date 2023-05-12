@@ -3,6 +3,7 @@ use event::EventError;
 use protocol::ProtocolError;
 use thiserror::Error;
 
+pub mod addr;
 pub mod controller;
 pub mod event;
 pub mod protocol;

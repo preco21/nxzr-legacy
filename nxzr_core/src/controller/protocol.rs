@@ -10,7 +10,10 @@ use super::{
     state::{ControllerState, StateError},
     ControllerType,
 };
-use crate::event::{setup_event, EventError};
+use crate::{
+    addr::Address,
+    event::{setup_event, EventError},
+};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use std::{future::Future, sync::Mutex, time::Duration};
@@ -153,12 +156,14 @@ impl Shared {
 #[derive(Debug, Default)]
 pub struct ControllerProtocolConfig {
     pub controller: ControllerType,
+    pub bd_addr: Address,
 }
 
 #[derive(Debug)]
 pub struct ControllerProtocol {
     state: Shared,
     controller: ControllerType,
+    bd_addr: Address,
     notify_data_received: Notify,
     notify_writer_wake: Notify,
     writer_ready_tx: watch::Sender<bool>,
@@ -180,6 +185,7 @@ impl ControllerProtocol {
         Ok(Self {
             state: Shared::new(controller_state, Some(spi_flash)),
             controller: config.controller,
+            bd_addr: config.bd_addr,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
             writer_ready_tx: watch::channel(false).0,
@@ -226,7 +232,6 @@ impl ControllerProtocol {
     where
         T: TransportRead + TransportWrite,
     {
-        // FIXME: receive addr for subcommand
         self.notify_data_received.notify_waiters();
         let buf = transport.read().await?;
         let output_report = match OutputReport::with_raw(buf) {
@@ -472,13 +477,8 @@ impl ControllerProtocol {
         &self,
         input_report: &mut InputReport,
     ) -> Result<(), ControllerProtocolError> {
-        // FIXME: receive addr: implement
-        // address = self.transport.get_extra_info('sockname')
-        // assert address is not None
-        // bd_address = list(map(lambda x: int(x, 16), address[0].split(':')))
         input_report.set_ack(0x82);
-        // FIXME: receive addr: update VVV
-        input_report.sub_0x02_device_info([0xFFu8; 6], None, self.controller)?;
+        input_report.sub_0x02_device_info(*self.bd_addr, None, self.controller)?;
         Ok(())
     }
 
