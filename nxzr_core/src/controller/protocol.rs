@@ -156,14 +156,14 @@ impl Shared {
 #[derive(Debug, Default)]
 pub struct ControllerProtocolConfig {
     pub controller: ControllerType,
-    pub bd_addr: Address,
+    pub dev_address: Address,
 }
 
 #[derive(Debug)]
 pub struct ControllerProtocol {
     state: Shared,
     controller: ControllerType,
-    bd_addr: Address,
+    dev_addr: Address,
     notify_data_received: Notify,
     notify_writer_wake: Notify,
     writer_ready_tx: watch::Sender<bool>,
@@ -185,7 +185,7 @@ impl ControllerProtocol {
         Ok(Self {
             state: Shared::new(controller_state, Some(spi_flash)),
             controller: config.controller,
-            bd_addr: config.bd_addr,
+            dev_addr: config.dev_address,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
             writer_ready_tx: watch::channel(false).0,
@@ -478,7 +478,7 @@ impl ControllerProtocol {
         input_report: &mut InputReport,
     ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x82);
-        input_report.sub_0x02_device_info(*self.bd_addr, None, self.controller)?;
+        input_report.sub_0x02_device_info(*self.dev_addr, None, self.controller)?;
         Ok(())
     }
 

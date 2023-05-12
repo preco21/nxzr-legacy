@@ -39,6 +39,9 @@ async-trait = "0.1.68"
 [dev-dependencies]
 tokio = { version = "1.25.0", features = ["full"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
+
 [features]
 # Allows `cross` to cross-compile linux-specific crates
 cross = ["dep:bluer", "dep:dbus"]

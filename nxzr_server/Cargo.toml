@@ -23,6 +23,8 @@ nxzr_device = { version = "0.1.0", path = "../nxzr_device" }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
 anyhow = "1.0.71"
+tokio-stream = "0.1.14"
+termion = "2.0.1"
 
 [features]
 # Forward `cross` feature to cross-compile linux-specific crates

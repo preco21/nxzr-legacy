@@ -10,6 +10,7 @@ use std::{
     mem::{size_of, MaybeUninit},
     ops::{Deref, DerefMut},
     os::unix::io::{AsRawFd, IntoRawFd, RawFd},
+    str::FromStr,
 };
 use strum::{Display, EnumString};
 use tokio::io::ReadBuf;
@@ -132,17 +133,42 @@ impl From<Address> for MacAddr6 {
     }
 }
 
-// FIXME: test if into() is necessary?
-// For `bluer` compatibility
-impl From<bluer::Address> for Address {
-    fn from(addr: bluer::Address) -> Self {
-        Self(addr.0.into())
+/// Invalid Bluetooth address error.
+#[derive(Debug, Clone)]
+pub struct InvalidAddress(pub String);
+
+impl fmt::Display for InvalidAddress {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "invalid Bluetooth address: {}", &self.0)
     }
 }
 
-impl From<Address> for bluer::Address {
+impl std::error::Error for InvalidAddress {}
+
+impl FromStr for Address {
+    type Err = InvalidAddress;
+    fn from_str(s: &str) -> std::result::Result<Self, InvalidAddress> {
+        let fields = s
+            .split(':')
+            .map(|s| u8::from_str_radix(s, 16).map_err(|_| InvalidAddress(s.to_string())))
+            .collect::<std::result::Result<Vec<_>, InvalidAddress>>()?;
+        Ok(Self(
+            fields
+                .try_into()
+                .map_err(|_| InvalidAddress(s.to_string()))?,
+        ))
+    }
+}
+
+impl From<[u8; 6]> for Address {
+    fn from(addr: [u8; 6]) -> Self {
+        Self(addr)
+    }
+}
+
+impl From<Address> for [u8; 6] {
     fn from(addr: Address) -> Self {
-        addr.0.into()
+        addr.0
     }
 }
 
