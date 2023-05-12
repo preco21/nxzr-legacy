@@ -164,12 +164,12 @@ pub struct ControllerProtocol {
     writer_ready_tx: watch::Sender<bool>,
     paused_tx: watch::Sender<bool>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
-    msg_tx: mpsc::UnboundedSender<Event>,
+    msg_tx: mpsc::Sender<Event>,
 }
 
 impl ControllerProtocol {
     pub fn new(config: ControllerProtocolConfig) -> Result<Self, ControllerProtocolError> {
-        let (msg_tx, msg_rx) = mpsc::unbounded_channel();
+        let (msg_tx, msg_rx) = mpsc::channel(256);
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         let spi_flash = SpiFlash::new();
@@ -663,7 +663,7 @@ impl ControllerProtocol {
     }
 
     fn dispatch_event(&self, event: Event) {
-        let _ = self.msg_tx.send(event);
+        let _ = self.msg_tx.try_send(event);
     }
 }
 

@@ -6,10 +6,14 @@ pub enum EventError {
     SubscriptionFailed,
 }
 
+// We manage events in separate event helper macro as we need to retain the
+// oldest values when receiver is stalled, which is differ from tokio's
+// broadcast channel `Lagging` mechanism where it releases the oldest values in
+// order to store new values.
 macro_rules! setup_event {
     () => {
         pub fn handle_events(
-            mut msg_rx: mpsc::UnboundedReceiver<Event>,
+            mut msg_rx: mpsc::Receiver<Event>,
             mut sub_rx: mpsc::Receiver<SubscriptionReq>,
         ) -> std::result::Result<(), crate::event::EventError> {
             tokio::spawn(async move {

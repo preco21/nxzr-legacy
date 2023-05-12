@@ -88,7 +88,7 @@ impl Protocol {
         let (closed_tx, closed_rx) = mpsc::channel(1);
         let (internal_close_tx, mut internal_close_rx) = broadcast::channel(1);
         let (state_send_tx, state_send_rx) = mpsc::channel(1);
-        let (msg_tx, msg_rx) = mpsc::unbounded_channel();
+        let (msg_tx, msg_rx) = mpsc::channel(256);
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         let mut set = JoinSet::<Result<(), ProtocolError>>::new();
@@ -259,7 +259,7 @@ pub(crate) struct ProtocolTask {}
 impl ProtocolTask {
     pub async fn setup_events_relay(
         protocol: Arc<ControllerProtocol>,
-        msg_tx: mpsc::UnboundedSender<Event>,
+        msg_tx: mpsc::Sender<Event>,
     ) -> Result<(), ProtocolError> {
         let mut rx = protocol.events().await?;
         loop {
@@ -268,7 +268,7 @@ impl ProtocolTask {
                     protocol::Event::Error(err) => Event::Warning(err.into()),
                     protocol::Event::Log(log) => Event::Log(LogType::ControllerProtocol(log)),
                 };
-                let _ = msg_tx.send(evt);
+                let _ = msg_tx.try_send(evt);
             }
         }
     }
