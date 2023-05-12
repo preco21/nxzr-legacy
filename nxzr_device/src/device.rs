@@ -126,11 +126,11 @@ impl Device {
             "attempting to change MAC address of Bluetooth adapter to target compatible one."
         );
         let addr = self.address().await?;
-        if &addr.as_ref()[..3] != SWITCH_MAC_PREFIX {
+        if &addr[..3] != SWITCH_MAC_PREFIX {
             let adapter_name = self.adapter_name().to_owned();
             let mut addr_bytes: [u8; 6] = [0; 6];
             addr_bytes[..3].copy_from_slice(SWITCH_MAC_PREFIX);
-            addr_bytes[3..].copy_from_slice(&addr.as_ref()[3..]);
+            addr_bytes[3..].copy_from_slice(&addr[3..]);
             let new_addr = bluer::Address::new(addr_bytes);
             helper::set_adapter_address(adapter_name.as_str(), new_addr).await?;
             // We need to re-instantiate device.

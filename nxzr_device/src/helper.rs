@@ -51,7 +51,7 @@ pub(crate) async fn set_adapter_address(
     // FIXME: update to not use bdaddr
     // run_command({
     //     let mut cmd = Command::new("bdaddr");
-    //     cmd.args(&["-i", adapter_name, address.to_string().as_ref()]);
+    //     cmd.args(&["-i", adapter_name, &address.to_string()]);
     //     cmd
     // })
     // .await?;
@@ -93,7 +93,7 @@ pub(crate) async fn run_command(mut command: Command) -> Result<(), HelperError>
     let output = command.output().await?;
     if !output.status.success() {
         return Err(HelperError::CommandFailed(
-            std::str::from_utf8(output.stderr.as_ref())?.to_owned(),
+            std::str::from_utf8(&output.stderr)?.to_owned(),
         ));
     }
     Ok(())
