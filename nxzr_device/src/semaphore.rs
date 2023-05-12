@@ -62,6 +62,12 @@ impl BoundedSemaphore {
         })
     }
 
+    // NOTE: Although this is thread-safe, it's prone to concurrency errors
+    // where permits can be added while checking the max permits, resulting to
+    // add more permits than actually allowed.
+    //
+    // However, the chances are very small and as long as not using this
+    // semaphore for critical cases, it would be good enough.
     pub fn add_permits(&self, n: usize) {
         let permits = self.sem.available_permits();
         let new_permits = std::cmp::min(permits + n, self.max_permits);
