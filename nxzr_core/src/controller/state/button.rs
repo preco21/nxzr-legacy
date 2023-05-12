@@ -277,7 +277,7 @@ impl ButtonState {
         }
     }
 
-    pub fn data(&self) -> &[u8; 3] {
+    pub fn as_bytes(&self) -> &[u8; 3] {
         &self.bytes
     }
 }

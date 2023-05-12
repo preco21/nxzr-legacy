@@ -153,7 +153,7 @@ impl StickState {
         Ok(())
     }
 
-    pub fn data(&self) -> [u8; 3] {
+    pub fn to_buf(&self) -> [u8; 3] {
         let byte_1 = (self.h_stick & 0xFF) as u8;
         let byte_2 = ((self.h_stick >> 8) as u8) | (((self.v_stick & 0xF) as u8) << 4);
         let byte_3 = (self.v_stick >> 4) as u8;

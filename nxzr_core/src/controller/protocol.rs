@@ -342,7 +342,7 @@ impl ControllerProtocol {
         input_report: InputReport,
     ) -> Result<(), ControllerProtocolError> {
         let mut pairing_bytes: [u8; 4] = [0; 4];
-        pairing_bytes[1..4].copy_from_slice(&input_report.data()[4..7]);
+        pairing_bytes[1..4].copy_from_slice(&input_report.as_buf()[4..7]);
         let close_pairing_mask = self.controller.close_pairing_masks();
         let state = self.state.get();
         if state.is_pairing && (u32::from_be_bytes(pairing_bytes) & close_pairing_mask) != 0 {
@@ -353,7 +353,7 @@ impl ControllerProtocol {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
         }
         transport_write
-            .write(Bytes::copy_from_slice(input_report.data()))
+            .write(Bytes::copy_from_slice(input_report.as_buf()))
             .await?;
         Ok(())
     }
@@ -392,10 +392,10 @@ impl ControllerProtocol {
                 };
                 input_report.set_timer(timer);
                 input_report.set_misc();
-                input_report.set_button(state.controller_state.button_state().data());
+                input_report.set_button(state.controller_state.button_state().as_bytes());
                 input_report.set_analog_stick(
-                    Some(state.controller_state.l_stick_state().data()),
-                    Some(state.controller_state.r_stick_state().data()),
+                    Some(state.controller_state.l_stick_state().to_buf()),
+                    Some(state.controller_state.r_stick_state().to_buf()),
                 );
                 input_report.set_vibrator_input();
                 // NOTE: Subcommand is set from caller
@@ -507,13 +507,12 @@ impl ControllerProtocol {
         let state = self.state.get();
         match state.spi_flash {
             Some(spi_flash) => {
-                let spi_flash_data =
-                    &spi_flash.data()[(offset as usize)..(offset + size as u64) as usize];
+                let spi_flash_data = &spi_flash[(offset as usize)..(offset + size as u64) as usize];
                 input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
             }
             None => {
-                let spi_flash_data: Vec<u8> = vec![0; size as usize];
-                input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data.as_ref())?;
+                let zeroed_spi_flash_data: Vec<u8> = vec![0; size as usize];
+                input_report.sub_0x10_spi_flash_read(offset, size, &zeroed_spi_flash_data)?;
             }
         }
         Ok(())

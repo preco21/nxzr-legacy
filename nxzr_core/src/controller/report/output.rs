@@ -49,7 +49,7 @@ impl OutputReport {
         if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
-        let [0xA2, ..] = data.as_ref() else {
+        let [0xA2, ..] = &data[..] else {
             return Err(ReportError::Malformed);
         };
         Ok(Self { buf: data })
@@ -118,7 +118,19 @@ impl OutputReport {
         Ok(())
     }
 
-    pub fn data(&self) -> &[u8] {
-        self.buf.as_ref()
+    pub fn as_buf(&self) -> &[u8] {
+        &self.buf
+    }
+}
+
+impl AsRef<[u8]> for OutputReport {
+    fn as_ref(&self) -> &[u8] {
+        &self.buf
+    }
+}
+
+impl AsMut<[u8]> for OutputReport {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.buf
     }
 }

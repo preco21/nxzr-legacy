@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use bytes::BytesMut;
 
 #[derive(Debug, Default)]
@@ -94,8 +96,30 @@ impl SpiFlash {
             None
         }
     }
+}
 
-    pub fn data(&self) -> &[u8] {
-        self.buf.as_ref()
+impl Deref for SpiFlash {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.buf
+    }
+}
+
+impl DerefMut for SpiFlash {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf
+    }
+}
+
+impl AsRef<[u8]> for SpiFlash {
+    fn as_ref(&self) -> &[u8] {
+        self
+    }
+}
+
+impl AsMut<[u8]> for SpiFlash {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self
     }
 }

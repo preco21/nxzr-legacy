@@ -78,7 +78,7 @@ impl InputReport {
         if data.len() < REPORT_MIN_LEN {
             return Err(ReportError::TooShort);
         }
-        let [0xA1, ..] = data.as_ref() else {
+        let [0xA1, ..] = &data[..] else {
             return Err(ReportError::Malformed);
         };
         Ok(Self { buf: data })
@@ -292,7 +292,7 @@ impl InputReport {
         Ok(())
     }
 
-    pub fn data(&self) -> &[u8] {
+    pub fn as_buf(&self) -> &[u8] {
         let Some(id) = self.input_report_id() else {
             return &self.buf[..51];
         };
@@ -306,8 +306,14 @@ impl InputReport {
     }
 }
 
+impl AsRef<[u8]> for InputReport {
+    fn as_ref(&self) -> &[u8] {
+        &self.buf
+    }
+}
+
 impl AsMut<[u8]> for InputReport {
     fn as_mut(&mut self) -> &mut [u8] {
-        self.buf.as_mut()
+        &mut self.buf
     }
 }
