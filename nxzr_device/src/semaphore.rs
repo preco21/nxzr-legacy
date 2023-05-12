@@ -62,9 +62,9 @@ impl BoundedSemaphore {
         })
     }
 
-    // NOTE: Although this is thread-safe, it's prone to concurrency errors
-    // where permits can be added while checking the max permits, resulting to
-    // add more permits than actually allowed.
+    // NOTE: Although this is thread-safe to increment, it's prone to
+    // concurrency errors where permits can be added while checking the max
+    // permits, resulting to add more permits than actually allowed.
     //
     // However, the chances are very small and as long as not using this
     // semaphore for critical cases, it would be good enough.
