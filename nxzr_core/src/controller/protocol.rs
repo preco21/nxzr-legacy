@@ -524,13 +524,13 @@ impl ControllerProtocol {
         subcommand_reply_data: &[u8],
     ) -> Result<(), ControllerProtocolError> {
         let state = self.state.get();
-        let command = subcommand_reply_data[0];
+        let mode = subcommand_reply_data[0];
         if let Some(report_mode) = state.report_mode {
-            if report_mode == command {
+            if report_mode == mode {
                 self.dispatch_event(Event::Log(LogType::RepetitiveSetOfReportMode));
             }
         }
-        self.set_report_mode(Some(command), None);
+        self.set_report_mode(Some(mode));
         input_report.set_ack(0x80);
         input_report.set_response_subcommand(Subcommand::SetInputReportMode)?;
         Ok(())
