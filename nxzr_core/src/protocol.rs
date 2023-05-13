@@ -150,13 +150,13 @@ impl Protocol {
             let protocol = protocol.clone();
             async move {
                 let (connected_tx, connected_rx) = mpsc::channel::<()>(1);
-                // Please note that sending empty reports after the initial
+                // Please note that sending blank reports after the initial
                 // connection until the host to finish reply (at `writer_ready`
                 // point) is very important because otherwise, the host will not
                 // send any further responses after last sending `spi_read`
                 // command.
-                let empty_report_sender = {
-                    tokio::spawn(Self::create_empty_report_sender(
+                let blank_report_sender = {
+                    tokio::spawn(Self::create_blank_report_sender(
                         transport,
                         protocol.clone(),
                         connected_tx,
@@ -164,14 +164,14 @@ impl Protocol {
                 };
                 tokio::select! {
                     _ = protocol.writer_ready() => {
-                        // Allow `empty_report_sender` to send one last command.
+                        // Allow the task to send one last command.
                         time::sleep(time::Duration::from_millis(1000)).await;
                     },
                     _ = internal_close_rx.recv() => {},
                 }
                 // Notifies the sender task to close then wait for it until closed.
                 drop(connected_rx);
-                empty_report_sender.await.map_err(|err| {
+                blank_report_sender.await.map_err(|err| {
                     ProtocolError::Internal(ProtocolInternalError::JoinError(err.to_string()))
                 })??;
                 Result::<(), ProtocolError>::Ok(())
@@ -333,15 +333,15 @@ impl Protocol {
         }
     }
 
-    async fn create_empty_report_sender(
+    async fn create_blank_report_sender(
         transport: impl Transport,
         protocol: Arc<ControllerProtocol>,
         connected_tx: mpsc::Sender<()>,
     ) -> Result<(), ProtocolError> {
-        // Send empty input reports up to 10 times until the host decides to reply.
+        // Send blank input reports up to 10 times until the host decides to reply.
         for _ in 0..10 {
             tokio::select! {
-                res = protocol.send_empty_input_report(&transport) => {
+                res = protocol.send_blank_input_report(&transport) => {
                     // Propagate errors immediately to the caller if any.
                     res?;
                     time::sleep(time::Duration::from_millis(1000)).await;

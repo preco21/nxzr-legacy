@@ -226,8 +226,8 @@ impl ControllerProtocol {
         self.notify_data_received.notified().await;
     }
 
-    // Send empty input reports to the host.
-    pub async fn send_empty_input_report(
+    // Send blank input reports to the host.
+    pub async fn send_blank_input_report(
         &self,
         transport_write: &impl TransportWrite,
     ) -> Result<(), ControllerProtocolError> {
