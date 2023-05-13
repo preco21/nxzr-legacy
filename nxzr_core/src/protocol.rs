@@ -78,7 +78,7 @@ pub(crate) struct StateSendReq {
 }
 
 impl Protocol {
-    pub fn connect(
+    pub async fn connect(
         transport: impl Transport,
         config: ControllerProtocolConfig,
     ) -> Result<(Self, ProtocolHandle), ProtocolError> {
@@ -90,27 +90,64 @@ impl Protocol {
         let (msg_tx, msg_rx) = mpsc::channel(256);
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
+        // Relay inner protocol events.
+        //
+        // Please note that, this task must survive even after the protocol
+        // tasks panic, so it can notify the caller what went wrong by sending
+        // the events that has raised from the protocol handler itself.
+        let mut inner_event_rx = protocol.events().await?;
+        tokio::spawn({
+            let msg_tx = msg_tx.clone();
+            async move {
+                loop {
+                    if let Some(orig) = inner_event_rx.recv().await {
+                        let evt = match orig {
+                            protocol::Event::Warning(err) => Event::Warning(err.into()),
+                            protocol::Event::Log(log) => {
+                                Event::Log(LogType::ControllerProtocol(log))
+                            }
+                        };
+                        let _ = msg_tx.try_send(evt);
+                    }
+                }
+            }
+        });
+        // Although we use `JoinSet` which is already capable of managing
+        // shutdown for all tasks that belongs to, it will not handle graceful
+        // shutdown. So, we're employing another close signal to let each task
+        // to finish it on their own.
+        //
+        // When there's an critical error including `JoinError`,
+        // `ControllerProtocolError` and etc... is raised, a close signal is
+        // sent and each task will receive the signal, so that they will escape
+        // the running task.
         let mut set = JoinSet::<Result<(), ProtocolError>>::new();
-        // Setup protocol events relay
-        let events_relay_fut = create_task(
-            ProtocolTask::setup_events_relay(protocol.clone(), msg_tx.clone()),
-            internal_close_tx.clone(),
-        );
         // Setup protocol reader task
-        let protocol_reader_fut = create_task(
-            ProtocolTask::setup_reader(transport.clone(), protocol.clone()),
-            internal_close_tx.clone(),
-        );
+        let reader_fut = {
+            let mut internal_close_rx = internal_close_tx.subscribe();
+            let fut = Self::setup_reader(transport.clone(), protocol.clone());
+            async move {
+                tokio::select! {
+                    res = fut => res,
+                    _ = internal_close_rx.recv() => return Result::<(), ProtocolError>::Ok(()),
+                }
+            }
+        };
         // Setup protocol writer task
-        let protocol_writer_fut = create_task(
-            ProtocolTask::setup_writer(transport.clone(), protocol.clone(), state_send_rx),
-            internal_close_tx.clone(),
-        );
+        let writer_fut = {
+            let mut internal_close_rx = internal_close_tx.subscribe();
+            let fut = Self::setup_writer(transport.clone(), protocol.clone(), state_send_rx);
+            async move {
+                tokio::select! {
+                    res = fut => res,
+                    _ = internal_close_rx.recv() => return Result::<(), ProtocolError>::Ok(()),
+                }
+            }
+        };
         // Setup protocol connection handler
-        let protocol_conn_handler_fut = {
+        let conn_handler_fut = {
             let transport = transport.clone();
             let protocol = protocol.clone();
-            let mut internal_close_rx = internal_close_tx.subscribe();
             async move {
                 let (connected_tx, connected_rx) = mpsc::channel::<()>(1);
                 // Please note that sending empty reports after the initial
@@ -119,21 +156,11 @@ impl Protocol {
                 // send any further responses after last sending `spi_read`
                 // command.
                 let empty_report_sender = {
-                    let protocol = protocol.clone();
-                    tokio::spawn(async move {
-                        // Send empty input reports up to 10 times until the host decides to reply.
-                        for _ in 0..10 {
-                            tokio::select! {
-                                res = protocol.send_empty_input_report(&transport) => {
-                                    // Propagate errors immediately to the caller.
-                                    res?;
-                                    time::sleep(time::Duration::from_millis(1000)).await;
-                                },
-                                _ = connected_tx.closed() => break,
-                            }
-                        }
-                        Result::<(), ProtocolError>::Ok(())
-                    })
+                    tokio::spawn(Self::create_empty_report_sender(
+                        transport,
+                        protocol.clone(),
+                        connected_tx,
+                    ))
                 };
                 tokio::select! {
                     _ = protocol.writer_ready() => {
@@ -150,58 +177,72 @@ impl Protocol {
                 Result::<(), ProtocolError>::Ok(())
             }
         };
-        set.spawn(events_relay_fut);
-        set.spawn(protocol_reader_fut);
-        set.spawn(protocol_writer_fut);
-        set.spawn(protocol_conn_handler_fut);
+        set.spawn(reader_fut);
+        set.spawn(writer_fut);
+        set.spawn(conn_handler_fut);
         let (term_tx, term_rx) = mpsc::channel(1);
-        // Graceful shutdown
+        // Close handling and graceful shutdown
         tokio::spawn({
-            let transport = transport.clone();
-            let internal_close_tx = internal_close_tx.clone();
-            let msg_tx = msg_tx.clone();
             async move {
-                tokio::select! {
-                    _ = close_tx.closed() => {
-                        transport.pause();
-                        let _ = internal_close_tx.send(());
-                    },
-                    _ = internal_close_rx.recv() => {
-                        transport.pause();
-                    },
+                loop {
+                    tokio::select! {
+                        res = set.join_next() => {
+                            // When all tasks in set are closed ok, break the loop.
+                            let Some(inner) = res else {
+                                break;
+                            };
+                            match inner {
+                                Ok(Err(err)) => {
+                                    let _ = msg_tx.try_send(Event::Error(err));
+                                    let _ = internal_close_tx.send(());
+                                    break;
+                                }
+                                Err(err) => {
+                                    // `JoinError`s are usually occurred when there's panic in spawned tasks in the set.
+                                    // In such case, we immediately abort the protocol tasks then bail.
+                                    let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
+                                        ProtocolInternalError::JoinError(err.to_string()),
+                                    )));
+                                    let _ = internal_close_tx.send(());
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        },
+                        _ = close_tx.closed() => {
+                            let _ = internal_close_tx.send(());
+                            break;
+                        },
+                    }
                 }
-                let _ = msg_tx.send(Event::Log(LogType::Closing));
-                // This will allow action methods to get notified when the
-                // actual close happens on any of shutdown signals received.
+                let _ = msg_tx.try_send(Event::Log(LogType::Closing));
+                // Trigger a pause for transport.
+                transport.pause();
+                // Drop the `term_rx` so that, relevant action methods to get
+                // notified when closing happens.
                 drop(term_rx);
-            }
-        });
-        // Task coordinating and handling errors
-        tokio::spawn(async move {
-            while let Some(res) = set.join_next().await {
-                match res {
-                    Ok(Err(err)) => {
-                        let _ = msg_tx.send(Event::Error(err));
-                        // Tell all other tasks to close due to other errors.
-                        let _ = internal_close_tx.send(());
+                // Wait for the rest of the tasks to finish.
+                while let Some(res) = set.join_next().await {
+                    match res {
+                        Ok(Err(err)) => {
+                            let _ = msg_tx.try_send(Event::Error(err));
+                        }
+                        Err(err) => {
+                            // Notify the caller that there's join error occurred,
+                            // so that they can choose what to do next.
+                            //
+                            // Note that this kind of errors is normally not recoverable.
+                            let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
+                                ProtocolInternalError::JoinError(err.to_string()),
+                            )));
+                        }
+                        _ => {}
                     }
-                    Err(err) => {
-                        // Notify the caller that there's join error occurred,
-                        // so that they can choose what to do next.
-                        //
-                        // Note that this kind of errors is normally not recoverable.
-                        let _ = msg_tx.send(Event::Error(ProtocolError::Internal(
-                            ProtocolInternalError::JoinError(err.to_string()),
-                        )));
-                        // Tell all other tasks to close due to join error.
-                        let _ = internal_close_tx.send(());
-                    }
-                    _ => {}
                 }
+                let _ = msg_tx.try_send(Event::Log(LogType::Closed));
+                // Mark the protocol is fully closed.
+                drop(closed_rx);
             }
-            // Mark the protocol is fully closed.
-            drop(closed_rx);
-            let _ = msg_tx.send(Event::Log(LogType::Closed));
         });
         protocol.establish_connection();
         Ok((
@@ -233,7 +274,7 @@ impl Protocol {
         tokio::select! {
             _ = fut => {}
             _ = self.term_tx.closed() => {
-                return Err(ProtocolError::ActionAbortedDueToClosing("action: update_controller_state".to_owned()))
+                return Err(ProtocolError::ActionAbortedDueToClosing("update_controller_state".to_owned()))
             },
         }
         Ok(())
@@ -251,28 +292,8 @@ impl Protocol {
         let closed_tx = self.closed_tx.clone();
         async move { closed_tx.closed().await }
     }
-}
 
-pub(crate) struct ProtocolTask {}
-
-impl ProtocolTask {
-    pub async fn setup_events_relay(
-        protocol: Arc<ControllerProtocol>,
-        msg_tx: mpsc::Sender<Event>,
-    ) -> Result<(), ProtocolError> {
-        let mut rx = protocol.events().await?;
-        loop {
-            if let Some(orig) = rx.recv().await {
-                let evt = match orig {
-                    protocol::Event::Error(err) => Event::Warning(err.into()),
-                    protocol::Event::Log(log) => Event::Log(LogType::ControllerProtocol(log)),
-                };
-                let _ = msg_tx.try_send(evt);
-            }
-        }
-    }
-
-    pub async fn setup_reader(
+    async fn setup_reader(
         transport: impl Transport,
         protocol: Arc<ControllerProtocol>,
     ) -> Result<(), ProtocolError> {
@@ -281,7 +302,7 @@ impl ProtocolTask {
         }
     }
 
-    pub async fn setup_writer(
+    async fn setup_writer(
         transport: impl Transport,
         protocol: Arc<ControllerProtocol>,
         mut ctrl_state_send_req_rx: mpsc::Receiver<StateSendReq>,
@@ -311,25 +332,24 @@ impl ProtocolTask {
             protocol.process_write(&transport, ready_fut).await?;
         }
     }
-}
 
-fn create_task(
-    fut: impl Future<Output = Result<(), ProtocolError>>,
-    close_tx: broadcast::Sender<()>,
-) -> impl Future<Output = Result<(), ProtocolError>> {
-    let mut close_rx = close_tx.subscribe();
-    async move {
-        // All tasks are managed by `JoinSet` on from the caller. However, in
-        // order to handle graceful shutdown, we leveraged `close_rx` signal to
-        // let each task to finish on their own.
-        //
-        // If there's any of errors including `JoinError` and
-        // ControllerProtocolError, etc... is raised, `close_rx` will receive a
-        // signal to escape the running task.
-        tokio::select! {
-            res = fut => res,
-            _ = close_rx.recv() => Result::<(), ProtocolError>::Ok(()),
+    async fn create_empty_report_sender(
+        transport: impl Transport,
+        protocol: Arc<ControllerProtocol>,
+        connected_tx: mpsc::Sender<()>,
+    ) -> Result<(), ProtocolError> {
+        // Send empty input reports up to 10 times until the host decides to reply.
+        for _ in 0..10 {
+            tokio::select! {
+                res = protocol.send_empty_input_report(&transport) => {
+                    // Propagate errors immediately to the caller if any.
+                    res?;
+                    time::sleep(time::Duration::from_millis(1000)).await;
+                },
+                _ = connected_tx.closed() => break,
+            }
         }
+        Result::<(), ProtocolError>::Ok(())
     }
 }
 
@@ -342,7 +362,7 @@ pub enum Event {
 
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
+        match self {
             Self::Log(log) => write!(f, "event log: {:?}", log),
             Self::Error(err) => write!(f, "event error: {}", err.to_string()),
             Self::Warning(err) => write!(f, "event warn: {}", err.to_string()),

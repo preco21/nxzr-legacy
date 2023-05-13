@@ -246,7 +246,7 @@ impl ControllerProtocol {
         let output_report = match OutputReport::with_raw(buf) {
             Ok(output_report) => output_report,
             Err(_) => {
-                self.dispatch_event(Event::Error(
+                self.dispatch_event(Event::Warning(
                     ControllerProtocolError::OutputReportParseFailed,
                 ));
                 // Continues silently after error logging.
@@ -254,7 +254,7 @@ impl ControllerProtocol {
             }
         };
         let Some(output_report_id) = output_report.output_report_id() else {
-            self.dispatch_event(Event::Error(ControllerProtocolError::OutputReportIdParseFailed));
+            self.dispatch_event(Event::Warning(ControllerProtocolError::OutputReportIdParseFailed));
             return Ok(());
         };
         match output_report_id {
@@ -265,7 +265,7 @@ impl ControllerProtocol {
                 // Rumble: noop
             }
             OutputReportId::RequestIrNfcMcu => {
-                self.dispatch_event(Event::Error(
+                self.dispatch_event(Event::Warning(
                     ControllerProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring.".to_owned()
                 )));
             }
@@ -297,7 +297,7 @@ impl ControllerProtocol {
                 Some(delay) => delay,
                 None => {
                     let slow_duration = elapsed - send_interval;
-                    self.dispatch_event(Event::Error(ControllerProtocolError::LaggedWrites(
+                    self.dispatch_event(Event::Warning(ControllerProtocolError::LaggedWrites(
                         slow_duration,
                     )));
                     return Ok(());
@@ -311,7 +311,7 @@ impl ControllerProtocol {
     fn set_report_mode(&self, mode: Option<u8>) {
         match mode {
             Some(0x21) => {
-                self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
+                self.dispatch_event(Event::Warning(ControllerProtocolError::Invariant(
                     "unexpectedly setting report mode for standard input reports.".to_owned(),
                 )));
             }
@@ -336,7 +336,7 @@ impl ControllerProtocol {
                 match interval {
                     Some(interval) => state.send_interval = interval,
                     None => {
-                        self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
+                        self.dispatch_event(Event::Warning(ControllerProtocolError::Invariant(
                             format!(
                         "unknown interval for report mode \"{mode:?}\", assuming it as 15hz.",
                     ),
@@ -450,7 +450,7 @@ impl ControllerProtocol {
         let subcommand = match output_report.subcommand() {
             Ok(subcommand) => subcommand,
             Err(err) => {
-                self.dispatch_event(Event::Error(ControllerProtocolError::from(err)));
+                self.dispatch_event(Event::Warning(ControllerProtocolError::from(err)));
                 // Silently continues the process after error logging.
                 return Ok(());
             }
@@ -490,7 +490,7 @@ impl ControllerProtocol {
                 self.command_enable_vibration(&mut res_input_report)?;
             }
             unsupported_subcommand => {
-                self.dispatch_event(Event::Error(ControllerProtocolError::NotImplemented(
+                self.dispatch_event(Event::Warning(ControllerProtocolError::NotImplemented(
                     format!("unsupported subcommand: \"{unsupported_subcommand}\", ignoring.",),
                 )));
                 return Ok(());
@@ -633,7 +633,7 @@ impl ControllerProtocol {
                 input_report.set_response_subcommand(Subcommand::SetNfcIrMcuState)?;
             }
             _ => {
-                self.dispatch_event(Event::Error(ControllerProtocolError::NotImplemented(
+                self.dispatch_event(Event::Warning(ControllerProtocolError::NotImplemented(
                     format!("command \"{command}\" for Subcommand NFC IR is not implemented.",),
                 )));
             }
@@ -696,14 +696,14 @@ impl ControllerProtocol {
 #[derive(Debug, Clone)]
 pub enum Event {
     Log(LogType),
-    Error(ControllerProtocolError),
+    Warning(ControllerProtocolError),
 }
 
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             Self::Log(log) => write!(f, "event log: {:?}", log),
-            Self::Error(err) => write!(f, "event error: {}", err.to_string()),
+            Self::Warning(err) => write!(f, "event warning: {}", err.to_string()),
         }
     }
 }

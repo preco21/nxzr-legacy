@@ -83,20 +83,14 @@ async fn main() -> anyhow::Result<()> {
             dev_address: nxzr_core::addr::Address::new(address.into()),
             ..Default::default()
         },
-    )?;
+    )
+    .await?;
 
     let mut event_rx = protocol.events().await?;
 
-    // FIXME:
     tokio::spawn(async move {
         while let Some(evt) = event_rx.recv().await {
-            tracing::warn!("{:?} {}", &evt, &evt.to_string());
-            // match evt {
-            //     Event::Log(log) => {
-            //         tracing::info!("{:?} {}", &log, &log.to_string());
-            //     }
-            //     E => {}
-            // }
+            tracing::warn!("protocol: {}", &evt.to_string());
         }
     });
 
@@ -152,10 +146,18 @@ async fn main() -> anyhow::Result<()> {
     // });
 
     tokio::select! {
-        _ = signal::ctrl_c() => {},
-        _ = p.closed() => {},
-        _ = transport.closed() => {},
-        _ = shutdown_tx.closed() => {},
+        _ = signal::ctrl_c() => {
+            tracing::warn!("close by signal");
+        },
+        _ = p.closed() => {
+            tracing::warn!("close by protocol");
+        },
+        _ = transport.closed() => {
+            tracing::warn!("close by transport");
+        },
+        _ = shutdown_tx.closed() => {
+            tracing::warn!("close by shutdown");
+        },
     }
 
     drop(record);
@@ -164,8 +166,6 @@ async fn main() -> anyhow::Result<()> {
 
     p.closed().await;
     transport.closed().await;
-
-    // handle.abort();
 
     Ok(())
 }
