@@ -1,4 +1,5 @@
-pub struct SendInterval(Option<u8>);
+#[derive(Debug, Clone)]
+pub struct SendInterval(pub Option<u8>);
 
 impl SendInterval {
     pub fn new(mode: Option<u8>) -> Self {
@@ -7,7 +8,7 @@ impl SendInterval {
 
     pub fn to_byte(&self) -> Option<f64> {
         let Some(mode) = self.0 else {
-            // Subcommands replies only
+            // For initial interval when no `mode` specified or subcommands replies
             return Some(f64::INFINITY);
         };
         match mode {
@@ -18,8 +19,12 @@ impl SendInterval {
             0x31 => Some(1.0 / 15.0),
             // 0x30 => Some(1.0 / 60.0),
             // 0x31 => Some(1.0 / 60.0),
-            // Unknown mode resorts to default, assuming it as 1/15
+            // Unknown `mode` should be handled by caller and resort to the default interval.
             _ => None,
         }
+    }
+
+    pub fn default_byte() -> f64 {
+        1.0 / 15.0
     }
 }

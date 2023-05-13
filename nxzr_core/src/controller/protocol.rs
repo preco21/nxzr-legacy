@@ -116,11 +116,19 @@ struct State {
 }
 
 impl Shared {
-    pub fn new(controller_state: ControllerState, spi_flash: Option<SpiFlash>) -> Self {
+    pub fn new(
+        controller_state: ControllerState,
+        spi_flash: Option<SpiFlash>,
+        reconnect: bool,
+    ) -> Self {
         Self {
             state: Mutex::new(State {
-                is_pairing: false,
-                send_interval: 1.0 / 15.0,
+                is_pairing: !reconnect,
+                send_interval: if reconnect {
+                    SendInterval::new(None).to_byte().unwrap()
+                } else {
+                    SendInterval::default_byte()
+                },
                 report_mode: None,
                 connected_at: None,
                 controller_state,
@@ -157,6 +165,7 @@ impl Shared {
 pub struct ControllerProtocolConfig {
     pub controller: ControllerType,
     pub dev_address: Address,
+    pub reconnect: bool,
 }
 
 #[derive(Debug)]
@@ -183,7 +192,7 @@ impl ControllerProtocol {
             spi_flash: Some(spi_flash.clone()),
         })?;
         Ok(Self {
-            state: Shared::new(controller_state, Some(spi_flash)),
+            state: Shared::new(controller_state, Some(spi_flash), config.reconnect),
             controller: config.controller,
             dev_addr: config.dev_address,
             notify_data_received: Notify::new(),
@@ -299,18 +308,29 @@ impl ControllerProtocol {
         Ok(())
     }
 
-    fn set_report_mode(&self, mode: Option<u8>, is_pairing: Option<bool>) {
-        if let Some(mode) = mode {
-            if mode == 0x21 {
+    fn set_report_mode(&self, mode: Option<u8>) {
+        match mode {
+            Some(0x21) => {
                 self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
                     "unexpectedly setting report mode for standard input reports.".to_owned(),
                 )));
             }
+            _ => {}
         }
-        self.state.modify(|state| {
+        self.state.modify(|state: &mut State| {
+            let mode = match mode {
+                Some(_) => mode,
+                None => state.report_mode,
+            };
             state.report_mode = mode;
-            if is_pairing.unwrap_or(state.is_pairing) {
-                state.send_interval = 1.0 / 15.0;
+            // In pairing mode, you must write reports at 15hz pace; exceeding
+            // this limit will result in disconnection from the host.
+            //
+            // After exiting the pairing mode, this routine will be called again
+            // with `is_pairing` set to `false`, and be setting appropriate
+            // send interval for the current report mode.
+            if state.is_pairing {
+                state.send_interval = SendInterval::default_byte();
             } else {
                 let interval = SendInterval::new(mode).to_byte();
                 match interval {
@@ -318,15 +338,15 @@ impl ControllerProtocol {
                     None => {
                         self.dispatch_event(Event::Error(ControllerProtocolError::Invariant(
                             format!(
-                            "unknown interval for report mode \"{mode:?}\", assuming it as 1/15.",
-                            ),
+                        "unknown interval for report mode \"{mode:?}\", assuming it as 15hz.",
+                    ),
                         )));
-                        state.send_interval = 1.0 / 15.0;
+                        state.send_interval = SendInterval::default_byte();
                     }
                 };
             }
         });
-        // TODO: Revisit: Should send set_ready_for_write() and start writer thread?
+        // TODO: Revisit: Should send set_writer_ready() and start writer thread?
         // if let Some(mode) = mode {
         //     match mode {
         //         0x30 | 0x31 | 0x32 | 0x33 => {}
@@ -344,10 +364,17 @@ impl ControllerProtocol {
         let mut pairing_bytes: [u8; 4] = [0; 4];
         pairing_bytes[1..4].copy_from_slice(&input_report.as_buf()[4..7]);
         let close_pairing_mask = self.controller.close_pairing_masks();
-        let state = self.state.get();
-        if state.is_pairing && (u32::from_be_bytes(pairing_bytes) & close_pairing_mask) != 0 {
+        let is_pairing_ended = self.state.modify(|state| {
+            if state.is_pairing && (u32::from_be_bytes(pairing_bytes) & close_pairing_mask) != 0 {
+                state.is_pairing = false;
+                true
+            } else {
+                false
+            }
+        });
+        if is_pairing_ended {
+            self.set_report_mode(None);
             self.dispatch_event(Event::Log(LogType::PairingSuccessful));
-            self.set_report_mode(state.report_mode, Some(false));
         }
         if self.is_paused() {
             self.dispatch_event(Event::Log(LogType::WriteWhilePaused));
