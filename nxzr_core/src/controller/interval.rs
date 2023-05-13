@@ -15,10 +15,8 @@ impl SendInterval {
             0x3F => Some(1.0),
             0x21 => Some(f64::INFINITY),
             // FIXME: revisit later for freq adjustment on procon 1/120
-            0x30 => Some(1.0 / 15.0),
-            0x31 => Some(1.0 / 15.0),
-            // 0x30 => Some(1.0 / 60.0),
-            // 0x31 => Some(1.0 / 60.0),
+            0x30 => Some(1.0 / 60.0),
+            0x31 => Some(1.0 / 60.0),
             // Unknown `mode` should be handled by caller and resort to the default interval.
             _ => None,
         }
