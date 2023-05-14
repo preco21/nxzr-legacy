@@ -112,13 +112,13 @@ impl Protocol {
                 }
             }
         });
-        // Although we use `JoinSet` which is already capable of managing
+        // Although we use [JoinSet] which is already capable of managing
         // shutdown for all tasks that belongs to, it will not handle graceful
         // shutdown. So, we're employing another close signal to let each task
         // to finish it on their own.
         //
-        // When there's an critical error including `JoinError`,
-        // `ControllerProtocolError` and etc... is raised, a close signal is
+        // When there's an critical error including [JoinError],
+        // [ControllerProtocolError] and etc... is raised, a close signal is
         // sent and each task will receive the signal, so that they will escape
         // the running task.
         let mut set = JoinSet::<Result<(), ProtocolError>>::new();
@@ -198,7 +198,7 @@ impl Protocol {
                                     break;
                                 }
                                 Err(err) => {
-                                    // `JoinError`s are usually occurred when there's panic in spawned tasks in the set.
+                                    // [JoinError] is usually occurred when there's panic in spawned tasks in the set.
                                     // In such case, we immediately abort the protocol tasks then bail.
                                     let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
                                         ProtocolInternalError::JoinError(err.to_string()),

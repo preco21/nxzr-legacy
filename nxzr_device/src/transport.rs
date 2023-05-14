@@ -129,8 +129,8 @@ impl Transport {
                 close_tx.closed().await;
                 tracing::info!("close signal received, terminating transport.");
                 // Generally, it's recommended to pause from caller before it
-                // ended up here. We are assuming the user may not be able to
-                // `.pause()` it anyway.
+                // ended up here. We are assuming that the user may not be able
+                // to call [TransportInner::pause()] anyway.
                 inner.pause();
                 set.shutdown().await;
                 tracing::info!("transport terminated");
@@ -298,7 +298,7 @@ impl TransportInner {
         self.write_sem.acquire_forget().await?;
         self.writable().await;
         // Writing a buffer in length more than MTU may fail, however, L2CAP's
-        // `SeqPacket` socket seems allows writing buf regardless of the MTU length.
+        // [SeqPacket] socket seems allows writing buf regardless of the MTU length.
         match self.session.itr_client().send(&buf).await {
             Ok(0) => Err(TransportError::WriterClosed),
             Ok(_) => Ok(()),
