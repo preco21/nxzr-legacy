@@ -1,50 +1,55 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  A description of these fields can be found in the following links:
+  - http://www.bluecove.org/bluecove/apidocs/javax/bluetooth/ServiceRecord.html
+  - https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
+ -->
 <record>
-	<attribute id="0x0001">
+	<attribute id="0x0001"> <!-- Service Class ID List -->
 		<sequence>
-			<uuid value="0x1124" />
+			<uuid value="0x1124" /> <!-- Human Interface Device Service -->
 		</sequence>
 	</attribute>
-	<attribute id="0x0004">
+	<attribute id="0x0004"> <!-- Protocol Descriptor List -->
 		<sequence>
 			<sequence>
-				<uuid value="0x0100" />
-				<uint16 value="0x0011" />
+				<uuid value="0x0100" /> <!-- L2CAP -->
+				<uint16 value="0x0011" /> <!-- HIDP -->
 			</sequence>
 			<sequence>
-				<uuid value="0x0011" />
+				<uuid value="0x0011" /> <!-- HIDP -->
 			</sequence>
 		</sequence>
 	</attribute>
-	<attribute id="0x0005">
+	<attribute id="0x0005"> <!-- Browse Group List -->
 		<sequence>
 			<uuid value="0x1002" />
 		</sequence>
 	</attribute>
-	<attribute id="0x0006">
+	<attribute id="0x0006"> <!-- Language Based Attribute ID List -->
 		<sequence>
-			<uint16 value="0x656e" />
-			<uint16 value="0x006a" />
-			<uint16 value="0x0100" />
+			<uint16 value="0x656e" /> <!-- code_ISO639 -->
+			<uint16 value="0x006a" /> <!-- encoding -->
+			<uint16 value="0x0100" /> <!-- base_offset -->
 		</sequence>
 	</attribute>
-	<attribute id="0x0009">
+	<attribute id="0x0009"> <!-- Bluetooth Profile Descriptor List -->
 		<sequence>
 			<sequence>
-				<uuid value="0x1124" />
-				<uint16 value="0x0100" />
+				<uuid value="0x1124" /> <!-- Human Interface Device -->
+				<uint16 value="0x0100" /> <!-- L2CAP -->
 			</sequence>
 		</sequence>
 	</attribute>
-	<attribute id="0x000d">
+	<attribute id="0x000d"> <!-- Additional Protocol Descriptor Lists -->
 		<sequence>
 			<sequence>
 				<sequence>
-					<uuid value="0x0100" />
+					<uuid value="0x0100" /> <!-- L2CAP -->
 					<uint16 value="0x0013" />
 				</sequence>
 				<sequence>
-					<uuid value="0x0011" />
+					<uuid value="0x0011" /> <!-- HIDP -->
 				</sequence>
 			</sequence>
 		</sequence>
@@ -58,25 +63,25 @@
 	<attribute id="0x0102">
 		<text value="Nintendo" />
 	</attribute>
-  <attribute id="0x0200">
+  <attribute id="0x0200"> <!-- HID Device Release Number (Deprecated) -->
     <uint16 value="0x0100"/>
   </attribute>
-	<attribute id="0x0201">
+	<attribute id="0x0201"> <!-- HID Parser Version -->
 		<uint16 value="0x0111" />
 	</attribute>
-	<attribute id="0x0202">
+	<attribute id="0x0202"> <!-- HID Device Subclass -->
 		<uint8 value="0x08" />
 	</attribute>
-	<attribute id="0x0203">
+	<attribute id="0x0203"> <!-- HID Country Code -->
 		<uint8 value="0x00" />
 	</attribute>
-	<attribute id="0x0204">
+	<attribute id="0x0204"> <!-- HID Virtual Cable -->
 		<boolean value="true" />
 	</attribute>
-	<attribute id="0x0205">
+	<attribute id="0x0205"> <!-- HID Reconnect Initiate -->
 		<boolean value="true" />
 	</attribute>
-	<attribute id="0x0206">
+	<attribute id="0x0206"> <!-- HID Descriptor List -->
 		<sequence>
 			<sequence>
 				<uint8 value="0x22" />
@@ -84,7 +89,7 @@
 			</sequence>
 		</sequence>
 	</attribute>
-	<attribute id="0x0207">
+	<attribute id="0x0207"> <!-- HID LANG ID Base List -->
 		<sequence>
 			<sequence>
 				<uint16 value="0x0409" />
@@ -92,28 +97,28 @@
 			</sequence>
 		</sequence>
 	</attribute>
-	<attribute id="0x0209">
+	<attribute id="0x0209"> <!-- HID Battery Power -->
 		<boolean value="true" />
 	</attribute>
-	<attribute id="0x020a">
+	<attribute id="0x020a"> <!-- HID Remote Wake -->
 		<boolean value="true" />
 	</attribute>
-  <attribute id="0x020b">
+  <attribute id="0x020b"> <!-- HID Profile Version -->
     <uint16 value="0x0100"/>
   </attribute>
-	<attribute id="0x020c">
+	<attribute id="0x020c"> <!-- HID Supervision Timeout -->
 		<uint16 value="0x0c80" />
 	</attribute>
-	<attribute id="0x020d">
+	<attribute id="0x020d"> <!-- HID Normally Connectable -->
 		<boolean value="false" />
 	</attribute>
-	<attribute id="0x020e">
+	<attribute id="0x020e"> <!-- HID Boot Device -->
 		<boolean value="true" />
 	</attribute>
-  <attribute id="0x020f">
+  <attribute id="0x020f"> <!-- HID SSR Host Max Latency -->
     <uint16 value="0x0640"/>
   </attribute>
-  <attribute id="0x0210">
+  <attribute id="0x0210"> <!-- HID SSR Host Min Timeout -->
     <uint16 value="0x0320"/>
   </attribute>
 </record>
