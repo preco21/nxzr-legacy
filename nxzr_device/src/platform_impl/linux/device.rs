@@ -3,6 +3,8 @@ use crate::{device::DeviceConfig, shared::SystemCommandError};
 use std::{collections::HashSet, str::FromStr};
 use thiserror::Error;
 
+pub use bluer::rfcomm::ProfileHandle;
+
 // Gamepad/Joystick device class
 const DEVICE_CLASS: u32 = 0x002508;
 

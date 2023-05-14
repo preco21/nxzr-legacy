@@ -1,7 +1,8 @@
+use crate::platform_impl::device;
 use crate::shared::{Address, Uuid};
 use std::collections::HashSet;
 
-pub type DeviceError = crate::platform_impl::device::DeviceError;
+pub type DeviceError = device::DeviceError;
 
 #[derive(Debug, Default)]
 pub struct DeviceConfig {
@@ -17,13 +18,13 @@ pub struct DeviceConfig {
 
 #[derive(Debug)]
 pub struct Device {
-    inner: crate::platform_impl::device::Device,
+    inner: device::Device,
 }
 
 impl Device {
     #[tracing::instrument(target = "device")]
     pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
-        let inner = crate::platform_impl::device::Device::new(config).await?;
+        let inner = device::Device::new(config).await?;
         Ok(Self { inner })
     }
 
@@ -46,12 +47,12 @@ impl Device {
         self.inner.address().await.map(|addr| addr.into())
     }
 
-    // FIXME: currently no use
+    // FIXME: currently not in use, may be used in future, find out to employ this one
     // pub async fn paired_devices(&self) -> Result<Vec<bluer::Device>, DeviceError> {
     //     self.inner.paired_devices().await
     // }
 
-    pub async fn register_sdp_record(&self) -> Result<bluer::rfcomm::ProfileHandle, DeviceError> {
+    pub async fn register_sdp_record(&self) -> Result<device::ProfileHandle, DeviceError> {
         self.inner.register_sdp_record().await
     }
 
