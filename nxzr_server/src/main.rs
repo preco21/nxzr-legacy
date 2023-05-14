@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
     let (protocol, protocol_handle) = Protocol::connect(
         transport.clone(),
         ProtocolConfig {
-            dev_address: nxzr_core::addr::Address::new(address.into()),
+            dev_address: nxzr_core::device::Address::new(address.into()),
             ..Default::default()
         },
     )

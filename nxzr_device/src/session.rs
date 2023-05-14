@@ -101,6 +101,7 @@ impl SessionListener {
         self.itr_sock.listen(1).await?;
         Ok(())
     }
+
     #[tracing::instrument(target = "session")]
     pub async fn accept(&self) -> Result<PairedSession, SessionError> {
         let (ctl_client, ctl_sa) = self.ctl_sock.accept().await?;
