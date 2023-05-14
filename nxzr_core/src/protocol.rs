@@ -1,10 +1,7 @@
-pub use crate::controller::protocol::ControllerProtocolConfig as ProtocolConfig;
-pub use crate::controller::protocol::TransportRead;
-pub use crate::controller::protocol::TransportWrite;
-use crate::controller::protocol::{
-    self, ControllerProtocol, ControllerProtocolConfig, ControllerProtocolError,
+use crate::controller::{
+    protocol::{self, ControllerProtocol, ControllerProtocolError},
+    state::ControllerState,
 };
-use crate::controller::state::ControllerState;
 use crate::event::{setup_event, EventError};
 use std::future::Future;
 use std::sync::Arc;
@@ -13,6 +10,11 @@ use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
 use tokio::time;
+
+// Re-exports subset of internal protocol module exports.
+pub use crate::controller::protocol::{
+    ControllerProtocolConfig as ProtocolConfig, TransportRead, TransportWrite,
+};
 
 #[derive(Clone, Error, Debug)]
 pub enum ProtocolError {
@@ -80,7 +82,7 @@ pub(crate) struct StateSendReq {
 impl Protocol {
     pub async fn connect(
         transport: impl Transport,
-        config: ControllerProtocolConfig,
+        config: ProtocolConfig,
     ) -> Result<(Self, ProtocolHandle), ProtocolError> {
         let protocol = Arc::new(ControllerProtocol::new(config)?);
         let (close_tx, close_rx) = mpsc::channel(1);
