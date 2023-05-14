@@ -4,9 +4,8 @@ use nxzr_core::{
 };
 use nxzr_device::{
     device::{Device, DeviceConfig},
-    helper,
+    platform::linux::{helper, syscheck},
     session::{SessionConfig, SessionListener},
-    syscheck,
     transport::{Transport, TransportConfig},
 };
 use std::{io::Write, sync::Arc};
@@ -16,6 +15,7 @@ use tokio::{signal, sync::mpsc, task, time};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
+
     syscheck::check_system_requirements().await?;
 
     let (shutdown_tx, _shutdown_rx) = mpsc::channel::<()>(1);
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     let address = device.address().await?;
     let session = SessionListener::new(SessionConfig {
-        address: Some(nxzr_device::sock::Address::new(address.into())),
+        address: Some(nxzr_device::Address::new(address.into())),
         ..Default::default()
     })?;
 

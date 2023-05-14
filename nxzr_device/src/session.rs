@@ -1,4 +1,5 @@
-use crate::sock::{l2cap, Address, AddressType};
+use crate::platform_impl::{l2cap, sock};
+use crate::shared::Address;
 use thiserror::Error;
 
 const DEFAULT_CTL_PSM: u16 = 17;
@@ -77,17 +78,17 @@ impl SessionListener {
         tracing::info!("binding the session.");
         self.ctl_sock
             .bind(l2cap::SocketAddr {
-                addr: self.addr_def.addr,
+                addr: self.addr_def.addr.into(),
                 psm: self.addr_def.ctl_psm,
-                addr_type: AddressType::BrEdr,
+                addr_type: sock::AddressType::BrEdr,
                 ..Default::default()
             })
             .await?;
         self.itr_sock
             .bind(l2cap::SocketAddr {
-                addr: self.addr_def.addr,
+                addr: self.addr_def.addr.into(),
                 psm: self.addr_def.itr_psm,
-                addr_type: AddressType::BrEdr,
+                addr_type: sock::AddressType::BrEdr,
                 ..Default::default()
             })
             .await?;
@@ -147,15 +148,15 @@ impl PairedSession {
         let control_psm = config.control_psm.unwrap_or(DEFAULT_CTL_PSM);
         let interrupt_psm = config.interrupt_psm.unwrap_or(DEFAULT_ITR_PSM);
         let ctl_addr = l2cap::SocketAddr {
-            addr: config.reconnect_address,
+            addr: config.reconnect_address.into(),
             psm: control_psm,
-            addr_type: AddressType::BrEdr,
+            addr_type: sock::AddressType::BrEdr,
             ..Default::default()
         };
         let itr_addr = l2cap::SocketAddr {
-            addr: config.reconnect_address,
+            addr: config.reconnect_address.into(),
             psm: interrupt_psm,
-            addr_type: AddressType::BrEdr,
+            addr_type: sock::AddressType::BrEdr,
             ..Default::default()
         };
         Ok(Self {

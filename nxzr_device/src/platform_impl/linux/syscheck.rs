@@ -1,7 +1,7 @@
 use thiserror::Error;
 use tokio::process::Command;
 
-use crate::helper;
+use crate::shared;
 
 #[derive(Clone, Error, Debug)]
 pub enum SysCheckError {
@@ -46,7 +46,7 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
         ));
     }
     // Check if `hciconfig` exists
-    helper::run_command({
+    shared::run_system_command({
         let mut cmd = Command::new("hciconfig");
         cmd.args(&["--h"]);
         cmd

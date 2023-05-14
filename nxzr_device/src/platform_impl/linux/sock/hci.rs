@@ -1,7 +1,7 @@
-use super::sys::{hci_filter, HCI_FILTER, SOL_HCI};
-use crate::sock::{
-    self, sock_priv_mini,
-    sys::{sockaddr_hci, BTPROTO_HCI},
+use super::super::sock;
+use super::{
+    sock_priv_mini,
+    sys::{hci_filter, sockaddr_hci, BTPROTO_HCI, HCI_FILTER, SOL_HCI},
     OwnedFd,
 };
 use libc::{

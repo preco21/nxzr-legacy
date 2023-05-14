@@ -9,9 +9,9 @@
 //! L2CAP sockets work with both Bluetooth classic (BR/EDR) and Bluetooth Low Energy (LE).
 //!
 
-use super::sock_priv;
-use crate::sock::{
-    self,
+use super::super::sock;
+use super::{
+    sock_priv,
     sys::{
         bt_power, bt_security, sockaddr_l2, BTPROTO_L2CAP, BT_MODE, BT_PHY, BT_POWER,
         BT_POWER_FORCE_ACTIVE_OFF, BT_POWER_FORCE_ACTIVE_ON, BT_RCVMTU, BT_SECURITY,
@@ -51,7 +51,7 @@ pub use super::sys::{l2cap_conninfo as ConnInfo, l2cap_options as Opts};
 
 /// Possible bit values for the [link mode socket option](Socket::link_mode).
 pub mod link_mode {
-    pub use crate::sock::sys::{
+    pub use super::sock::sys::{
         L2CAP_LM_AUTH as AUTH, L2CAP_LM_ENCRYPT as ENCRYPT, L2CAP_LM_FIPS as FIPS,
         L2CAP_LM_MASTER as MASTER, L2CAP_LM_RELIABLE as RELIABLE, L2CAP_LM_SECURE as SECURE,
         L2CAP_LM_TRUSTED as TRUSTED,
@@ -60,7 +60,7 @@ pub mod link_mode {
 
 /// Possible bit values for the [PHY socket option](Socket::phy).
 pub mod phy {
-    pub use crate::sock::sys::{
+    pub use super::sock::sys::{
         BR1M1SLOT, BR1M3SLOT, BR1M5SLOT, EDR2M1SLOT, EDR2M3SLOT, EDR2M5SLOT, EDR3M1SLOT,
         EDR3M3SLOT, EDR3M5SLOT, LE1MRX, LE1MTX, LE2MRX, LE2MTX, LECODEDRX, LECODEDTX,
     };

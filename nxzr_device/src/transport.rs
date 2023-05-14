@@ -1,6 +1,6 @@
+use crate::platform_impl::hci;
 use crate::semaphore::BoundedSemaphore;
 use crate::session::PairedSession;
-use crate::sock::hci;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use std::future::Future;
