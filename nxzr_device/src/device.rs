@@ -52,8 +52,11 @@ impl Device {
     //     self.inner.paired_devices().await
     // }
 
-    pub async fn register_sdp_record(&self) -> Result<device::ProfileHandle, DeviceError> {
-        self.inner.register_sdp_record().await
+    pub async fn register_sdp_record(&self) -> Result<ProfileHandle, DeviceError> {
+        let inner_handle = self.inner.register_sdp_record().await?;
+        Ok(ProfileHandle {
+            _inner: inner_handle,
+        })
     }
 
     pub async fn ensure_device_class(&self) -> Result<(), DeviceError> {
@@ -82,5 +85,16 @@ impl Device {
 
     pub async fn uuids(&self) -> Result<Option<HashSet<Uuid>>, DeviceError> {
         self.inner.uuids().await
+    }
+}
+
+#[derive(Debug)]
+pub struct ProfileHandle {
+    _inner: device::ProfileHandle,
+}
+
+impl Drop for ProfileHandle {
+    fn drop(&mut self) {
+        // Required for drop order
     }
 }
