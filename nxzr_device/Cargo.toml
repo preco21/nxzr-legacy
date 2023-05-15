@@ -34,6 +34,9 @@ async-trait = "0.1.68"
 [dev-dependencies]
 tokio = { version = "1.25.0", features = ["full"] }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.48.0" }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
 dbus = { version = "0.9.7", features = ["vendored"], optional = true }
