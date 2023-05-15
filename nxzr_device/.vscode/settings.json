@@ -4,11 +4,5 @@
     "editor.formatOnSave": true
   },
   "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
-  "rust-analyzer.check.overrideCommand": [
-    "cross",
-    "check",
-    "--target=x86_64-unknown-linux-gnu",
-    "--features=cross",
-    "--message-format=json"
-  ]
+  "rust-analyzer.check.overrideCommand": ["cross", "check", "--target=x86_64-unknown-linux-gnu", "--features=cross-linux", "--message-format=json"]
 }

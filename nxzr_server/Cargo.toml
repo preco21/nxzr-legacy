@@ -28,4 +28,4 @@ termion = "2.0.1"
 
 [features]
 # Forward `cross` feature to cross-compile linux-specific crates
-cross = ["nxzr_device/cross"]
+cross-linux = ["nxzr_device/cross-linux"]

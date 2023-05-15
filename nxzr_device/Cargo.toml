@@ -40,4 +40,4 @@ dbus = { version = "0.9.7", features = ["vendored"], optional = true }
 
 [features]
 # Allows `cross` to cross-compile linux-specific crates
-cross = ["dep:dbus"]
+cross-linux = ["dep:dbus"]
