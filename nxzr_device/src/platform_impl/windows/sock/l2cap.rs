@@ -1162,6 +1162,7 @@ impl FromRawFd for Datagram {
     }
 }
 
+// FIXME: 다른건 필요 없고 이것만 남겨도 될 것 같은데... linux도 마찬가지, 그리고 Address도 하나로 통일해도 괜찮을 것 같음.
 #[derive(Debug)]
 pub struct LazySeqPacketListener {
     socket: Socket<SeqPacket>,
