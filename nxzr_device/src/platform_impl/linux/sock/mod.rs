@@ -1,16 +1,13 @@
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/sock.rs
-
 //! System socket base.
+use crate::Address;
 use libc::{c_int, sockaddr, socklen_t, Ioctl, SOCK_CLOEXEC, SOCK_NONBLOCK};
-use macaddr::MacAddr6;
 use num_derive::FromPrimitive;
 use std::{
-    fmt::{self, Debug, Display, Formatter},
+    fmt::Debug,
     io::{Error, ErrorKind, Result},
     mem::{size_of, MaybeUninit},
-    ops::{Deref, DerefMut},
     os::unix::io::{AsRawFd, IntoRawFd, RawFd},
-    str::FromStr,
 };
 use strum::{Display, EnumString};
 use tokio::io::ReadBuf;
@@ -57,56 +54,6 @@ impl Drop for OwnedFd {
     }
 }
 
-/// Bluetooth address.
-///
-/// The serialized representation is a string in colon-hexadecimal notation.
-#[derive(Clone, Copy, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Address(pub [u8; 6]);
-
-impl Address {
-    /// Creates a new Bluetooth address with the specified value.
-    pub const fn new(addr: [u8; 6]) -> Self {
-        Self(addr)
-    }
-
-    /// Any Bluetooth address.
-    ///
-    /// Corresponds to `00:00:00:00:00:00`.
-    pub const fn any() -> Self {
-        Self([0; 6])
-    }
-}
-
-impl Deref for Address {
-    type Target = [u8; 6];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Address {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Display for Address {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
-        )
-    }
-}
-
-impl Debug for Address {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{self}")
-    }
-}
-
 impl From<sys::bdaddr_t> for Address {
     fn from(mut addr: sys::bdaddr_t) -> Self {
         addr.b.reverse();
@@ -121,54 +68,16 @@ impl From<Address> for sys::bdaddr_t {
     }
 }
 
-impl From<MacAddr6> for Address {
-    fn from(addr: MacAddr6) -> Self {
-        Self(addr.into_array())
-    }
-}
-
-impl From<Address> for MacAddr6 {
-    fn from(addr: Address) -> Self {
+// Interop [bluer::Address] with [Address].
+impl From<bluer::Address> for Address {
+    fn from(addr: bluer::Address) -> Self {
         addr.0.into()
     }
 }
 
-/// Invalid Bluetooth address error.
-#[derive(Debug, Clone)]
-pub struct InvalidAddress(pub String);
-
-impl fmt::Display for InvalidAddress {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "invalid Bluetooth address: {}", &self.0)
-    }
-}
-
-impl std::error::Error for InvalidAddress {}
-
-impl FromStr for Address {
-    type Err = InvalidAddress;
-    fn from_str(s: &str) -> std::result::Result<Self, InvalidAddress> {
-        let fields = s
-            .split(':')
-            .map(|s| u8::from_str_radix(s, 16).map_err(|_| InvalidAddress(s.to_string())))
-            .collect::<std::result::Result<Vec<_>, InvalidAddress>>()?;
-        Ok(Self(
-            fields
-                .try_into()
-                .map_err(|_| InvalidAddress(s.to_string()))?,
-        ))
-    }
-}
-
-impl From<[u8; 6]> for Address {
-    fn from(addr: [u8; 6]) -> Self {
-        Self(addr)
-    }
-}
-
-impl From<Address> for [u8; 6] {
+impl From<Address> for bluer::Address {
     fn from(addr: Address) -> Self {
-        addr.0
+        addr.0.into()
     }
 }
 
@@ -727,149 +636,4 @@ macro_rules! sock_priv {
     };
 }
 
-macro_rules! sock_priv_mini {
-    () => {
-        async fn connect_priv(&self, sa: SocketAddr) -> Result<()> {
-            match sock::connect(self.fd.get_ref(), sa) {
-                Ok(()) => Ok(()),
-                Err(err)
-                    if err.raw_os_error() == Some(EINPROGRESS)
-                        || err.raw_os_error() == Some(EAGAIN) =>
-                {
-                    loop {
-                        let mut guard = self.fd.writable().await?;
-                        match guard.try_io(|inner| {
-                            let err: c_int =
-                                sock::getsockopt(inner.get_ref(), SOL_SOCKET, SO_ERROR)?;
-                            match err {
-                                0 => Ok(()),
-                                EINPROGRESS | EAGAIN => Err(ErrorKind::WouldBlock.into()),
-                                _ => Err(Error::from_raw_os_error(err)),
-                            }
-                        }) {
-                            Ok(result) => break result,
-                            Err(_would_block) => continue,
-                        }
-                    }?;
-                    Ok(())
-                }
-                Err(err) => Err(err),
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn send_priv(&self, buf: &[u8]) -> Result<usize> {
-            loop {
-                let mut guard = self.fd.writable().await?;
-                match guard.try_io(|inner| sock::send(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn poll_send_priv(&self, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_write_ready(cx))?;
-                match guard.try_io(|inner| sock::send(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return Poll::Ready(result),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn send_to_priv(&self, buf: &[u8], target: SocketAddr) -> Result<usize> {
-            loop {
-                let mut guard = self.fd.writable().await?;
-                match guard.try_io(|inner| sock::sendto(inner.get_ref(), buf, 0, target)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        fn poll_send_to_priv(
-            &self,
-            cx: &mut Context,
-            buf: &[u8],
-            target: SocketAddr,
-        ) -> Poll<Result<usize>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_write_ready(cx))?;
-                match guard.try_io(|inner| sock::sendto(inner.get_ref(), buf, 0, target)) {
-                    Ok(result) => return Poll::Ready(result),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn recv_priv(&self, buf: &mut [u8]) -> Result<usize> {
-            let mut buf = ReadBuf::new(buf);
-            loop {
-                let mut guard = self.fd.readable().await?;
-                match guard.try_io(|inner| sock::recv(inner.get_ref(), &mut buf, 0)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn poll_recv_priv(&self, cx: &mut Context, buf: &mut ReadBuf) -> Poll<Result<()>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
-                match guard.try_io(|inner| sock::recv(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return Poll::Ready(result.map(|_| ())),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn recv_from_priv(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr)> {
-            let mut buf = ReadBuf::new(buf);
-            loop {
-                let mut guard = self.fd.readable().await?;
-                match guard.try_io(|inner| sock::recvfrom(inner.get_ref(), &mut buf, 0)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        fn poll_recv_from_priv(
-            &self,
-            cx: &mut Context,
-            buf: &mut ReadBuf,
-        ) -> Poll<Result<SocketAddr>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
-                match guard.try_io(|inner| sock::recvfrom(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return Poll::Ready(result.map(|(_n, sa)| sa)),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn shutdown_priv(&self, how: Shutdown) -> Result<()> {
-            let how = match how {
-                Shutdown::Read => SHUT_RD,
-                Shutdown::Write => SHUT_WR,
-                Shutdown::Both => SHUT_RDWR,
-            };
-            sock::shutdown(self.fd.get_ref(), how)?;
-            Ok(())
-        }
-
-        fn poll_shutdown_priv(&self, _cx: &mut Context, how: Shutdown) -> Poll<Result<()>> {
-            self.shutdown_priv(how)?;
-            Poll::Ready(Ok(()))
-        }
-    };
-}
-
 pub(crate) use sock_priv;
-pub(crate) use sock_priv_mini;
