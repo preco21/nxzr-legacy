@@ -1,13 +1,12 @@
-// FIXME: implement
 use super::super::sock;
 use super::{
-    sock_priv_mini,
+    sock_priv,
     sys::{hci_filter, sockaddr_hci, BTPROTO_HCI, HCI_FILTER, SOL_HCI},
     OwnedFd,
 };
 use libc::{
-    AF_BLUETOOTH, EAGAIN, EINPROGRESS, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC, SOCK_RAW,
-    SOL_SOCKET, SO_ERROR, SO_RCVBUF, TIOCINQ, TIOCOUTQ,
+    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
+    SOCK_RAW, SOL_SOCKET, SO_ERROR, SO_RCVBUF, TIOCINQ, TIOCOUTQ,
 };
 use std::{
     fmt,
@@ -145,7 +144,13 @@ impl Socket {
         })
     }
 
-    sock_priv_mini!();
+    fn from_owned_fd(fd: OwnedFd) -> Result<Self> {
+        Ok(Self {
+            fd: AsyncFd::new(fd)?,
+        })
+    }
+
+    sock_priv!();
 }
 
 impl AsRawFd for Socket {

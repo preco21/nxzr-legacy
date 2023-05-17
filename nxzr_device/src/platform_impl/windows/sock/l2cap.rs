@@ -1,5 +1,4 @@
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/l2cap.rs
-
 //! Logical Link Control and Adaptation Protocol (L2CAP) sockets.
 //!
 //! L2CAP sockets provide Bluetooth Connection Oriented Channels (CoC).
@@ -8,7 +7,6 @@
 //!
 //! L2CAP sockets work with both Bluetooth classic (BR/EDR) and Bluetooth Low Energy (LE).
 //!
-
 use super::super::sock;
 use super::{
     sock_priv,
@@ -18,8 +16,9 @@ use super::{
         BT_SECURITY_FIPS, BT_SECURITY_HIGH, BT_SECURITY_LOW, BT_SECURITY_MEDIUM, BT_SECURITY_SDP,
         BT_SNDMTU, L2CAP_CONNINFO, L2CAP_LM, L2CAP_OPTIONS, SOL_L2CAP,
     },
-    Address, AddressType, OwnedFd,
+    AddressType, OwnedFd,
 };
+use crate::Address;
 use libc::{
     AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_DGRAM,
     SOCK_SEQPACKET, SOCK_STREAM, SOL_BLUETOOTH, SOL_SOCKET, SO_ERROR, SO_RCVBUF, SO_REUSEADDR,
@@ -1162,7 +1161,6 @@ impl FromRawFd for Datagram {
     }
 }
 
-// FIXME: 다른건 필요 없고 이것만 남겨도 될 것 같은데... linux도 마찬가지, 그리고 Address도 하나로 통일해도 괜찮을 것 같음.
 #[derive(Debug)]
 pub struct LazySeqPacketListener {
     socket: Socket<SeqPacket>,

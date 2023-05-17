@@ -7,28 +7,33 @@
 // https://github.com/Wodann/io-bluetooth-rs/blob/4a7dc3bcbce1f263fe52fcaf5a5961b2df7fc5a5/src/sys/windows/c.rs
 // https://github.com/gmallios/SoundcoreManager/blob/ac2d755786e160cde832143f6e41c6650f0c5ef5/bluetooth-lib/src/winrt/rfcomm.rs
 
-use macaddr::MacAddr6;
+// Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/sock.rs
+//! System socket base.
+use crate::Address;
+use libc::{c_int, sockaddr, socklen_t, Ioctl, SOCK_CLOEXEC, SOCK_NONBLOCK};
 use num_derive::FromPrimitive;
 use std::{
-    fmt::{self, Debug, Display, Formatter},
+    fmt::Debug,
     io::{Error, ErrorKind, Result},
     mem::{size_of, MaybeUninit},
-    ops::{Deref, DerefMut},
-    str::FromStr,
+    os::unix::io::{AsRawFd, IntoRawFd, RawFd},
 };
 use strum::{Display, EnumString};
 use tokio::io::ReadBuf;
 
 pub mod hci;
 pub mod l2cap;
+pub mod sys;
 
+/// File descriptor that is closed on drop.
 #[derive(Debug)]
-pub struct OwnedHandle {
+pub struct OwnedFd {
     fd: RawFd,
     close_on_drop: bool,
 }
 
-impl OwnedHandle {
+impl OwnedFd {
+    /// Create new OwnedFd taking ownership of file descriptor.
     pub unsafe fn new(fd: RawFd) -> Self {
         Self {
             fd,
@@ -37,67 +42,24 @@ impl OwnedHandle {
     }
 }
 
-impl AsRawFd for OwnedHandle {
+impl AsRawFd for OwnedFd {
     fn as_raw_fd(&self) -> RawFd {
         self.fd
     }
 }
 
-impl IntoRawFd for OwnedHandle {
+impl IntoRawFd for OwnedFd {
     fn into_raw_fd(mut self) -> RawFd {
         self.close_on_drop = false;
         self.fd
     }
 }
 
-impl Drop for OwnedHandle {
+impl Drop for OwnedFd {
     fn drop(&mut self) {
         if self.close_on_drop {
             unsafe { libc::close(self.fd) };
         }
-    }
-}
-
-#[derive(Clone, Copy, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Address(pub [u8; 6]);
-
-impl Address {
-    pub const fn new(addr: [u8; 6]) -> Self {
-        Self(addr)
-    }
-
-    pub const fn any() -> Self {
-        Self([0; 6])
-    }
-}
-
-impl Deref for Address {
-    type Target = [u8; 6];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Address {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Display for Address {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
-        )
-    }
-}
-
-impl Debug for Address {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{self}")
     }
 }
 
@@ -115,53 +77,16 @@ impl From<Address> for sys::bdaddr_t {
     }
 }
 
-impl From<MacAddr6> for Address {
-    fn from(addr: MacAddr6) -> Self {
-        Self(addr.into_array())
-    }
-}
-
-impl From<Address> for MacAddr6 {
-    fn from(addr: Address) -> Self {
+// Interop [bluer::Address] with [Address].
+impl From<bluer::Address> for Address {
+    fn from(addr: bluer::Address) -> Self {
         addr.0.into()
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct InvalidAddress(pub String);
-
-impl fmt::Display for InvalidAddress {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "invalid Bluetooth address: {}", &self.0)
-    }
-}
-
-impl std::error::Error for InvalidAddress {}
-
-impl FromStr for Address {
-    type Err = InvalidAddress;
-    fn from_str(s: &str) -> std::result::Result<Self, InvalidAddress> {
-        let fields = s
-            .split(':')
-            .map(|s| u8::from_str_radix(s, 16).map_err(|_| InvalidAddress(s.to_string())))
-            .collect::<std::result::Result<Vec<_>, InvalidAddress>>()?;
-        Ok(Self(
-            fields
-                .try_into()
-                .map_err(|_| InvalidAddress(s.to_string()))?,
-        ))
-    }
-}
-
-impl From<[u8; 6]> for Address {
-    fn from(addr: [u8; 6]) -> Self {
-        Self(addr)
-    }
-}
-
-impl From<Address> for [u8; 6] {
+impl From<Address> for bluer::Address {
     fn from(addr: Address) -> Self {
-        addr.0
+        addr.0.into()
     }
 }
 
@@ -204,16 +129,16 @@ pub trait SysSockAddr: Sized {
 /// Creates a socket of the specified type and returns its file descriptor.
 ///
 /// The socket is set to non-blocking mode.
-pub fn socket(sa: c_int, ty: c_int, proto: c_int) -> Result<OwnedHandle> {
+pub fn socket(sa: c_int, ty: c_int, proto: c_int) -> Result<OwnedFd> {
     let fd = match unsafe { libc::socket(sa, ty | SOCK_NONBLOCK | SOCK_CLOEXEC, proto) } {
         -1 => return Err(Error::last_os_error()),
-        fd => unsafe { OwnedHandle::new(fd) },
+        fd => unsafe { OwnedFd::new(fd) },
     };
     Ok(fd)
 }
 
 /// Binds socket to specified address.
-pub fn bind<SA>(socket: &OwnedHandle, sa: SA) -> Result<()>
+pub fn bind<SA>(socket: &OwnedFd, sa: SA) -> Result<()>
 where
     SA: SysSockAddr,
 {
@@ -233,7 +158,7 @@ where
 }
 
 /// Gets the address the socket is bound to.
-pub fn getsockname<SA>(socket: &OwnedHandle) -> Result<SA>
+pub fn getsockname<SA>(socket: &OwnedFd) -> Result<SA>
 where
     SA: SysSockAddr,
 {
@@ -262,7 +187,7 @@ where
 }
 
 /// Gets the address the socket is connected to.
-pub fn getpeername<SA>(socket: &OwnedHandle) -> Result<SA>
+pub fn getpeername<SA>(socket: &OwnedFd) -> Result<SA>
 where
     SA: SysSockAddr,
 {
@@ -291,7 +216,7 @@ where
 }
 
 /// Puts socket in listen mode.
-pub fn listen(socket: &OwnedHandle, backlog: i32) -> Result<()> {
+pub fn listen(socket: &OwnedFd, backlog: i32) -> Result<()> {
     if unsafe { libc::listen(socket.as_raw_fd(), backlog) } == 0 {
         Ok(())
     } else {
@@ -302,7 +227,7 @@ pub fn listen(socket: &OwnedHandle, backlog: i32) -> Result<()> {
 /// Accept a connection on the provided socket.
 ///
 /// The accepted socket is set into non-blocking mode.
-pub fn accept<SA>(socket: &OwnedHandle) -> Result<(OwnedHandle, SA)>
+pub fn accept<SA>(socket: &OwnedFd) -> Result<(OwnedFd, SA)>
 where
     SA: SysSockAddr,
 {
@@ -318,7 +243,7 @@ where
         )
     } {
         -1 => return Err(Error::last_os_error()),
-        fd => unsafe { OwnedHandle::new(fd) },
+        fd => unsafe { OwnedFd::new(fd) },
     };
 
     if length != size_of::<SA::SysSockAddr>() as socklen_t {
@@ -334,7 +259,7 @@ where
 }
 
 /// Initiate a connection on a socket to the specified address.
-pub fn connect<SA>(socket: &OwnedHandle, sa: SA) -> Result<()>
+pub fn connect<SA>(socket: &OwnedFd, sa: SA) -> Result<()>
 where
     SA: SysSockAddr,
 {
@@ -354,7 +279,7 @@ where
 }
 
 /// Sends from buffer into socket.
-pub fn send(socket: &OwnedHandle, buf: &[u8], flags: c_int) -> Result<usize> {
+pub fn send(socket: &OwnedFd, buf: &[u8], flags: c_int) -> Result<usize> {
     match unsafe {
         libc::send(
             socket.as_raw_fd(),
@@ -369,7 +294,7 @@ pub fn send(socket: &OwnedHandle, buf: &[u8], flags: c_int) -> Result<usize> {
 }
 
 /// Sends from buffer into socket using destination address.
-pub fn sendto<SA>(socket: &OwnedHandle, buf: &[u8], flags: c_int, sa: SA) -> Result<usize>
+pub fn sendto<SA>(socket: &OwnedFd, buf: &[u8], flags: c_int, sa: SA) -> Result<usize>
 where
     SA: SysSockAddr,
 {
@@ -390,7 +315,7 @@ where
 }
 
 /// Receive from socket into buffer.
-pub fn recv(socket: &OwnedHandle, buf: &mut ReadBuf, flags: c_int) -> Result<usize> {
+pub fn recv(socket: &OwnedFd, buf: &mut ReadBuf, flags: c_int) -> Result<usize> {
     let unfilled = unsafe { buf.unfilled_mut() };
     match unsafe {
         libc::recv(
@@ -413,7 +338,7 @@ pub fn recv(socket: &OwnedHandle, buf: &mut ReadBuf, flags: c_int) -> Result<usi
 }
 
 /// Receive from socket into buffer with source address.
-pub fn recvfrom<SA>(socket: &OwnedHandle, buf: &mut ReadBuf, flags: c_int) -> Result<(usize, SA)>
+pub fn recvfrom<SA>(socket: &OwnedFd, buf: &mut ReadBuf, flags: c_int) -> Result<(usize, SA)>
 where
     SA: SysSockAddr,
 {
@@ -453,7 +378,7 @@ where
 }
 
 /// Shut down part of a socket.
-pub fn shutdown(socket: &OwnedHandle, how: c_int) -> Result<()> {
+pub fn shutdown(socket: &OwnedFd, how: c_int) -> Result<()> {
     if unsafe { libc::shutdown(socket.as_raw_fd(), how) } == 0 {
         Ok(())
     } else {
@@ -462,7 +387,7 @@ pub fn shutdown(socket: &OwnedHandle, how: c_int) -> Result<()> {
 }
 
 /// Get socket option.
-pub fn getsockopt<T>(socket: &OwnedHandle, level: c_int, optname: c_int) -> Result<T> {
+pub fn getsockopt<T>(socket: &OwnedFd, level: c_int, optname: c_int) -> Result<T> {
     let mut optval: MaybeUninit<T> = MaybeUninit::uninit();
     let mut optlen: socklen_t = size_of::<T>() as _;
     if unsafe {
@@ -485,7 +410,7 @@ pub fn getsockopt<T>(socket: &OwnedHandle, level: c_int, optname: c_int) -> Resu
 }
 
 /// Set socket option.
-pub fn setsockopt<T>(socket: &OwnedHandle, level: c_int, optname: i32, optval: &T) -> Result<()> {
+pub fn setsockopt<T>(socket: &OwnedFd, level: c_int, optname: i32, optval: &T) -> Result<()> {
     let optlen: socklen_t = size_of::<T>() as _;
     if unsafe {
         libc::setsockopt(
@@ -503,7 +428,7 @@ pub fn setsockopt<T>(socket: &OwnedHandle, level: c_int, optname: i32, optval: &
 }
 
 /// Perform an IOCTL that reads a single value.
-pub fn ioctl_read<T>(socket: &OwnedHandle, request: Ioctl) -> Result<T> {
+pub fn ioctl_read<T>(socket: &OwnedFd, request: Ioctl) -> Result<T> {
     let mut value: MaybeUninit<T> = MaybeUninit::uninit();
     let ret = unsafe { libc::ioctl(socket.as_raw_fd(), request, value.as_mut_ptr()) };
     if ret == -1 {
@@ -515,7 +440,7 @@ pub fn ioctl_read<T>(socket: &OwnedHandle, request: Ioctl) -> Result<T> {
 
 /// Perform an IOCTL that writes a single value.
 #[allow(dead_code)]
-pub fn ioctl_write<T>(socket: &OwnedHandle, request: Ioctl, value: &T) -> Result<c_int> {
+pub fn ioctl_write<T>(socket: &OwnedFd, request: Ioctl, value: &T) -> Result<c_int> {
     let ret = unsafe { libc::ioctl(socket.as_raw_fd(), request, value as *const _) };
     if ret == -1 {
         return Err(Error::last_os_error());
@@ -720,149 +645,4 @@ macro_rules! sock_priv {
     };
 }
 
-macro_rules! sock_priv_mini {
-    () => {
-        async fn connect_priv(&self, sa: SocketAddr) -> Result<()> {
-            match sock::connect(self.fd.get_ref(), sa) {
-                Ok(()) => Ok(()),
-                Err(err)
-                    if err.raw_os_error() == Some(EINPROGRESS)
-                        || err.raw_os_error() == Some(EAGAIN) =>
-                {
-                    loop {
-                        let mut guard = self.fd.writable().await?;
-                        match guard.try_io(|inner| {
-                            let err: c_int =
-                                sock::getsockopt(inner.get_ref(), SOL_SOCKET, SO_ERROR)?;
-                            match err {
-                                0 => Ok(()),
-                                EINPROGRESS | EAGAIN => Err(ErrorKind::WouldBlock.into()),
-                                _ => Err(Error::from_raw_os_error(err)),
-                            }
-                        }) {
-                            Ok(result) => break result,
-                            Err(_would_block) => continue,
-                        }
-                    }?;
-                    Ok(())
-                }
-                Err(err) => Err(err),
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn send_priv(&self, buf: &[u8]) -> Result<usize> {
-            loop {
-                let mut guard = self.fd.writable().await?;
-                match guard.try_io(|inner| sock::send(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn poll_send_priv(&self, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_write_ready(cx))?;
-                match guard.try_io(|inner| sock::send(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return Poll::Ready(result),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn send_to_priv(&self, buf: &[u8], target: SocketAddr) -> Result<usize> {
-            loop {
-                let mut guard = self.fd.writable().await?;
-                match guard.try_io(|inner| sock::sendto(inner.get_ref(), buf, 0, target)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        fn poll_send_to_priv(
-            &self,
-            cx: &mut Context,
-            buf: &[u8],
-            target: SocketAddr,
-        ) -> Poll<Result<usize>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_write_ready(cx))?;
-                match guard.try_io(|inner| sock::sendto(inner.get_ref(), buf, 0, target)) {
-                    Ok(result) => return Poll::Ready(result),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn recv_priv(&self, buf: &mut [u8]) -> Result<usize> {
-            let mut buf = ReadBuf::new(buf);
-            loop {
-                let mut guard = self.fd.readable().await?;
-                match guard.try_io(|inner| sock::recv(inner.get_ref(), &mut buf, 0)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn poll_recv_priv(&self, cx: &mut Context, buf: &mut ReadBuf) -> Poll<Result<()>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
-                match guard.try_io(|inner| sock::recv(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return Poll::Ready(result.map(|_| ())),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        async fn recv_from_priv(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr)> {
-            let mut buf = ReadBuf::new(buf);
-            loop {
-                let mut guard = self.fd.readable().await?;
-                match guard.try_io(|inner| sock::recvfrom(inner.get_ref(), &mut buf, 0)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        fn poll_recv_from_priv(
-            &self,
-            cx: &mut Context,
-            buf: &mut ReadBuf,
-        ) -> Poll<Result<SocketAddr>> {
-            loop {
-                let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
-                match guard.try_io(|inner| sock::recvfrom(inner.get_ref(), buf, 0)) {
-                    Ok(result) => return Poll::Ready(result.map(|(_n, sa)| sa)),
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-
-        fn shutdown_priv(&self, how: Shutdown) -> Result<()> {
-            let how = match how {
-                Shutdown::Read => SHUT_RD,
-                Shutdown::Write => SHUT_WR,
-                Shutdown::Both => SHUT_RDWR,
-            };
-            sock::shutdown(self.fd.get_ref(), how)?;
-            Ok(())
-        }
-
-        fn poll_shutdown_priv(&self, _cx: &mut Context, how: Shutdown) -> Poll<Result<()>> {
-            self.shutdown_priv(how)?;
-            Poll::Ready(Ok(()))
-        }
-    };
-}
-
 pub(crate) use sock_priv;
-pub(crate) use sock_priv_mini;
