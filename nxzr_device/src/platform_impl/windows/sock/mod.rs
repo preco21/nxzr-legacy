@@ -10,194 +10,207 @@
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/sock.rs
 //! System socket base.
 use crate::Address;
-use libc::{c_int, sockaddr, socklen_t, Ioctl, SOCK_CLOEXEC, SOCK_NONBLOCK};
-use num_derive::FromPrimitive;
 use std::{
     fmt::Debug,
-    io::{Error, ErrorKind, Result},
+    io,
     mem::{size_of, MaybeUninit},
-    os::unix::io::{AsRawFd, IntoRawFd, RawFd},
+    os::windows::{
+        prelude::{AsRawHandle, AsRawSocket, IntoRawSocket, RawSocket},
+        raw::SOCKET,
+    },
 };
 use strum::{Display, EnumString};
 use tokio::io::ReadBuf;
+use windows::Win32::Networking::WinSock::{self, SOCKADDR};
 
 pub mod hci;
 pub mod l2cap;
-pub mod sys;
 
-/// File descriptor that is closed on drop.
+// Socket handle that is closed on drop.
 #[derive(Debug)]
-pub struct OwnedFd {
-    fd: RawFd,
+pub struct OwnedSocket {
+    sock: RawSocket,
     close_on_drop: bool,
 }
 
-impl OwnedFd {
-    /// Create new OwnedFd taking ownership of file descriptor.
-    pub unsafe fn new(fd: RawFd) -> Self {
+impl OwnedSocket {
+    // Create new OwnedSocket taking ownership of socket handle.
+    pub unsafe fn new(socket: RawSocket) -> Self {
         Self {
-            fd,
+            sock: socket,
             close_on_drop: true,
         }
     }
 }
 
-impl AsRawFd for OwnedFd {
-    fn as_raw_fd(&self) -> RawFd {
-        self.fd
+impl AsRawSocket for OwnedSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.sock
     }
 }
 
-impl IntoRawFd for OwnedFd {
-    fn into_raw_fd(mut self) -> RawFd {
+impl IntoRawSocket for OwnedSocket {
+    fn into_raw_socket(mut self) -> RawSocket {
         self.close_on_drop = false;
-        self.fd
+        self.sock
     }
 }
 
-impl Drop for OwnedFd {
+impl Drop for OwnedSocket {
     fn drop(&mut self) {
         if self.close_on_drop {
-            unsafe { libc::close(self.fd) };
+            unsafe { WinSock::closesocket(self.sock) };
         }
     }
 }
 
-impl From<sys::bdaddr_t> for Address {
-    fn from(mut addr: sys::bdaddr_t) -> Self {
-        addr.b.reverse();
-        Self(addr.b)
-    }
-}
+// FIXME:
+// impl From<WinSock::BTH_SO> for Address {
+//     fn from(mut addr: WinSock::SOCKADDR_BTH) -> Self {
+//         accept
+//         addr.b.reverse();
+//         Self(addr.b)
+//     }
+// }
 
-impl From<Address> for sys::bdaddr_t {
-    fn from(mut addr: Address) -> Self {
-        addr.0.reverse();
-        sys::bdaddr_t { b: addr.0 }
-    }
-}
+// impl From<Address> for SOCKADDR {
+//     fn from(mut addr: Address) -> Self {
+//         addr.0.reverse();
+//         SOCKADDR { b: addr.0 }
+//     }
+// }
 
-// Interop [bluer::Address] with [Address].
-impl From<bluer::Address> for Address {
-    fn from(addr: bluer::Address) -> Self {
-        addr.0.into()
-    }
-}
+// FIXME:
+// Bluetooth device address type.
+// #[derive(
+//     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Display, EnumString, FromPrimitive,
+// )]
+// #[repr(u8)]
+// pub enum AddressType {
+//     // Classic Bluetooth (BR/EDR) address.
+//     #[strum(serialize = "br/edr")]
+//     BrEdr = sys::BDADDR_BREDR,
+//     // Bluetooth Low Energy (LE) public address.
+//     #[strum(serialize = "public")]
+//     LePublic = sys::BDADDR_LE_PUBLIC,
+//     // Bluetooth Low Energy (LE) random address.
+//     #[strum(serialize = "random")]
+//     LeRandom = sys::BDADDR_LE_RANDOM,
+// }
 
-impl From<Address> for bluer::Address {
-    fn from(addr: Address) -> Self {
-        addr.0.into()
-    }
-}
+// impl Default for AddressType {
+//     fn default() -> Self {
+//         Self::LePublic
+//     }
+// }
 
-/// Bluetooth device address type.
-#[derive(
-    Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Display, EnumString, FromPrimitive,
-)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[repr(u8)]
-pub enum AddressType {
-    /// Classic Bluetooth (BR/EDR) address.
-    #[strum(serialize = "br/edr")]
-    BrEdr = sys::BDADDR_BREDR,
-    /// Bluetooth Low Energy (LE) public address.
-    #[strum(serialize = "public")]
-    LePublic = sys::BDADDR_LE_PUBLIC,
-    /// Bluetooth Low Energy (LE) random address.
-    #[strum(serialize = "random")]
-    LeRandom = sys::BDADDR_LE_RANDOM,
-}
-
-impl Default for AddressType {
-    fn default() -> Self {
-        Self::LePublic
-    }
-}
-
-/// Address that is convertible to and from a system socket address.
+// Address that is convertible to and from a system socket address.
 pub trait SysSockAddr: Sized {
-    /// System socket address type.
+    // System socket address type.
     type SysSockAddr: Sized + 'static;
 
-    /// Convert to system socket address.
+    // Convert to system socket address.
     fn into_sys_sock_addr(self) -> Self::SysSockAddr;
 
-    /// Convert from system socket address.
-    fn try_from_sys_sock_addr(addr: Self::SysSockAddr) -> Result<Self>;
+    // Convert from system socket address.
+    fn try_from_sys_sock_addr(addr: Self::SysSockAddr) -> io::Result<Self>;
 }
 
-/// Creates a socket of the specified type and returns its file descriptor.
-///
-/// The socket is set to non-blocking mode.
-pub fn socket(sa: c_int, ty: c_int, proto: c_int) -> Result<OwnedFd> {
-    let fd = match unsafe { libc::socket(sa, ty | SOCK_NONBLOCK | SOCK_CLOEXEC, proto) } {
-        -1 => return Err(Error::last_os_error()),
-        fd => unsafe { OwnedFd::new(fd) },
+// Initializes Windows socket interface.
+//
+// This function must be called before use of any other Windows socket operations.
+pub fn init_winsock() -> i32 {
+    let wsa_data = Box::into_raw(Box::default());
+    unsafe { WinSock::WSAStartup(0x0202, wsa_data) }
+}
+
+// Teardown Windows socket interface.
+pub fn terminate_winsock() -> i32 {
+    unsafe { WinSock::WSACleanup() }
+}
+
+// Returns the last error from the Windows socket interface.
+pub fn last_socket_error() -> io::Error {
+    io::Error::from_raw_os_error(unsafe { WinSock::WSAGetLastError() })
+}
+
+// Creates a socket of the specified type and returns its socket handle.
+//
+// The socket is set to non-blocking mode.
+pub fn socket(af: i32, ty: WinSock::WINSOCK_SOCKET_TYPE, proto: i32) -> io::Result<OwnedSocket> {
+    let sock = match unsafe { WinSock::socket(af, ty, proto) } {
+        WinSock::SOCKET_ERROR => return Err(last_socket_error()),
+        sock => sock,
     };
-    Ok(fd)
+    if let WinSock::SOCKET_ERROR = unsafe {
+        let mut non_blocking = true as u32;
+        WinSock::ioctlsocket(sock, WinSock::FIONBIO, &mut non_blocking)
+    } {
+        let _ = unsafe { WinSock::closesocket(sock) };
+        return Err(last_socket_error());
+    }
+    Ok(unsafe { OwnedSocket::new(sock) })
 }
 
-/// Binds socket to specified address.
-pub fn bind<SA>(socket: &OwnedFd, sa: SA) -> Result<()>
+// Binds socket to specified address.
+pub fn bind<SA>(socket: &OwnedSocket, sa: SA) -> io::Result<()>
 where
     SA: SysSockAddr,
 {
     let addr: SA::SysSockAddr = sa.into_sys_sock_addr();
-    if unsafe {
-        libc::bind(
-            socket.as_raw_fd(),
-            &addr as *const _ as *const sockaddr,
-            size_of::<SA::SysSockAddr>() as socklen_t,
+    match unsafe {
+        WinSock::bind(
+            socket.as_raw_socket(),
+            &addr as *const _ as *const WinSock::SOCKADDR,
+            size_of::<SA::SysSockAddr>() as i32,
         )
-    } == 0
-    {
-        Ok(())
-    } else {
-        Err(Error::last_os_error())
+    } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => Ok(()),
     }
 }
 
-/// Gets the address the socket is bound to.
-pub fn getsockname<SA>(socket: &OwnedFd) -> Result<SA>
+// Gets the address the socket is bound to.
+pub fn getsockname<SA>(socket: &OwnedSocket) -> io::Result<SA>
 where
     SA: SysSockAddr,
 {
-    let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
-    let mut length = size_of::<SA::SysSockAddr>() as socklen_t;
-
-    if unsafe {
-        libc::getsockname(
-            socket.as_raw_fd(),
-            saddr.as_mut_ptr() as *mut _,
+    let mut addr_stub: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
+    let mut length = size_of::<SA::SysSockAddr>() as i32;
+    match unsafe {
+        WinSock::getsockname(
+            socket.as_raw_socket(),
+            // FIXME: should we change this to `as *mut _ as *mut WinSock::SOCKADDR`?
+            // https://github.com/daniel5151/spotify-car-thing-bt/blob/dde2595ae39add1573455f36e23d6fc9e34c15f5/carthing_server/src/sys/win.rs#L49
+            addr_stub.as_mut_ptr() as *mut _,
             &mut length,
         )
-    } == -1
-    {
-        return Err(Error::last_os_error());
-    };
-
-    if length != size_of::<SA::SysSockAddr>() as socklen_t {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "invalid sockaddr length from getsockname",
-        ));
+    } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => {
+            if length != size_of::<SA::SysSockAddr>() as i32 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "invalid sockaddr length from getsockname",
+                ));
+            }
+            let sys_addr = unsafe { addr_stub.assume_init() };
+            SA::try_from_sys_sock_addr(sys_addr)
+        }
     }
-    let saddr = unsafe { saddr.assume_init() };
-    SA::try_from_sys_sock_addr(saddr)
 }
 
-/// Gets the address the socket is connected to.
-pub fn getpeername<SA>(socket: &OwnedFd) -> Result<SA>
+// Gets the address the socket is connected to.
+pub fn getpeername<SA>(socket: &OwnedSocket) -> io::Result<SA>
 where
     SA: SysSockAddr,
 {
-    let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
-    let mut length = size_of::<SA::SysSockAddr>() as socklen_t;
-
+    let mut addr_stub: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
+    let mut length = size_of::<SA::SysSockAddr>() as i32;
     if unsafe {
-        libc::getpeername(
-            socket.as_raw_fd(),
-            saddr.as_mut_ptr() as *mut _,
+        WinSock::getpeername(
+            socket.as_raw_socket(),
+            addr_stub.as_mut_ptr() as *mut _,
             &mut length,
         )
     } == -1
@@ -211,12 +224,12 @@ where
             "invalid sockaddr length from getpeername",
         ));
     }
-    let saddr = unsafe { saddr.assume_init() };
+    let saddr = unsafe { addr_stub.assume_init() };
     SA::try_from_sys_sock_addr(saddr)
 }
 
-/// Puts socket in listen mode.
-pub fn listen(socket: &OwnedFd, backlog: i32) -> Result<()> {
+// Puts socket in listen mode.
+pub fn listen(socket: &OwnedSocket, backlog: i32) -> Result<()> {
     if unsafe { libc::listen(socket.as_raw_fd(), backlog) } == 0 {
         Ok(())
     } else {
@@ -224,10 +237,10 @@ pub fn listen(socket: &OwnedFd, backlog: i32) -> Result<()> {
     }
 }
 
-/// Accept a connection on the provided socket.
-///
-/// The accepted socket is set into non-blocking mode.
-pub fn accept<SA>(socket: &OwnedFd) -> Result<(OwnedFd, SA)>
+// Accept a connection on the provided socket.
+//
+// The accepted socket is set into non-blocking mode.
+pub fn accept<SA>(socket: &OwnedSocket) -> Result<(OwnedSocket, SA)>
 where
     SA: SysSockAddr,
 {
@@ -243,7 +256,7 @@ where
         )
     } {
         -1 => return Err(Error::last_os_error()),
-        fd => unsafe { OwnedFd::new(fd) },
+        fd => unsafe { OwnedSocket::new(fd) },
     };
 
     if length != size_of::<SA::SysSockAddr>() as socklen_t {
@@ -258,8 +271,8 @@ where
     Ok((fd, sa))
 }
 
-/// Initiate a connection on a socket to the specified address.
-pub fn connect<SA>(socket: &OwnedFd, sa: SA) -> Result<()>
+// Initiate a connection on a socket to the specified address.
+pub fn connect<SA>(socket: &OwnedSocket, sa: SA) -> Result<()>
 where
     SA: SysSockAddr,
 {
@@ -278,8 +291,8 @@ where
     }
 }
 
-/// Sends from buffer into socket.
-pub fn send(socket: &OwnedFd, buf: &[u8], flags: c_int) -> Result<usize> {
+// Sends from buffer into socket.
+pub fn send(socket: &OwnedSocket, buf: &[u8], flags: c_int) -> Result<usize> {
     match unsafe {
         libc::send(
             socket.as_raw_fd(),
@@ -293,8 +306,8 @@ pub fn send(socket: &OwnedFd, buf: &[u8], flags: c_int) -> Result<usize> {
     }
 }
 
-/// Sends from buffer into socket using destination address.
-pub fn sendto<SA>(socket: &OwnedFd, buf: &[u8], flags: c_int, sa: SA) -> Result<usize>
+// Sends from buffer into socket using destination address.
+pub fn sendto<SA>(socket: &OwnedSocket, buf: &[u8], flags: c_int, sa: SA) -> Result<usize>
 where
     SA: SysSockAddr,
 {
@@ -314,8 +327,8 @@ where
     }
 }
 
-/// Receive from socket into buffer.
-pub fn recv(socket: &OwnedFd, buf: &mut ReadBuf, flags: c_int) -> Result<usize> {
+// Receive from socket into buffer.
+pub fn recv(socket: &OwnedSocket, buf: &mut ReadBuf, flags: c_int) -> Result<usize> {
     let unfilled = unsafe { buf.unfilled_mut() };
     match unsafe {
         libc::recv(
@@ -337,8 +350,8 @@ pub fn recv(socket: &OwnedFd, buf: &mut ReadBuf, flags: c_int) -> Result<usize> 
     }
 }
 
-/// Receive from socket into buffer with source address.
-pub fn recvfrom<SA>(socket: &OwnedFd, buf: &mut ReadBuf, flags: c_int) -> Result<(usize, SA)>
+// Receive from socket into buffer with source address.
+pub fn recvfrom<SA>(socket: &OwnedSocket, buf: &mut ReadBuf, flags: c_int) -> Result<(usize, SA)>
 where
     SA: SysSockAddr,
 {
@@ -377,8 +390,8 @@ where
     }
 }
 
-/// Shut down part of a socket.
-pub fn shutdown(socket: &OwnedFd, how: c_int) -> Result<()> {
+// Shut down part of a socket.
+pub fn shutdown(socket: &OwnedSocket, how: c_int) -> Result<()> {
     if unsafe { libc::shutdown(socket.as_raw_fd(), how) } == 0 {
         Ok(())
     } else {
@@ -386,8 +399,8 @@ pub fn shutdown(socket: &OwnedFd, how: c_int) -> Result<()> {
     }
 }
 
-/// Get socket option.
-pub fn getsockopt<T>(socket: &OwnedFd, level: c_int, optname: c_int) -> Result<T> {
+// Get socket option.
+pub fn getsockopt<T>(socket: &OwnedSocket, level: c_int, optname: c_int) -> Result<T> {
     let mut optval: MaybeUninit<T> = MaybeUninit::uninit();
     let mut optlen: socklen_t = size_of::<T>() as _;
     if unsafe {
@@ -409,8 +422,8 @@ pub fn getsockopt<T>(socket: &OwnedFd, level: c_int, optname: c_int) -> Result<T
     Ok(optval)
 }
 
-/// Set socket option.
-pub fn setsockopt<T>(socket: &OwnedFd, level: c_int, optname: i32, optval: &T) -> Result<()> {
+// Set socket option.
+pub fn setsockopt<T>(socket: &OwnedSocket, level: c_int, optname: i32, optval: &T) -> Result<()> {
     let optlen: socklen_t = size_of::<T>() as _;
     if unsafe {
         libc::setsockopt(
@@ -427,8 +440,8 @@ pub fn setsockopt<T>(socket: &OwnedFd, level: c_int, optname: i32, optval: &T) -
     Ok(())
 }
 
-/// Perform an IOCTL that reads a single value.
-pub fn ioctl_read<T>(socket: &OwnedFd, request: Ioctl) -> Result<T> {
+// Perform an IOCTL that reads a single value.
+pub fn ioctl_read<T>(socket: &OwnedSocket, request: Ioctl) -> Result<T> {
     let mut value: MaybeUninit<T> = MaybeUninit::uninit();
     let ret = unsafe { libc::ioctl(socket.as_raw_fd(), request, value.as_mut_ptr()) };
     if ret == -1 {
@@ -438,9 +451,9 @@ pub fn ioctl_read<T>(socket: &OwnedFd, request: Ioctl) -> Result<T> {
     Ok(value)
 }
 
-/// Perform an IOCTL that writes a single value.
+// Perform an IOCTL that writes a single value.
 #[allow(dead_code)]
-pub fn ioctl_write<T>(socket: &OwnedFd, request: Ioctl, value: &T) -> Result<c_int> {
+pub fn ioctl_write<T>(socket: &OwnedSocket, request: Ioctl, value: &T) -> Result<c_int> {
     let ret = unsafe { libc::ioctl(socket.as_raw_fd(), request, value as *const _) };
     if ret == -1 {
         return Err(Error::last_os_error());
@@ -448,7 +461,7 @@ pub fn ioctl_write<T>(socket: &OwnedFd, request: Ioctl, value: &T) -> Result<c_i
     Ok(ret)
 }
 
-/// Private socket implementation functions.
+// Private socket implementation functions.
 macro_rules! sock_priv {
     () => {
         async fn accept_priv(&self) -> Result<(Self, SocketAddr)> {

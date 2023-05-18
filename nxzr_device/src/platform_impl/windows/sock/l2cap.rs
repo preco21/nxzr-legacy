@@ -16,7 +16,7 @@ use super::{
         BT_SECURITY_FIPS, BT_SECURITY_HIGH, BT_SECURITY_LOW, BT_SECURITY_MEDIUM, BT_SECURITY_SDP,
         BT_SNDMTU, L2CAP_CONNINFO, L2CAP_LM, L2CAP_OPTIONS, SOL_L2CAP,
     },
-    AddressType, OwnedFd,
+    AddressType, OwnedSocket,
 };
 use crate::Address;
 use libc::{
@@ -247,7 +247,7 @@ pub enum FlowControl {
 ///
 /// The primary use of this is to configure the socket before connecting or listening.
 pub struct Socket<Type> {
-    fd: AsyncFd<OwnedFd>,
+    fd: AsyncFd<OwnedSocket>,
     _type: PhantomData<Type>,
 }
 
@@ -458,12 +458,12 @@ impl<Type> Socket<Type> {
     /// If the passed file descriptor is invalid, undefined behavior may occur.
     pub unsafe fn from_raw_fd(fd: RawFd) -> Result<Self> {
         Ok(Self {
-            fd: AsyncFd::new(OwnedFd::new(fd))?,
+            fd: AsyncFd::new(OwnedSocket::new(fd))?,
             _type: PhantomData,
         })
     }
 
-    fn from_owned_fd(fd: OwnedFd) -> Result<Self> {
+    fn from_owned_fd(fd: OwnedSocket) -> Result<Self> {
         Ok(Self {
             fd: AsyncFd::new(fd)?,
             _type: PhantomData,
@@ -818,10 +818,6 @@ impl AsyncWrite for Stream {
     }
 }
 
-#[allow(clippy::duplicate_mod)]
-#[path = "stream_util.rs"]
-pub mod stream;
-
 /// An L2CAP socket server, listening for [SeqPacket] connections.
 #[derive(Debug)]
 pub struct SeqPacketListener {
@@ -916,7 +912,7 @@ impl SeqPacket {
         // Resetting socket option `SO_SNDBUF` to `0` let the OS to set the
         // value to its default like `4608`.
         // Ref: https://www.ibm.com/docs/en/ztpf/1.1.0.15?topic=apis-setsockopt-set-options-associated-socket
-        let owned_fd = unsafe { OwnedFd::new(self.socket.as_raw_fd()) };
+        let owned_fd = unsafe { OwnedSocket::new(self.socket.as_raw_fd()) };
         sock::setsockopt(&owned_fd, SOL_SOCKET, SO_SNDBUF, &0)
     }
 

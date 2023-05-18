@@ -4,10 +4,6 @@ use super::{
     sys::{hci_filter, sockaddr_hci, BTPROTO_HCI, HCI_FILTER, SOL_HCI},
     OwnedFd,
 };
-use libc::{
-    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
-    SOCK_RAW, SOL_SOCKET, SO_ERROR, SO_RCVBUF, TIOCINQ, TIOCOUTQ,
-};
 use std::{
     fmt,
     io::{Error, ErrorKind, Result},
