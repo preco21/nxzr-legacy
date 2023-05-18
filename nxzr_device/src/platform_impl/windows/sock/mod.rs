@@ -247,13 +247,12 @@ pub fn accept<SA>(socket: &OwnedSocket) -> io::Result<(OwnedSocket, SA)>
 where
     SA: SysSockAddr,
 {
-    let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
+    let mut addr_stub: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
     let mut length = size_of::<SA::SysSockAddr>() as i32;
-
     let fd = match unsafe {
         libc::accept4(
             socket.as_raw_fd(),
-            saddr.as_mut_ptr() as *mut _,
+            addr_stub.as_mut_ptr() as *mut _,
             &mut length,
             SOCK_CLOEXEC | SOCK_NONBLOCK,
         )
@@ -261,15 +260,14 @@ where
         -1 => return Err(Error::last_os_error()),
         fd => unsafe { OwnedSocket::new(fd) },
     };
-
     if length != size_of::<SA::SysSockAddr>() as i32 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             "invalid sockaddr length",
         ));
     }
-    let saddr = unsafe { saddr.assume_init() };
-    let sa = SA::try_from_sys_sock_addr(saddr)?;
+    let sys_addr = unsafe { addr_stub.assume_init() };
+    let sa = SA::try_from_sys_sock_addr(sys_addr)?;
 
     Ok((fd, sa))
 }
