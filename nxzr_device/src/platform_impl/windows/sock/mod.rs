@@ -180,8 +180,6 @@ where
     match unsafe {
         WinSock::getsockname(
             socket.as_raw_socket(),
-            // FIXME: should we change this to `as *mut _ as *mut WinSock::SOCKADDR`?
-            // https://github.com/daniel5151/spotify-car-thing-bt/blob/dde2595ae39add1573455f36e23d6fc9e34c15f5/carthing_server/src/sys/win.rs#L49
             addr_stub.as_mut_ptr() as *mut _,
             &mut length,
         )
