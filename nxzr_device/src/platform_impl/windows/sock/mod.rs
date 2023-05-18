@@ -21,7 +21,10 @@ use std::{
 };
 use strum::{Display, EnumString};
 use tokio::io::ReadBuf;
-use windows::Win32::Networking::WinSock::{self, SOCKADDR};
+use windows::Win32::{
+    Foundation,
+    Networking::WinSock::{self, SOCKADDR},
+};
 
 pub mod hci;
 pub mod l2cap;
@@ -139,15 +142,18 @@ pub fn last_socket_error() -> io::Error {
 // The socket is set to non-blocking mode.
 pub fn socket(af: i32, ty: WinSock::WINSOCK_SOCKET_TYPE, proto: i32) -> io::Result<OwnedSocket> {
     let sock = match unsafe { WinSock::socket(af, ty, proto) } {
-        WinSock::SOCKET_ERROR => return Err(last_socket_error()),
+        WinSock::INVALID_SOCKET => return Err(last_socket_error()),
         sock => sock,
     };
-    if let WinSock::SOCKET_ERROR = unsafe {
+    match unsafe {
         let mut non_blocking = true as u32;
         WinSock::ioctlsocket(sock, WinSock::FIONBIO, &mut non_blocking)
     } {
-        let _ = unsafe { WinSock::closesocket(sock) };
-        return Err(last_socket_error());
+        Foundation::NO_ERROR => {}
+        _ => {
+            let _ = unsafe { WinSock::closesocket(sock) };
+            return Err(last_socket_error());
+        }
     }
     Ok(unsafe { OwnedSocket::new(sock) })
 }
@@ -205,45 +211,44 @@ where
 {
     let mut addr_stub: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
     let mut length = size_of::<SA::SysSockAddr>() as i32;
-    if unsafe {
+    match unsafe {
         WinSock::getpeername(
             socket.as_raw_socket(),
             addr_stub.as_mut_ptr() as *mut _,
             &mut length,
         )
-    } == -1
-    {
-        return Err(Error::last_os_error());
-    };
-
-    if length != size_of::<SA::SysSockAddr>() as socklen_t {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "invalid sockaddr length from getpeername",
-        ));
+    } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => {
+            if length != size_of::<SA::SysSockAddr>() as i32 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "invalid sockaddr length from getpeername",
+                ));
+            }
+            let sys_addr = unsafe { addr_stub.assume_init() };
+            SA::try_from_sys_sock_addr(sys_addr)
+        }
     }
-    let saddr = unsafe { addr_stub.assume_init() };
-    SA::try_from_sys_sock_addr(saddr)
 }
 
 // Puts socket in listen mode.
-pub fn listen(socket: &OwnedSocket, backlog: i32) -> Result<()> {
-    if unsafe { libc::listen(socket.as_raw_fd(), backlog) } == 0 {
-        Ok(())
-    } else {
-        Err(Error::last_os_error())
+pub fn listen(socket: &OwnedSocket, backlog: i32) -> io::Result<()> {
+    match unsafe { WinSock::listen(socket.as_raw_socket(), backlog) } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => Ok(()),
     }
 }
 
 // Accept a connection on the provided socket.
 //
 // The accepted socket is set into non-blocking mode.
-pub fn accept<SA>(socket: &OwnedSocket) -> Result<(OwnedSocket, SA)>
+pub fn accept<SA>(socket: &OwnedSocket) -> io::Result<(OwnedSocket, SA)>
 where
     SA: SysSockAddr,
 {
     let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
-    let mut length = size_of::<SA::SysSockAddr>() as socklen_t;
+    let mut length = size_of::<SA::SysSockAddr>() as i32;
 
     let fd = match unsafe {
         libc::accept4(
@@ -257,7 +262,7 @@ where
         fd => unsafe { OwnedSocket::new(fd) },
     };
 
-    if length != size_of::<SA::SysSockAddr>() as socklen_t {
+    if length != size_of::<SA::SysSockAddr>() as i32 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             "invalid sockaddr length",
