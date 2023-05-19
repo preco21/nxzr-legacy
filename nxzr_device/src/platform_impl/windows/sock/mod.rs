@@ -9,22 +9,14 @@
 
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/sock.rs
 //! System socket base.
-use crate::Address;
 use std::{
     fmt::Debug,
     io,
     mem::{size_of, MaybeUninit},
-    os::windows::{
-        prelude::{AsRawHandle, AsRawSocket, IntoRawSocket, RawSocket},
-        raw::SOCKET,
-    },
+    os::windows::prelude::{AsRawSocket, IntoRawSocket, RawSocket},
 };
-use strum::{Display, EnumString};
 use tokio::io::ReadBuf;
-use windows::Win32::{
-    Foundation,
-    Networking::WinSock::{self, SOCKADDR},
-};
+use windows::Win32::Networking::WinSock;
 
 pub mod hci;
 pub mod l2cap;
@@ -122,14 +114,22 @@ pub trait SysSockAddr: Sized {
 // Initializes Windows socket interface.
 //
 // This function must be called before use of any other Windows socket operations.
-pub fn init_winsock() -> i32 {
+pub fn init_winsock() -> io::Result<()> {
     let wsa_data = Box::into_raw(Box::default());
-    unsafe { WinSock::WSAStartup(0x0202, wsa_data) }
+    match unsafe { WinSock::WSAStartup(0x0202, wsa_data) } {
+        0 => Ok(()),
+        // WSAStartup function returns corresponding error code directly, so no need to call [last_socket_error()].
+        // https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsastartup#return-value
+        code => Err(io::Error::from_raw_os_error(code)),
+    }
 }
 
 // Teardown Windows socket interface.
-pub fn terminate_winsock() -> i32 {
-    unsafe { WinSock::WSACleanup() }
+pub fn terminate_winsock() -> io::Result<()> {
+    match unsafe { WinSock::WSACleanup() } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => Ok(()),
+    }
 }
 
 // Returns the last error from the Windows socket interface.
@@ -149,13 +149,12 @@ pub fn socket(af: i32, ty: WinSock::WINSOCK_SOCKET_TYPE, proto: i32) -> io::Resu
         let mut non_blocking = true as u32;
         WinSock::ioctlsocket(sock, WinSock::FIONBIO, &mut non_blocking)
     } {
-        Foundation::NO_ERROR => {}
-        _ => {
+        WinSock::SOCKET_ERROR => {
             let _ = unsafe { WinSock::closesocket(sock) };
-            return Err(last_socket_error());
+            Err(last_socket_error())
         }
+        _ => Ok(unsafe { OwnedSocket::new(sock) }),
     }
-    Ok(unsafe { OwnedSocket::new(sock) })
 }
 
 // Binds socket to specified address.
@@ -181,12 +180,12 @@ pub fn getsockname<SA>(socket: &OwnedSocket) -> io::Result<SA>
 where
     SA: SysSockAddr,
 {
-    let mut addr_stub: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
+    let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
     let mut length = size_of::<SA::SysSockAddr>() as i32;
     match unsafe {
         WinSock::getsockname(
             socket.as_raw_socket(),
-            addr_stub.as_mut_ptr() as *mut _,
+            saddr.as_mut_ptr() as *mut _,
             &mut length,
         )
     } {
@@ -198,7 +197,7 @@ where
                     "invalid sockaddr length from getsockname",
                 ));
             }
-            let sys_addr = unsafe { addr_stub.assume_init() };
+            let sys_addr = unsafe { saddr.assume_init() };
             SA::try_from_sys_sock_addr(sys_addr)
         }
     }
@@ -209,12 +208,12 @@ pub fn getpeername<SA>(socket: &OwnedSocket) -> io::Result<SA>
 where
     SA: SysSockAddr,
 {
-    let mut addr_stub: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
+    let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
     let mut length = size_of::<SA::SysSockAddr>() as i32;
     match unsafe {
         WinSock::getpeername(
             socket.as_raw_socket(),
-            addr_stub.as_mut_ptr() as *mut _,
+            saddr.as_mut_ptr() as *mut _,
             &mut length,
         )
     } {
@@ -226,7 +225,7 @@ where
                     "invalid sockaddr length from getpeername",
                 ));
             }
-            let sys_addr = unsafe { addr_stub.assume_init() };
+            let sys_addr = unsafe { saddr.assume_init() };
             SA::try_from_sys_sock_addr(sys_addr)
         }
     }
@@ -247,99 +246,100 @@ pub fn accept<SA>(socket: &OwnedSocket) -> io::Result<(OwnedSocket, SA)>
 where
     SA: SysSockAddr,
 {
-    let mut addr_stub: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
+    let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
     let mut length = size_of::<SA::SysSockAddr>() as i32;
-    let fd = match unsafe {
-        libc::accept4(
-            socket.as_raw_fd(),
-            addr_stub.as_mut_ptr() as *mut _,
-            &mut length,
-            SOCK_CLOEXEC | SOCK_NONBLOCK,
+    let sock = match unsafe {
+        WinSock::accept(
+            socket.as_raw_socket(),
+            Some(saddr.as_mut_ptr() as *mut _),
+            Some(&mut length),
         )
     } {
-        -1 => return Err(Error::last_os_error()),
-        fd => unsafe { OwnedSocket::new(fd) },
+        WinSock::INVALID_SOCKET => return Err(last_socket_error()),
+        sock => sock,
+    };
+    let sock = match unsafe {
+        let mut non_blocking = true as u32;
+        WinSock::ioctlsocket(sock, WinSock::FIONBIO, &mut non_blocking)
+    } {
+        WinSock::SOCKET_ERROR => {
+            let _ = unsafe { WinSock::closesocket(sock) };
+            return Err(last_socket_error());
+        }
+        _ => sock,
     };
     if length != size_of::<SA::SysSockAddr>() as i32 {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
+        let _ = unsafe { WinSock::closesocket(sock) };
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
             "invalid sockaddr length",
         ));
     }
-    let sys_addr = unsafe { addr_stub.assume_init() };
+    let sys_addr = unsafe { saddr.assume_init() };
+    let sock = unsafe { OwnedSocket::new(sock) };
     let sa = SA::try_from_sys_sock_addr(sys_addr)?;
-
-    Ok((fd, sa))
+    Ok((sock, sa))
 }
 
 // Initiate a connection on a socket to the specified address.
-pub fn connect<SA>(socket: &OwnedSocket, sa: SA) -> Result<()>
+pub fn connect<SA>(socket: &OwnedSocket, sa: SA) -> io::Result<()>
 where
     SA: SysSockAddr,
 {
     let addr: SA::SysSockAddr = sa.into_sys_sock_addr();
-    if unsafe {
-        libc::connect(
-            socket.as_raw_fd(),
-            &addr as *const _ as *const sockaddr,
-            size_of::<SA::SysSockAddr>() as socklen_t,
+    match unsafe {
+        WinSock::connect(
+            socket.as_raw_socket(),
+            &addr as *const _ as *const WinSock::SOCKADDR,
+            size_of::<SA::SysSockAddr>() as i32,
         )
-    } == 0
-    {
-        Ok(())
-    } else {
-        Err(Error::last_os_error())
+    } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => Ok(()),
     }
 }
 
 // Sends from buffer into socket.
-pub fn send(socket: &OwnedSocket, buf: &[u8], flags: c_int) -> Result<usize> {
-    match unsafe {
-        libc::send(
-            socket.as_raw_fd(),
-            buf.as_ptr() as *const _,
-            buf.len(),
-            flags,
-        )
-    } {
-        -1 => Err(Error::last_os_error()),
+pub fn send(
+    socket: &OwnedSocket,
+    buf: &[u8],
+    flags: WinSock::SEND_RECV_FLAGS,
+) -> io::Result<usize> {
+    match unsafe { WinSock::send(socket.as_raw_socket(), buf, flags) } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
         n => Ok(n as _),
     }
 }
 
 // Sends from buffer into socket using destination address.
-pub fn sendto<SA>(socket: &OwnedSocket, buf: &[u8], flags: c_int, sa: SA) -> Result<usize>
+pub fn sendto<SA>(socket: &OwnedSocket, buf: &[u8], flags: i32, sa: SA) -> io::Result<usize>
 where
     SA: SysSockAddr,
 {
     let addr: SA::SysSockAddr = sa.into_sys_sock_addr();
     match unsafe {
-        libc::sendto(
-            socket.as_raw_fd(),
-            buf.as_ptr() as *const _,
-            buf.len(),
+        WinSock::sendto(
+            socket.as_raw_socket(),
+            buf,
             flags,
-            &addr as *const _ as *const sockaddr,
-            size_of::<SA::SysSockAddr>() as socklen_t,
+            &addr as *const _ as *const WinSock::SOCKADDR,
+            size_of::<SA::SysSockAddr>() as i32,
         )
     } {
-        -1 => Err(Error::last_os_error()),
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
         n => Ok(n as _),
     }
 }
 
 // Receive from socket into buffer.
-pub fn recv(socket: &OwnedSocket, buf: &mut ReadBuf, flags: c_int) -> Result<usize> {
+pub fn recv(
+    socket: &OwnedSocket,
+    buf: &mut ReadBuf,
+    flags: WinSock::SEND_RECV_FLAGS,
+) -> io::Result<usize> {
     let unfilled = unsafe { buf.unfilled_mut() };
-    match unsafe {
-        libc::recv(
-            socket.as_raw_fd(),
-            unfilled.as_mut_ptr() as *mut _,
-            unfilled.len(),
-            flags,
-        )
-    } {
-        -1 => Err(Error::last_os_error()),
+    match unsafe { WinSock::recv(socket.as_raw_socket(), unfilled, flags) } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
         n => {
             let n = n as usize;
             unsafe {
@@ -352,114 +352,102 @@ pub fn recv(socket: &OwnedSocket, buf: &mut ReadBuf, flags: c_int) -> Result<usi
 }
 
 // Receive from socket into buffer with source address.
-pub fn recvfrom<SA>(socket: &OwnedSocket, buf: &mut ReadBuf, flags: c_int) -> Result<(usize, SA)>
+pub fn recvfrom<SA>(socket: &OwnedSocket, buf: &mut ReadBuf, flags: i32) -> io::Result<(usize, SA)>
 where
     SA: SysSockAddr,
 {
     let unfilled = unsafe { buf.unfilled_mut() };
     let mut saddr: MaybeUninit<SA::SysSockAddr> = MaybeUninit::uninit();
-    let mut length = size_of::<SA::SysSockAddr>() as socklen_t;
+    let mut length = size_of::<SA::SysSockAddr>() as i32;
     match unsafe {
-        libc::recvfrom(
-            socket.as_raw_fd(),
-            unfilled.as_mut_ptr() as *mut _,
-            unfilled.len(),
+        WinSock::recvfrom(
+            socket.as_raw_socket(),
+            unfilled,
             flags,
-            saddr.as_mut_ptr() as *mut _,
+            Some(saddr.as_mut_ptr() as *mut _),
             &mut length,
         )
     } {
-        -1 => Err(Error::last_os_error()),
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
         n => {
             let n = n as usize;
             unsafe {
                 buf.assume_init(n);
             }
             buf.advance(n);
-
-            if length != size_of::<SA::SysSockAddr>() as socklen_t {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
+            if length != size_of::<SA::SysSockAddr>() as i32 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
                     "invalid sockaddr length",
                 ));
             }
             let saddr = unsafe { saddr.assume_init() };
             let sa = SA::try_from_sys_sock_addr(saddr)?;
-
             Ok((n, sa))
         }
     }
 }
 
 // Shut down part of a socket.
-pub fn shutdown(socket: &OwnedSocket, how: c_int) -> Result<()> {
-    if unsafe { libc::shutdown(socket.as_raw_fd(), how) } == 0 {
-        Ok(())
-    } else {
-        Err(Error::last_os_error())
+pub fn shutdown(socket: &OwnedSocket, how: WinSock::WINSOCK_SHUTDOWN_HOW) -> io::Result<()> {
+    match unsafe { WinSock::shutdown(socket.as_raw_socket(), how) } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => Ok(()),
     }
 }
 
 // Get socket option.
-pub fn getsockopt<T>(socket: &OwnedSocket, level: c_int, optname: c_int) -> Result<T> {
+pub fn getsockopt<T>(socket: &OwnedSocket, level: i32, optname: i32) -> io::Result<T> {
     let mut optval: MaybeUninit<T> = MaybeUninit::uninit();
-    let mut optlen: socklen_t = size_of::<T>() as _;
-    if unsafe {
-        libc::getsockopt(
-            socket.as_raw_fd(),
+    let mut optlen: i32 = size_of::<T>() as _;
+    match unsafe {
+        WinSock::getsockopt(
+            socket.as_raw_socket(),
             level,
             optname,
-            optval.as_mut_ptr() as *mut _,
+            windows::core::PSTR::from_raw(optval.as_mut_ptr() as *mut _),
             &mut optlen,
         )
-    } == -1
-    {
-        return Err(Error::last_os_error());
+    } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => {
+            if optlen != size_of::<T>() as _ {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid size"));
+            }
+            let optval = unsafe { optval.assume_init() };
+            Ok(optval)
+        }
     }
-    if optlen != size_of::<T>() as _ {
-        return Err(Error::new(ErrorKind::InvalidInput, "invalid size"));
-    }
-    let optval = unsafe { optval.assume_init() };
-    Ok(optval)
 }
 
 // Set socket option.
-pub fn setsockopt<T>(socket: &OwnedSocket, level: c_int, optname: i32, optval: &T) -> Result<()> {
-    let optlen: socklen_t = size_of::<T>() as _;
-    if unsafe {
-        libc::setsockopt(
-            socket.as_raw_fd(),
-            level,
-            optname,
-            optval as *const _ as *const _,
-            optlen,
-        )
-    } == -1
-    {
-        return Err(Error::last_os_error());
+pub fn setsockopt<T>(socket: &OwnedSocket, level: i32, optname: i32, optval: &T) -> io::Result<()> {
+    let optlen: i32 = size_of::<T>() as _;
+    match unsafe { WinSock::setsockopt(socket.as_raw_socket(), level, optname, Some(optval)) } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => Ok(()),
     }
-    Ok(())
 }
 
 // Perform an IOCTL that reads a single value.
-pub fn ioctl_read<T>(socket: &OwnedSocket, request: Ioctl) -> Result<T> {
+pub fn ioctl_read<T>(socket: &OwnedSocket, cmd: i32) -> io::Result<T> {
     let mut value: MaybeUninit<T> = MaybeUninit::uninit();
-    let ret = unsafe { libc::ioctl(socket.as_raw_fd(), request, value.as_mut_ptr()) };
-    if ret == -1 {
-        return Err(Error::last_os_error());
+    match unsafe { WinSock::ioctlsocket(socket.as_raw_socket(), cmd, value.as_mut_ptr()) } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        _ => {
+            let value = unsafe { value.assume_init() };
+            Ok(value)
+        }
     }
-    let value = unsafe { value.assume_init() };
-    Ok(value)
 }
 
 // Perform an IOCTL that writes a single value.
 #[allow(dead_code)]
-pub fn ioctl_write<T>(socket: &OwnedSocket, request: Ioctl, value: &T) -> Result<c_int> {
-    let ret = unsafe { libc::ioctl(socket.as_raw_fd(), request, value as *const _) };
-    if ret == -1 {
-        return Err(Error::last_os_error());
+pub fn ioctl_write<T>(socket: &OwnedSocket, cmd: i32, value: &T) -> io::Result<i32> {
+    match unsafe { WinSock::ioctlsocket(socket.as_raw_socket(), cmd, value as *mut _) } {
+        WinSock::SOCKET_ERROR => Err(last_socket_error()),
+        ret => Ok(ret),
     }
-    Ok(ret)
 }
 
 // Private socket implementation functions.
