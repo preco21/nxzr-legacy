@@ -365,7 +365,7 @@ where
             unfilled,
             flags,
             Some(saddr.as_mut_ptr() as *mut _),
-            &mut length,
+            Some(&mut length),
         )
     } {
         WinSock::SOCKET_ERROR => Err(last_socket_error()),
@@ -432,7 +432,8 @@ pub fn setsockopt<T>(socket: &OwnedSocket, level: i32, optname: i32, optval: &T)
 // Perform an IOCTL that reads a single value.
 pub fn ioctl_read<T>(socket: &OwnedSocket, cmd: i32) -> io::Result<T> {
     let mut value: MaybeUninit<T> = MaybeUninit::uninit();
-    match unsafe { WinSock::ioctlsocket(socket.as_raw_socket(), cmd, value.as_mut_ptr()) } {
+    match unsafe { WinSock::ioctlsocket(socket.as_raw_socket(), cmd, value.as_mut_ptr() as *mut _) }
+    {
         WinSock::SOCKET_ERROR => Err(last_socket_error()),
         _ => {
             let value = unsafe { value.assume_init() };
