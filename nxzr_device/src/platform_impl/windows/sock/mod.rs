@@ -16,7 +16,7 @@ use std::{
     os::windows::prelude::{AsRawSocket, IntoRawSocket, RawSocket},
 };
 use tokio::io::ReadBuf;
-use windows::Win32::Networking::WinSock;
+use windows_sys::Win32::Networking::WinSock;
 
 pub mod hci;
 pub mod l2cap;
@@ -251,8 +251,8 @@ where
     let sock = match unsafe {
         WinSock::accept(
             socket.as_raw_socket(),
-            Some(saddr.as_mut_ptr() as *mut _),
-            Some(&mut length),
+            saddr.as_mut_ptr() as *mut _,
+            &mut length,
         )
     } {
         WinSock::INVALID_SOCKET => return Err(last_socket_error()),
@@ -305,7 +305,14 @@ pub fn send(
     buf: &[u8],
     flags: WinSock::SEND_RECV_FLAGS,
 ) -> io::Result<usize> {
-    match unsafe { WinSock::send(socket.as_raw_socket(), buf, flags) } {
+    match unsafe {
+        WinSock::send(
+            socket.as_raw_socket(),
+            buf.as_ptr() as *const _,
+            buf.len(),
+            flags,
+        )
+    } {
         WinSock::SOCKET_ERROR => Err(last_socket_error()),
         n => Ok(n as _),
     }
@@ -320,7 +327,8 @@ where
     match unsafe {
         WinSock::sendto(
             socket.as_raw_socket(),
-            buf,
+            buf.as_ptr() as *const _,
+            buf.len(),
             flags,
             &addr as *const _ as *const WinSock::SOCKADDR,
             size_of::<SA::SysSockAddr>() as i32,
@@ -338,7 +346,14 @@ pub fn recv(
     flags: WinSock::SEND_RECV_FLAGS,
 ) -> io::Result<usize> {
     let unfilled = unsafe { buf.unfilled_mut() };
-    match unsafe { WinSock::recv(socket.as_raw_socket(), unfilled, flags) } {
+    match unsafe {
+        WinSock::recv(
+            socket.as_raw_socket(),
+            unfilled.as_mut_ptr() as *mut _,
+            unfilled.len(),
+            flags,
+        )
+    } {
         WinSock::SOCKET_ERROR => Err(last_socket_error()),
         n => {
             let n = n as usize;
@@ -362,10 +377,11 @@ where
     match unsafe {
         WinSock::recvfrom(
             socket.as_raw_socket(),
-            unfilled,
+            unfilled.as_mut_ptr() as *mut _,
+            unfilled.len(),
             flags,
-            Some(saddr.as_mut_ptr() as *mut _),
-            Some(&mut length),
+            saddr.as_mut_ptr() as *mut _,
+            &mut length,
         )
     } {
         WinSock::SOCKET_ERROR => Err(last_socket_error()),
@@ -405,7 +421,7 @@ pub fn getsockopt<T>(socket: &OwnedSocket, level: i32, optname: i32) -> io::Resu
             socket.as_raw_socket(),
             level,
             optname,
-            windows::core::PSTR::from_raw(optval.as_mut_ptr() as *mut _),
+            optval.as_mut_ptr() as *mut _,
             &mut optlen,
         )
     } {
@@ -423,7 +439,15 @@ pub fn getsockopt<T>(socket: &OwnedSocket, level: i32, optname: i32) -> io::Resu
 // Set socket option.
 pub fn setsockopt<T>(socket: &OwnedSocket, level: i32, optname: i32, optval: &T) -> io::Result<()> {
     let optlen: i32 = size_of::<T>() as _;
-    match unsafe { WinSock::setsockopt(socket.as_raw_socket(), level, optname, Some(optval)) } {
+    match unsafe {
+        WinSock::setsockopt(
+            socket.as_raw_socket(),
+            level,
+            optname,
+            optval as *const _ as *const _,
+            optlen,
+        )
+    } {
         WinSock::SOCKET_ERROR => Err(last_socket_error()),
         _ => Ok(()),
     }
@@ -445,7 +469,7 @@ pub fn ioctl_read<T>(socket: &OwnedSocket, cmd: i32) -> io::Result<T> {
 // Perform an IOCTL that writes a single value.
 #[allow(dead_code)]
 pub fn ioctl_write<T>(socket: &OwnedSocket, cmd: i32, value: &T) -> io::Result<i32> {
-    match unsafe { WinSock::ioctlsocket(socket.as_raw_socket(), cmd, value as *mut _) } {
+    match unsafe { WinSock::ioctlsocket(socket.as_raw_socket(), cmd, value as *const _) } {
         WinSock::SOCKET_ERROR => Err(last_socket_error()),
         ret => Ok(ret),
     }
