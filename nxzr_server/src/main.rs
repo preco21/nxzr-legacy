@@ -9,7 +9,7 @@ use nxzr_device::{
     transport::{Transport, TransportConfig},
 };
 use std::{io::Write, sync::Arc};
-use termion::{event::Key, input::TermRead, raw::IntoRawMode};
+// use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 use tokio::{signal, sync::mpsc, task, time};
 
 #[tokio::main]
