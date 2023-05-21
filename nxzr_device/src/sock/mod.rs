@@ -68,7 +68,7 @@ impl From<Address> for sys::bdaddr_t {
     }
 }
 
-/// Interop [bluer::Address] with [crate::shared::Address].
+/// Interop [bluer::Address] with [crate::Address].
 impl From<bluer::Address> for Address {
     fn from(addr: bluer::Address) -> Self {
         addr.0.into()
