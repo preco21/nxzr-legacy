@@ -1,4 +1,4 @@
-use crate::system;
+use crate::{system, Address, Uuid};
 use std::{collections::HashSet, str::FromStr};
 use thiserror::Error;
 
@@ -131,15 +131,15 @@ impl Device {
             let mut addr_bytes: [u8; 6] = [0; 6];
             addr_bytes[..3].copy_from_slice(SWITCH_MAC_PREFIX);
             addr_bytes[3..].copy_from_slice(&addr[3..]);
-            let new_addr = bluer::Address::new(addr_bytes);
-            system::set_adapter_address(adapter_name.as_str(), new_addr.into()).await?;
+            let new_addr = Address::new(addr_bytes);
+            system::set_adapter_address(adapter_name.as_str(), new_addr).await?;
             // We need to re-instantiate device.
             drop(self);
             let new_self = Self::new(DeviceConfig {
                 id: Some(adapter_name.to_owned()),
             })
             .await?;
-            let cur_addr = new_self.address().await?;
+            let cur_addr: Address = new_self.address().await?.into();
             if cur_addr != new_addr {
                 tracing::error!(
                     "failed to change MAC address of Bluetooth adapter: current={:?} desired={:?}",
@@ -168,7 +168,7 @@ impl Device {
             if disconnect {
                 for dev in self.paired_devices().await? {
                     tracing::info!("unpairing device of address: {}", dev.address());
-                    self.unpair_device(dev.address()).await?;
+                    self.unpair_device(dev.address().into()).await?;
                 }
             } else {
                 let paired_addresses: Vec<String> = self
@@ -190,9 +190,9 @@ impl Device {
         self.adapter.name()
     }
 
-    pub async fn address(&self) -> Result<bluer::Address, DeviceError> {
+    pub async fn address(&self) -> Result<Address, DeviceError> {
         let addr = self.adapter.address().await?;
-        Ok(addr)
+        Ok(addr.into())
     }
 
     pub async fn paired_devices(&self) -> Result<Vec<bluer::Device>, DeviceError> {
@@ -236,8 +236,8 @@ impl Device {
         Ok(())
     }
 
-    pub async fn unpair_device(&self, address: bluer::Address) -> Result<(), DeviceError> {
-        self.adapter.remove_device(address).await?;
+    pub async fn unpair_device(&self, address: Address) -> Result<(), DeviceError> {
+        self.adapter.remove_device(address.into()).await?;
         Ok(())
     }
 
@@ -261,7 +261,7 @@ impl Device {
         Ok(())
     }
 
-    pub async fn uuids(&self) -> Result<Option<HashSet<bluer::Uuid>>, DeviceError> {
+    pub async fn uuids(&self) -> Result<Option<HashSet<Uuid>>, DeviceError> {
         let uuids = self.adapter.uuids().await?;
         Ok(uuids)
     }
