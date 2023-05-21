@@ -14,13 +14,19 @@ pub enum SysCheckError {
     DBusFailed(String),
     #[error("cli tool presence check failed: {0}")]
     CliToolFailed(String),
+    #[error("prepare failed")]
+    PrepareFailed,
 }
 
-pub async fn check_system_requirements() -> Result<(), SysCheckError> {
+pub async fn check_privileges() -> Result<(), SysCheckError> {
     // Check if the program has been run as root.
     if sudo::check() != sudo::RunningAs::Root {
         return Err(SysCheckError::RootPrivilegeRequired);
     }
+    Ok(())
+}
+
+pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     // Check if the Bluetooth service is active.
     if !systemctl::exists("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::BluetoothFailed(
@@ -32,30 +38,37 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
             "Bluetooth service is not active.".to_owned(),
         ));
     }
-    // FIXME: maybe this is not platform agnostic
-    // Check if the `dbus` service is active
+    // Check if the `dbus` service is active.
     if !systemctl::exists("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::DBusFailed(
-            "dbus service does not exist.".to_owned(),
+            "DBus service does not exist.".to_owned(),
         ));
     };
     if !systemctl::is_active("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
         return Err(SysCheckError::DBusFailed(
-            "dbus service is not active.".to_owned(),
+            "DBus service is not active.".to_owned(),
         ));
     }
-    // Check if `hciconfig` exists
+    // Check if `hciconfig` exists.
+    //
+    // This will be used to manipulate HCI settings like MAC address, device classes, etc...
     run_system_command({
         let mut cmd = Command::new("hciconfig");
-        cmd.args(&["--h"]);
+        cmd.args(&["-h"]);
         cmd
     })
     .await
     .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()))?;
-
-    // FIXME: check for bluetooth ctl?
-
-    // FIXME: maybe this is not platform agnostic
+    // Check if `bluetoothctl` exists.
+    run_system_command({
+        let mut cmd = Command::new("bluetoothctl");
+        cmd.args(&["-h"]);
+        cmd
+    })
+    .await
+    .map_err(|_| SysCheckError::CliToolFailed("bluetoothctl".to_owned()))?;
+    // FIXME: Maybe we do not need to change bdaddr
+    // Revisit for revise: https://github.com/thxomas/bdaddr
     // Check if `bdaddr` exists
     // helper::run_command({
     //     let mut cmd = Command::new("bdaddr");
@@ -67,7 +80,16 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     Ok(())
 }
 
-#[tracing::instrument(target = "helper")]
+pub async fn prepare_device() -> Result<(), SysCheckError> {
+    check_privileges().await?;
+    check_system_requirements().await?;
+    prepare_bluetooth_service()
+        .await
+        .map_err(|_| SysCheckError::PrepareFailed)?;
+    Ok(())
+}
+
+#[tracing::instrument(target = "system")]
 pub(crate) async fn set_adapter_address(
     adapter_name: &str,
     address: Address,
@@ -77,10 +99,9 @@ pub(crate) async fn set_adapter_address(
         adapter_name,
         address
     );
-    // Set Bluetooth adapter address by adapter name.
-    //
-    // The user will need to install `apt-get install bluez-utils`.
-    // FIXME: update to not use bdaddr
+    // FIXME: Maybe we do not need to change bdaddr
+    // Revisit for revise: https://github.com/thxomas/bdaddr
+    // Reset Bluetooth adapter address by adapter name.
     // run_command({
     //     let mut cmd = Command::new("bdaddr");
     //     cmd.args(&["-i", adapter_name, &address.to_string()]);
@@ -99,7 +120,7 @@ pub(crate) async fn set_adapter_address(
     Ok(())
 }
 
-#[tracing::instrument(target = "helper")]
+#[tracing::instrument(target = "system")]
 pub(crate) async fn set_device_class(
     adapter_name: &str,
     class: u32,
@@ -119,9 +140,23 @@ pub(crate) async fn set_device_class(
     Ok(class)
 }
 
-#[tracing::instrument(target = "helper")]
+#[tracing::instrument(target = "system")]
 pub fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
     systemctl::restart("bluetooth.service")?;
+    Ok(())
+}
+
+#[tracing::instrument(target = "system")]
+async fn prepare_bluetooth_service() -> Result<(), SystemCommandError> {
+    // Turn off bluetooth scanning.
+    //
+    // This may fail for unknown reason, in that case, just ignore it.
+    let _ = run_system_command({
+        let mut cmd = Command::new("bluetoothctl");
+        cmd.args(&["scan", "off"]);
+        cmd
+    })
+    .await;
     Ok(())
 }
 

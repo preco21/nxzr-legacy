@@ -85,7 +85,7 @@ pub struct Device {
 }
 
 impl Device {
-    #[tracing::instrument(target = "device_inner")]
+    #[tracing::instrument(target = "device")]
     pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
         let session = bluer::Session::new()
             .await
@@ -120,8 +120,8 @@ impl Device {
         Ok(Self { adapter, session })
     }
 
-    #[tracing::instrument(target = "device_inner")]
-    pub async fn ensure_adapter_address_switch(self) -> Result<Self, DeviceError> {
+    #[tracing::instrument(target = "device")]
+    pub async fn ensure_adapter_compatible_address(self) -> Result<Self, DeviceError> {
         tracing::info!(
             "attempting to change MAC address of Bluetooth adapter to target compatible one."
         );
@@ -157,7 +157,7 @@ impl Device {
         Ok(self)
     }
 
-    #[tracing::instrument(target = "device_inner")]
+    #[tracing::instrument(target = "device")]
     pub async fn check_paired_devices(&self, disconnect: bool) -> Result<(), DeviceError> {
         let Some(uuids) = self.uuids().await? else {
             return Ok(())

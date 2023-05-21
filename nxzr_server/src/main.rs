@@ -16,15 +16,12 @@ use tokio::{signal, sync::mpsc, task, time};
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    system::check_system_requirements().await?;
+    system::prepare_device().await?;
 
     let (shutdown_tx, _shutdown_rx) = mpsc::channel::<()>(1);
 
     // FIXME: accept device id here
-    let mut device = Device::new(DeviceConfig::default())
-        // .await?
-        // .ensure_adapter_address_switch()
-        .await?;
+    let mut device = Device::new(DeviceConfig::default()).await?;
 
     // FIXME: implement reconnect, currently connecting from scratch only supported
     device.check_paired_devices(true).await?;
