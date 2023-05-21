@@ -68,13 +68,13 @@ impl From<system::SystemCommandError> for DeviceError {
 
 #[derive(Debug, Default)]
 pub struct DeviceConfig {
-    // Name of Bluetooth adapter to use.
-    //
-    // In form of a raw string that matches the adapter name, which is
-    // generally represented in the hci* notation. (e.g. hci0, hci1, ...)
-    //
-    // If None, it will automatically choose the first one by sorting adapter
-    // names in lexicographic order.
+    /// Name of Bluetooth adapter to use.
+    ///
+    /// In form of a raw string that matches the adapter name, which is
+    /// generally represented in the hci* notation. (e.g. hci0, hci1, ...)
+    ///
+    /// If None, it will automatically choose the first one by sorting adapter
+    /// names in lexicographic order.
     pub id: Option<String>,
 }
 
