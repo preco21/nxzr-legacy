@@ -1,5 +1,7 @@
-use crate::platform_impl::{l2cap, sock};
-use crate::shared::Address;
+use crate::{
+    sock::{self, l2cap},
+    Address,
+};
 use thiserror::Error;
 
 const DEFAULT_CTL_PSM: u16 = 17;

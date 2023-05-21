@@ -7,16 +7,15 @@
 //!
 //! L2CAP sockets work with both Bluetooth classic (BR/EDR) and Bluetooth Low Energy (LE).
 //!
-use super::super::sock;
-use super::{
-    sock_priv,
+use crate::sock::{
+    self, sock_priv,
     sys::{
         bt_power, bt_security, sockaddr_l2, BTPROTO_L2CAP, BT_MODE, BT_PHY, BT_POWER,
         BT_POWER_FORCE_ACTIVE_OFF, BT_POWER_FORCE_ACTIVE_ON, BT_RCVMTU, BT_SECURITY,
         BT_SECURITY_FIPS, BT_SECURITY_HIGH, BT_SECURITY_LOW, BT_SECURITY_MEDIUM, BT_SECURITY_SDP,
         BT_SNDMTU, L2CAP_CONNINFO, L2CAP_LM, L2CAP_OPTIONS, SOL_L2CAP,
     },
-    AddressType, OwnedSocket,
+    AddressType, OwnedFd,
 };
 use crate::Address;
 use libc::{
@@ -46,11 +45,11 @@ use std::{
 };
 use tokio::io::{unix::AsyncFd, AsyncRead, AsyncWrite, ReadBuf};
 
-pub use super::sys::{l2cap_conninfo as ConnInfo, l2cap_options as Opts};
+pub use crate::sock::sys::{l2cap_conninfo as ConnInfo, l2cap_options as Opts};
 
 /// Possible bit values for the [link mode socket option](Socket::link_mode).
 pub mod link_mode {
-    pub use super::sock::sys::{
+    pub use crate::sock::sys::{
         L2CAP_LM_AUTH as AUTH, L2CAP_LM_ENCRYPT as ENCRYPT, L2CAP_LM_FIPS as FIPS,
         L2CAP_LM_MASTER as MASTER, L2CAP_LM_RELIABLE as RELIABLE, L2CAP_LM_SECURE as SECURE,
         L2CAP_LM_TRUSTED as TRUSTED,
@@ -59,7 +58,7 @@ pub mod link_mode {
 
 /// Possible bit values for the [PHY socket option](Socket::phy).
 pub mod phy {
-    pub use super::sock::sys::{
+    pub use crate::sock::sys::{
         BR1M1SLOT, BR1M3SLOT, BR1M5SLOT, EDR2M1SLOT, EDR2M3SLOT, EDR2M5SLOT, EDR3M1SLOT,
         EDR3M3SLOT, EDR3M5SLOT, LE1MRX, LE1MTX, LE2MRX, LE2MTX, LECODEDRX, LECODEDTX,
     };
@@ -247,7 +246,7 @@ pub enum FlowControl {
 ///
 /// The primary use of this is to configure the socket before connecting or listening.
 pub struct Socket<Type> {
-    fd: AsyncFd<OwnedSocket>,
+    fd: AsyncFd<OwnedFd>,
     _type: PhantomData<Type>,
 }
 
@@ -458,12 +457,12 @@ impl<Type> Socket<Type> {
     /// If the passed file descriptor is invalid, undefined behavior may occur.
     pub unsafe fn from_raw_fd(fd: RawFd) -> Result<Self> {
         Ok(Self {
-            fd: AsyncFd::new(OwnedSocket::new(fd))?,
+            fd: AsyncFd::new(OwnedFd::new(fd))?,
             _type: PhantomData,
         })
     }
 
-    fn from_owned_fd(fd: OwnedSocket) -> Result<Self> {
+    fn from_owned_fd(fd: OwnedFd) -> Result<Self> {
         Ok(Self {
             fd: AsyncFd::new(fd)?,
             _type: PhantomData,
@@ -818,6 +817,10 @@ impl AsyncWrite for Stream {
     }
 }
 
+#[allow(clippy::duplicate_mod)]
+#[path = "stream_util.rs"]
+pub mod stream;
+
 /// An L2CAP socket server, listening for [SeqPacket] connections.
 #[derive(Debug)]
 pub struct SeqPacketListener {
@@ -912,7 +915,7 @@ impl SeqPacket {
         // Resetting socket option `SO_SNDBUF` to `0` let the OS to set the
         // value to its default like `4608`.
         // Ref: https://www.ibm.com/docs/en/ztpf/1.1.0.15?topic=apis-setsockopt-set-options-associated-socket
-        let owned_fd = unsafe { OwnedSocket::new(self.socket.as_raw_fd()) };
+        let owned_fd = unsafe { OwnedFd::new(self.socket.as_raw_fd()) };
         sock::setsockopt(&owned_fd, SOL_SOCKET, SO_SNDBUF, &0)
     }
 

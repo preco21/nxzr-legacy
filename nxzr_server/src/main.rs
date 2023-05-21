@@ -4,8 +4,8 @@ use nxzr_core::{
 };
 use nxzr_device::{
     device::{Device, DeviceConfig},
-    platform::linux::{helper, syscheck},
     session::{SessionConfig, SessionListener},
+    system,
     transport::{Transport, TransportConfig},
 };
 use std::{io::Write, sync::Arc};
@@ -16,7 +16,7 @@ use tokio::{signal, sync::mpsc, task, time};
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    syscheck::check_system_requirements().await?;
+    system::check_system_requirements().await?;
 
     let (shutdown_tx, _shutdown_rx) = mpsc::channel::<()>(1);
 
@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!("{:?}", err);
         tracing::warn!("fallback: restarting Bluetooth session due to incompatibilities with the bluez `input` plugin, disable this plugin to avoid issues.");
         tracing::info!("restarting Bluetooth service...");
-        helper::restart_bluetooth_service()?;
+        system::restart_bluetooth_service()?;
         time::sleep(time::Duration::from_millis(1000)).await;
         // FIXME: accept device id here
         device = Device::new(DeviceConfig::default()).await?;
@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
     let (protocol, protocol_handle) = Protocol::connect(
         transport.clone(),
         ProtocolConfig {
-            dev_address: nxzr_core::device::Address::new(address.into()),
+            dev_address: nxzr_core::Address::new(address.into()),
             ..Default::default()
         },
     )

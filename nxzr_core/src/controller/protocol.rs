@@ -11,7 +11,7 @@ use super::{
     ControllerType,
 };
 use crate::{
-    device::Address,
+    addr::Address,
     event::{setup_event, EventError},
 };
 use async_trait::async_trait;

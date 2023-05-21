@@ -1,5 +1,4 @@
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/stream_util.rs
-
 //! Stream utility types.
 // Note that this is included as a module by both l2cap and rfcomm.
 use libc::{SHUT_RD, SHUT_WR};

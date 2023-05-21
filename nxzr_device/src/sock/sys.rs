@@ -1,5 +1,4 @@
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/sys.rs
-
 //! System native types and constants.
 #![allow(dead_code)]
 use libc::{c_ushort, sa_family_t};

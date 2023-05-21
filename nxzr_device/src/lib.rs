@@ -1,14 +1,14 @@
-// General NXZR device implementation.
+mod semaphore;
+mod sock;
+
+mod addr;
+pub use addr::*;
+
+pub use uuid::Uuid;
+mod uuid_ext;
+pub use uuid_ext::UuidExt;
+
 pub mod device;
-pub mod semaphore;
 pub mod session;
-pub mod shared;
+pub mod system;
 pub mod transport;
-
-pub use shared::*;
-
-// Exports "private" platform specific implementation
-mod platform_impl;
-
-// Exports public interfaces of the platform specific module.
-pub mod platform;
