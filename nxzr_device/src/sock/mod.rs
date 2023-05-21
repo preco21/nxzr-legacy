@@ -442,6 +442,7 @@ pub fn ioctl_write<T>(socket: &OwnedFd, request: Ioctl, value: &T) -> Result<c_i
 /// Private socket implementation functions.
 macro_rules! sock_priv {
     () => {
+        #[allow(dead_code)]
         async fn accept_priv(&self) -> Result<(Self, SocketAddr)> {
             let (fd, sa) = loop {
                 let mut guard = self.fd.readable().await?;
@@ -455,6 +456,7 @@ macro_rules! sock_priv {
             Ok((socket, sa))
         }
 
+        #[allow(dead_code)]
         fn poll_accept_priv(&self, cx: &mut Context) -> Poll<Result<(Self, SocketAddr)>> {
             let (fd, sa) = loop {
                 let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
@@ -593,6 +595,7 @@ macro_rules! sock_priv {
             }
         }
 
+        #[allow(dead_code)]
         async fn peek_priv(&self, buf: &mut [u8]) -> Result<usize> {
             let mut buf = ReadBuf::new(buf);
             loop {
@@ -604,6 +607,7 @@ macro_rules! sock_priv {
             }
         }
 
+        #[allow(dead_code)]
         fn poll_peek_priv(&self, cx: &mut Context, buf: &mut ReadBuf) -> Poll<Result<usize>> {
             loop {
                 let mut guard = std::task::ready!(self.fd.poll_read_ready(cx))?;
@@ -614,6 +618,7 @@ macro_rules! sock_priv {
             }
         }
 
+        #[allow(dead_code)]
         fn poll_flush_priv(&self, _cx: &mut Context) -> Poll<Result<()>> {
             // Flush is a no-op.
             Poll::Ready(Ok(()))
