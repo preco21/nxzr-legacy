@@ -909,14 +909,14 @@ impl SeqPacket {
         socket.connect(addr).await
     }
 
-    // FIXME: this does not work
     /// Resets `SO_SNDBUF` value to `0`
     pub fn reset_sndbuf(&self) -> Result<()> {
         // Resetting socket option `SO_SNDBUF` to `0` let the OS to set the
         // value to its default like `4608`.
         // Ref: https://www.ibm.com/docs/en/ztpf/1.1.0.15?topic=apis-setsockopt-set-options-associated-socket
         let owned_fd = unsafe { OwnedFd::new(self.socket.as_raw_fd()) };
-        sock::setsockopt(&owned_fd, SOL_SOCKET, SO_SNDBUF, &0)
+        let optval = 0;
+        sock::setsockopt(&owned_fd, SOL_SOCKET, SO_SNDBUF, &optval)
     }
 
     /// Gets the peer address of this stream.
