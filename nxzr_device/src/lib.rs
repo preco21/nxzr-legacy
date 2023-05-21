@@ -1,5 +1,5 @@
-mod semaphore;
-mod sock;
+pub mod semaphore;
+pub mod sock;
 
 mod addr;
 pub use addr::*;
