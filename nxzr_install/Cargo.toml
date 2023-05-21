@@ -1,11 +1,11 @@
 [package]
 name = "nxzr_install"
-version.workspace = true
+version = { workspace = true }
 description = "NXZR project: Installer helpers"
 readme = "README.md"
-authors.workspace = true
-repository.workspace = true
-license.workspace = true
+authors = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 edition = "2021"
 publish = false
 

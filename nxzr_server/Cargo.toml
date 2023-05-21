@@ -1,11 +1,11 @@
 [package]
 name = "nxzr_server"
-version.workspace = true
+version = { workspace = true }
 description = "NXZR project: server daemon application"
 readme = "README.md"
-authors.workspace = true
-repository.workspace = true
-license.workspace = true
+authors = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 edition = "2021"
 publish = false
 

@@ -1,11 +1,11 @@
 [package]
 name = "nxzr_core"
-version.workspace = true
+version = { workspace = true }
 description = "NXZR project: The core module"
 readme = "README.md"
-authors.workspace = true
-repository.workspace = true
-license.workspace = true
+authors = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 edition = "2021"
 publish = false
 
