@@ -279,7 +279,6 @@ impl TransportInner {
         self.running().await;
         let mut buf = BytesMut::with_capacity(self.read_buf_size);
         buf.resize(self.read_buf_size, 0);
-        println!("readbuf");
         match self.session.itr_client().recv(&mut buf).await {
             Ok(0) => Err(TransportError::ReaderClosed),
             Ok(_) => Ok(buf),
