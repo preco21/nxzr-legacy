@@ -16,6 +16,7 @@ pub async fn prepare_system_requirements() -> Result<(), Error> {
     // 5. check wsl config is ready -> otherwise, install one
     // ㄴ check /etc/wsl.conf is ready -> otherwise, set one and restart vm (wait 8 sec)
     // 6. disable windows bt
+    // 7. enable usbipd
     Ok(())
 }
 
