@@ -1,11 +1,5 @@
 [workspace]
-members = [
-    "nxzr_core",
-    "nxzr_device",
-    "nxzr_server",
-    "nxzr_gui",
-    "nxzr_install",
-]
+members = ["nxzr_core", "nxzr_device", "nxzr_server", "nxzr_gui"]
 
 [workspace.package]
 version = "0.1.0"
