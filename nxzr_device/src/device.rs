@@ -163,6 +163,7 @@ impl Device {
             return Ok(())
         };
         if uuids.len() > 3 {
+            // https://btprodspecificationrefs.blob.core.windows.net/assigned-numbers/Assigned%20Number%20Types/Assigned_Numbers.pdf
             tracing::warn!("there's too many SDP-records active, Switch might refuse connection.");
             tracing::warn!("try modifying \"/lib/systemd/system/bluetooth.service\" file.");
             tracing::warn!("UUIDs: {:?}", &uuids);
