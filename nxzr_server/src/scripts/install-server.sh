@@ -20,3 +20,10 @@ apt -y install linux-tools-virtual hwdata bluez dbus dbus-broker
 
 # Cleanup packages.
 apt -y autoremove && apt -y clean
+
+# Update WSL config to enable `systemd` and startup services.
+cat <<'EOF' > /etc/wsl.conf
+[boot]
+systemd = true
+command = "systemctl start dbus-broker.service bluetooth.service"
+EOF
