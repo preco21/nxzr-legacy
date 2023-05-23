@@ -44,11 +44,11 @@ pub struct SessionConfig {
 pub struct SessionListener {
     ctl_sock: l2cap::LazySeqPacketListener,
     itr_sock: l2cap::LazySeqPacketListener,
-    addr_def: SessionAddressDef,
+    addr_def: SessionAddress,
 }
 
 #[derive(Debug)]
-struct SessionAddressDef {
+struct SessionAddress {
     addr: Address,
     ctl_psm: u16,
     itr_psm: u16,
@@ -67,7 +67,7 @@ impl SessionListener {
         Ok(Self {
             ctl_sock,
             itr_sock,
-            addr_def: SessionAddressDef {
+            addr_def: SessionAddress {
                 ctl_psm: control_psm,
                 itr_psm: interrupt_psm,
                 addr: config.address.unwrap_or(Address::default()),
