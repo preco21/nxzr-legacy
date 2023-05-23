@@ -20,19 +20,3 @@ apt -y install linux-tools-virtual hwdata bluez dbus dbus-broker
 
 # Cleanup packages.
 apt -y autoremove && apt -y clean
-
-# Prepare `usbip`.
-update-alternatives --install /usr/local/bin/usbip usbip `ls /usr/lib/linux-tools/*/usbip | tail -n1` 20
-
-# Enable `dbus-broker`.
-systemctl enable dbus-broker.service
-
-# Prepare NXZR-friendly Bluetooth settings.
-#
-## A. Set bluetooth enabled flag to system default settings.
-echo "export BLUETOOTH_ENABLED=1" > /etc/default/bluetooth
-## B. Replace `bluetoothd` service definition.
-sed -i 's/\(ExecStart=\/usr\/lib\/bluetooth\/bluetoothd\).*/\1 --noplugin=input,sap,avrcp,a2dp,a2dp-source,hfp,spp,opp,hdp,hsp,map,pan,pbap,sync/' /lib/systemd/system/bluetooth.service
-## C. Restart systemd daemons.
-systemctl daemon-reload
-systemctl restart dbus-broker.service bluetooth.service
