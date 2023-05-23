@@ -165,6 +165,7 @@ impl Device {
         if uuids.len() > 3 {
             tracing::warn!("there's too many SDP-records active, Switch might refuse connection.");
             tracing::warn!("try modifying \"/lib/systemd/system/bluetooth.service\" file.");
+            tracing::warn!("UUIDs: {:?}", &uuids);
             if disconnect {
                 for dev in self.paired_devices().await? {
                     tracing::info!("unpairing device of address: {}", dev.address());
