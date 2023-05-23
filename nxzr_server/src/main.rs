@@ -32,7 +32,7 @@ enum Commands {
         #[arg(short, long, value_enum)]
         mode: SetupMode,
     },
-    /// Run daemon
+    /// Run server daemon
     Run,
 }
 
