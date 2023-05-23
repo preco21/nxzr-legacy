@@ -32,7 +32,7 @@ systemctl enable dbus-broker.service
 ## A. Set bluetooth enabled flag to system default settings.
 echo "export BLUETOOTH_ENABLED=1" > /etc/default/bluetooth
 ## B. Replace `bluetoothd` service definition.
-sed -i 's/\(ExecStart=\/usr\/lib\/bluetooth\/bluetoothd\).*/\1 --noplugin=input,sap,avrcp,a2dp,a2dp-source,hfp,spp,opp,hdp/' /lib/systemd/system/bluetooth.service
+sed -i 's/\(ExecStart=\/usr\/lib\/bluetooth\/bluetoothd\).*/\1 --noplugin=input,sap,avrcp,a2dp,a2dp-source,hfp,spp,opp,hdp,pan,pbap,sync/' /lib/systemd/system/bluetooth.service
 ## C. Restart systemd daemons.
 systemctl daemon-reload
 systemctl restart dbus-broker.service bluetooth.service
