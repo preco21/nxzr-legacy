@@ -4,7 +4,7 @@ use tokio::process::Command;
 
 #[derive(Clone, Error, Debug)]
 pub enum SysCheckError {
-    #[error("privilege error, the program is required to run as root user")]
+    #[error("privilege error, this program is required to run as root user")]
     RootPrivilegeRequired,
     #[error("systemctl check failed")]
     SysctlFailed,
@@ -81,7 +81,6 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
 }
 
 pub async fn prepare_device() -> Result<(), SysCheckError> {
-    check_privileges().await?;
     check_system_requirements().await?;
     prepare_bluetooth_service()
         .await

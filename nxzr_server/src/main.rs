@@ -1,3 +1,5 @@
+use clap::{builder::PossibleValue, Parser, Subcommand, ValueEnum};
+use external_scripts::run_setup_config;
 use nxzr_core::{
     controller::{state::button::ButtonKey, ControllerType},
     protocol::{Event, Protocol, ProtocolConfig},
@@ -12,10 +14,73 @@ use std::{io::Write, sync::Arc};
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 use tokio::{signal, sync::mpsc, task, time};
 
+use crate::external_scripts::run_server_install;
+
+mod external_scripts;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Run setup
+    Setup {
+        #[arg(short, long, value_enum)]
+        mode: SetupMode,
+    },
+    /// Run daemon
+    Run,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum SetupMode {
+    InstallServer,
+    SetupConfig,
+}
+
+impl ValueEnum for SetupMode {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::InstallServer, Self::SetupConfig]
+    }
+
+    fn to_possible_value<'a>(&self) -> Option<PossibleValue> {
+        Some(match self {
+            Self::InstallServer => {
+                PossibleValue::new("install").help("Install system requirements for the daemon")
+            }
+            Self::SetupConfig => PossibleValue::new("config").help("Setup config for the daemon"),
+        })
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
+    system::check_privileges().await?;
+    let args = Cli::parse();
+    match args.command {
+        Commands::Run => run().await?,
+        Commands::Setup { mode } => match mode {
+            SetupMode::InstallServer => {
+                println!("Running server install...");
+                run_server_install()?;
+                println!("Successfully installed required components.");
+            }
+            SetupMode::SetupConfig => {
+                println!("Running config setup...");
+                run_setup_config()?;
+                println!("Successfully made changes for system config.");
+            }
+        },
+    }
+    Ok(())
+}
 
+async fn run() -> anyhow::Result<()> {
     system::prepare_device().await?;
 
     let (shutdown_tx, _shutdown_rx) = mpsc::channel::<()>(1);
