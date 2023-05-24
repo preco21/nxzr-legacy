@@ -207,7 +207,7 @@ impl InputReport {
         self.buf[SUBCOMMAND_OFFSET + 3] = 0x02;
         self.buf[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
         self.buf[SUBCOMMAND_OFFSET + 10] = 0x01;
-        self.buf[SUBCOMMAND_OFFSET + 11] = 0x01;
+        self.buf[SUBCOMMAND_OFFSET + 11] = controller_type.device_info_color();
         Ok(())
     }
 
