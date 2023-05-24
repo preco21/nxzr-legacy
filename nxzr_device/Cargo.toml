@@ -1,7 +1,7 @@
 [package]
 name = "nxzr_device"
 version = { workspace = true }
-description = "NXZR project: A collection of tools, actual transport layer and connection helpers"
+description = "NXZR Project: A collection of tools, actual transport layer and connection helpers"
 readme = "README.md"
 authors = { workspace = true }
 repository = { workspace = true }
