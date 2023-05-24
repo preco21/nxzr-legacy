@@ -13,6 +13,7 @@ use nxzr_device::{
 use std::{io::Write, sync::Arc};
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 use tokio::{signal, sync::mpsc, task, time};
+use tracing::Level;
 
 use crate::external_scripts::run_server_install;
 
@@ -59,8 +60,14 @@ impl ValueEnum for SetupMode {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    // Setup a tracer.
+    let subscriber = tracing_subscriber::fmt::Subscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
+    // Check whether the program runs with elevated privileges.
     system::check_privileges().await?;
+    // Run CLI.
     let args = Cli::parse();
     match args.command {
         Commands::Run => run().await?,
