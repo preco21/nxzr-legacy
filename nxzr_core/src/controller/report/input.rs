@@ -208,6 +208,7 @@ impl InputReport {
         self.buf[SUBCOMMAND_OFFSET + 4..SUBCOMMAND_OFFSET + 10].copy_from_slice(&mac_addr);
         self.buf[SUBCOMMAND_OFFSET + 10] = 0x01;
         // FIXME: To figure out SPI settings to set controller colors
+        // https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/spi_flash_notes.md#x6000-factory-configuration-and-calibration
         // self.buf[SUBCOMMAND_OFFSET + 11] = controller_type.device_info_color();
         self.buf[SUBCOMMAND_OFFSET + 11] = 0x00;
         Ok(())
