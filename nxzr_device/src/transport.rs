@@ -11,6 +11,8 @@ use tokio::task::JoinSet;
 use tokio::time;
 use tracing::Instrument;
 
+const MTU_THRESHOLD: usize = 400;
+
 const DEFAULT_FLOW_CONTROL_PERMITS: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
 
@@ -214,11 +216,14 @@ impl TransportInner {
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
         tracing::info!("initializing a transport.");
-        tracing::trace!(
-            "MTU: ctl={} itr={}",
-            paired_session.ctl_client().send_mtu()?,
-            paired_session.itr_client().send_mtu()?
-        );
+        let ctl_mtu = paired_session.ctl_client().send_mtu()?;
+        let itr_mtu = paired_session.itr_client().send_mtu()?;
+        tracing::trace!("MTU: ctl={} itr={}", ctl_mtu, itr_mtu);
+        if ctl_mtu < MTU_THRESHOLD || itr_mtu < MTU_THRESHOLD {
+            tracing::warn!(
+                "MTU for session is too low, packets that's being send may be truncated."
+            );
+        }
         // Device ids must be targeting to the local machine.
         let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
         // 0x04 = HCI_EVT; 0x13 = Number of completed packets
