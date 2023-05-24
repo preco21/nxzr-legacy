@@ -221,7 +221,7 @@ impl TransportInner {
         tracing::trace!("MTU: ctl={} itr={}", ctl_mtu, itr_mtu);
         if ctl_mtu < MTU_THRESHOLD || itr_mtu < MTU_THRESHOLD {
             tracing::warn!(
-                "MTU for session is too low, packets that's being send may be truncated."
+                "the MTU for the session is below the threshold, so the packets being sent may be truncated."
             );
         }
         // Device ids must be targeting to the local machine.
