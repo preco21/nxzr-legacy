@@ -45,9 +45,15 @@ impl ControllerType {
 
     pub fn connection_info(&self) -> u8 {
         match self {
-            Self::JoyConL => 0x0E,
-            Self::JoyConR => 0x0E,
             Self::ProController => 0x00,
+            _ => 0x0E,
+        }
+    }
+
+    pub fn device_info_color(&self) -> u8 {
+        match self {
+            Self::ProController => 0x02,
+            _ => 0x01,
         }
     }
 
