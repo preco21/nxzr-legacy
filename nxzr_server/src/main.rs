@@ -1,7 +1,12 @@
+use std::str::FromStr;
+
 use clap::{builder::PossibleValue, Parser, Subcommand, ValueEnum};
-use nxzr_device::system;
+use nxzr_device::{system, Address};
+use server::{ReconnectType, ServerOpts};
+use tokio::signal;
 
 mod external_scripts;
+mod server;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -19,11 +24,44 @@ enum Cmd {
 }
 
 #[derive(Parser)]
-struct RunOpts {}
+struct RunOpts {
+    #[arg(short, long)]
+    reconnect: Option<String>,
+}
 
 impl RunOpts {
     pub async fn perform(self) -> anyhow::Result<()> {
-        //
+        match self.reconnect {
+            Some(addr_or_auto) => {
+                if addr_or_auto == "auto" {
+                    tracing::info!("running server with automatic reconnect mode.");
+                    server::run(
+                        ServerOpts {
+                            reconnect: Some(ReconnectType::Auto),
+                            ..Default::default()
+                        },
+                        signal::ctrl_c(),
+                    )
+                    .await?
+                } else {
+                    tracing::info!("running server with manual reconnect mode.");
+                    server::run(
+                        ServerOpts {
+                            reconnect: Some(ReconnectType::Manual(Address::from_str(
+                                &addr_or_auto,
+                            )?)),
+                            ..Default::default()
+                        },
+                        signal::ctrl_c(),
+                    )
+                    .await?
+                }
+            }
+            None => {
+                tracing::info!("running server with initial connection mode.");
+                server::run(ServerOpts::default(), signal::ctrl_c()).await?
+            }
+        }
         Ok(())
     }
 }

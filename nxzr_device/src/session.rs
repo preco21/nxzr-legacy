@@ -132,9 +132,9 @@ impl SessionListener {
 
 #[derive(Debug, Default)]
 pub struct PairedSessionConfig {
-    reconnect_address: Address,
-    control_psm: Option<u16>,
-    interrupt_psm: Option<u16>,
+    pub reconnect_address: Address,
+    pub control_psm: Option<u16>,
+    pub interrupt_psm: Option<u16>,
 }
 
 #[derive(Debug)]

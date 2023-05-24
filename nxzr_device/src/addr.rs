@@ -67,6 +67,32 @@ impl From<Address> for MacAddr6 {
     }
 }
 
+/// Interop [bluer::Address] with [crate::Address].
+impl From<bluer::Address> for Address {
+    fn from(addr: bluer::Address) -> Self {
+        addr.0.into()
+    }
+}
+
+impl From<Address> for bluer::Address {
+    fn from(addr: Address) -> Self {
+        addr.0.into()
+    }
+}
+
+/// Interop [nxzr_core::Address] with [crate::Address].
+impl From<nxzr_core::Address> for Address {
+    fn from(addr: nxzr_core::Address) -> Self {
+        addr.0.into()
+    }
+}
+
+impl From<Address> for nxzr_core::Address {
+    fn from(addr: Address) -> Self {
+        addr.0.into()
+    }
+}
+
 /// Invalid Bluetooth address error.
 #[derive(Debug, Clone)]
 pub struct InvalidAddressError(pub String);

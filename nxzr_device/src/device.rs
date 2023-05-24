@@ -158,7 +158,7 @@ impl Device {
     }
 
     #[tracing::instrument(target = "device")]
-    pub async fn check_paired_devices(&self, disconnect: bool) -> Result<(), DeviceError> {
+    pub async fn check_paired_switches(&self, disconnect: bool) -> Result<(), DeviceError> {
         let Some(uuids) = self.uuids().await? else {
             return Ok(())
         };
@@ -168,13 +168,13 @@ impl Device {
             tracing::warn!("try modifying \"/lib/systemd/system/bluetooth.service\" file.");
             tracing::trace!("UUIDs: {:?}", &uuids);
             if disconnect {
-                for dev in self.paired_devices().await? {
-                    tracing::info!("unpairing device of address: {}", dev.address());
-                    self.unpair_device(dev.address().into()).await?;
+                for target in self.paired_switches().await? {
+                    tracing::info!("unpairing device of address: {}", target.address());
+                    self.unpair_device(target.address().into()).await?;
                 }
             } else {
                 let paired_addresses: Vec<String> = self
-                    .paired_devices()
+                    .paired_switches()
                     .await?
                     .iter()
                     .map(|d| d.address().to_string())
@@ -197,7 +197,7 @@ impl Device {
         Ok(addr.into())
     }
 
-    pub async fn paired_devices(&self) -> Result<Vec<bluer::Device>, DeviceError> {
+    pub async fn paired_switches(&self) -> Result<Vec<bluer::Device>, DeviceError> {
         let mut devices = vec![];
         for addr in self.adapter.device_addresses().await? {
             let dev = self.adapter.device(addr)?;

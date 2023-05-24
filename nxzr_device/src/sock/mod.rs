@@ -68,19 +68,6 @@ impl From<Address> for sys::bdaddr_t {
     }
 }
 
-/// Interop [bluer::Address] with [crate::Address].
-impl From<bluer::Address> for Address {
-    fn from(addr: bluer::Address) -> Self {
-        addr.0.into()
-    }
-}
-
-impl From<Address> for bluer::Address {
-    fn from(addr: Address) -> Self {
-        addr.0.into()
-    }
-}
-
 /// Bluetooth device address type.
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Display, EnumString, FromPrimitive,
