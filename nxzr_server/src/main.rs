@@ -52,7 +52,7 @@ impl ValueEnum for SetupMode {
             Self::InstallServer => {
                 PossibleValue::new("install").help("Install system requirements for the daemon")
             }
-            Self::SetupConfig => PossibleValue::new("config").help("Setup config for the daemon"),
+            Self::SetupConfig => PossibleValue::new("setup").help("Setup config for the daemon"),
         })
     }
 }
