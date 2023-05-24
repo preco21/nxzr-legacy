@@ -212,10 +212,8 @@ async fn establish_initial_connection(
     session.listen().await?;
     device.set_powered(true).await?;
     device.set_pairable(true).await?;
-    tracing::info!("setting device alias to {}", controller_type);
-    device
-        .set_alias(ControllerType::ProController.name())
-        .await?;
+    tracing::info!("setting device alias to {}", controller_type.name());
+    device.set_alias(controller_type.name()).await?;
     tracing::info!("advertising Bluetooth SDP record...");
     let record_handle = device.register_sdp_record().await?;
     device.set_discoverable(true).await?;
