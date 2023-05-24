@@ -214,6 +214,11 @@ impl TransportInner {
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
         tracing::info!("initializing a transport.");
+        tracing::trace!(
+            "MTU: ctl={} itr={}",
+            paired_session.ctl_client().send_mtu()?,
+            paired_session.itr_client().send_mtu()?
+        );
         // Device ids must be targeting to the local machine.
         let write_window = hci::Datagram::bind(hci::SocketAddr { dev_id: 0 }).await?;
         // 0x04 = HCI_EVT; 0x13 = Number of completed packets
