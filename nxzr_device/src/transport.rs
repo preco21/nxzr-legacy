@@ -34,7 +34,7 @@ pub enum TransportError {
 
 #[derive(Clone, Error, Debug)]
 pub enum TransportInternalError {
-    #[error("io: {kind}; {message}")]
+    #[error("io: {message}")]
     Io {
         kind: std::io::ErrorKind,
         message: String,

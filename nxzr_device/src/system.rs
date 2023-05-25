@@ -171,7 +171,7 @@ pub enum SystemCommandError {
 pub enum SystemCommandInternalError {
     #[error("utf8: {0}")]
     Utf8Error(std::str::Utf8Error),
-    #[error("io: {kind}; {message}")]
+    #[error("io: {message}")]
     Io {
         kind: std::io::ErrorKind,
         message: String,

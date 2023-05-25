@@ -17,7 +17,7 @@ pub enum SessionError {
 
 #[derive(Clone, Error, Debug)]
 pub enum SessionInternalError {
-    #[error("io: {kind}; {message}")]
+    #[error("io: {message}")]
     Io {
         kind: std::io::ErrorKind,
         message: String,

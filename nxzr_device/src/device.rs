@@ -26,7 +26,7 @@ pub enum DeviceError {
 
 #[derive(Clone, Error, Debug)]
 pub enum DeviceInternalError {
-    #[error("io: {kind}; {message}")]
+    #[error("io: {message}")]
     Io {
         kind: std::io::ErrorKind,
         message: String,
