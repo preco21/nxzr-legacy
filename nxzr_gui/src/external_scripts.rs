@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::{
     io::{self, Stderr, Stdout},
     path::Path,
@@ -54,25 +55,29 @@ pub async fn install_system_requirements() -> Result<(), ExternalScriptError> {
     Ok(())
 }
 
-// // One for windows
-// pub async fn prepare_system_requirements() -> Result<(), Error> {
-//     // 1. check wsl installed
-//     // 2. check if system can run wsl -> vm requirements (이건 그냥 체크되나? 1에서?)
-//     // 3. wsl version check if it's v2
-//     // 4. check usbipd installed -> maybe just include the binary
-//     // ㄴ https://github.com/dorssel/usbipd-win/wiki/WSL-support
-//     // 5. check wsl config is ready -> otherwise, install one
-//     // ㄴ check /etc/wsl.conf is ready -> otherwise, set one and restart vm (wait 8 sec)
-//     // 6. disable windows bt
-//     // 7. enable usbipd
-//     Ok(())
-// }
+// 시작할 때 1번 호출, nxzr 설치 경로는 wsl내 고정
+pub async fn prepare_daemon() -> Result<(), ExternalScriptError> {
+    // 1. Check WSL installed.
+    // 2. WSL version check if it's > 2
+    // 3. check if usbipd installed (see below)
+    // 4. check if kernel is there
+    // 5. check wsl config is ready -- we cannot fix this as we need to shutdown the wsl if config is not properly setup.
+    // 6. run nxzr_server setup --mode=config
+    // 7. enable usbipd using usbipd_attach() below.
+}
 
-// // One for linux
-// pub async fn ensure_system_requirements() -> Result<(), SysCheckError> {
-//     // sudo systemctl daemon-reload
-//     // sudo systemctl restart bluetooth
-// }
+pub async fn install() -> Result<(), ExternalScriptError> {
+    // FIXME: run install-nxzr.ps1 script for the moment...
+}
+
+// FIXME: move this into dedicated module
+pub async fn usbipd_attach() -> Result<(), ExternalScriptError> {
+    // 0. check if usbipd installed
+    // A. usbipd query
+    // B. usbipd attach
+    // C. usbipd detach
+    // ㄴ https://github.com/dorssel/usbipd-win/wiki/WSL-support
+}
 
 #[derive(Error, Debug)]
 pub enum SystemCommandError {
