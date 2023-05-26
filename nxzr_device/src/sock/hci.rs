@@ -4,7 +4,7 @@ use crate::sock::{
     OwnedFd,
 };
 use libc::{
-    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
+    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_NONBLOCK,
     SOCK_RAW, SOL_SOCKET, SO_ERROR, SO_RCVBUF, TIOCINQ, TIOCOUTQ,
 };
 use std::{
@@ -90,7 +90,11 @@ impl fmt::Debug for Socket {
 impl Socket {
     pub fn new() -> Result<Socket> {
         Ok(Self {
-            fd: AsyncFd::new(sock::socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)?)?,
+            fd: AsyncFd::new(sock::socket(
+                AF_BLUETOOTH,
+                SOCK_RAW | SOCK_NONBLOCK,
+                BTPROTO_HCI,
+            )?)?,
         })
     }
 

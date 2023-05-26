@@ -19,9 +19,9 @@ use crate::sock::{
 };
 use crate::Address;
 use libc::{
-    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_DGRAM,
-    SOCK_SEQPACKET, SOCK_STREAM, SOL_BLUETOOTH, SOL_SOCKET, SO_ERROR, SO_RCVBUF, SO_REUSEADDR,
-    SO_SNDBUF, TIOCINQ, TIOCOUTQ,
+    AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR,
+    SOCK_DGRAM, SOCK_SEQPACKET, SOCK_STREAM, SOL_BLUETOOTH, SOL_SOCKET, SO_ERROR, SO_RCVBUF,
+    SO_REUSEADDR, SO_SNDBUF, TIOCINQ, TIOCOUTQ,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
@@ -537,7 +537,7 @@ impl Socket<SeqPacket> {
         })
     }
 
-    // Sets `SO_REUSEADDR` socket option to `1`.
+    /// Sets `SO_REUSEADDR` socket option to `1`.
     pub fn enable_reuse_addr(&self) -> Result<()> {
         sock::setsockopt(self.fd.get_ref(), SOL_SOCKET, SO_REUSEADDR, &1)
     }
@@ -556,10 +556,10 @@ impl Socket<SeqPacket> {
         Ok(SeqPacketListener { socket: self })
     }
 
-    // Listen on the socket.
-    //
-    // `backlog` defines the maximum number of pending connections are queued by the operating system
-    // at any given time.
+    /// Listen on the socket.
+    ///
+    /// `backlog` defines the maximum number of pending connections are queued by the operating system
+    /// at any given time.
     pub fn listen_on(&self, backlog: u32) -> Result<()> {
         sock::listen(
             self.fd.get_ref(),
@@ -570,9 +570,14 @@ impl Socket<SeqPacket> {
         Ok(())
     }
 
+    // FIXME: split the type of socket
     /// Establish a sequential packet connection with a peer at the specified socket address.
+    ///
+    /// Also sets non-blocking mode after the connect.
     pub async fn connect(self, sa: SocketAddr) -> Result<SeqPacket> {
         self.connect_priv(sa).await?;
+        let flags = sock::fcntl_read(self.fd.get_ref())?;
+        sock::fcntl_write(self.fd.get_ref(), flags | O_NONBLOCK)?;
         Ok(SeqPacket { socket: self })
     }
 }
@@ -906,7 +911,10 @@ impl SeqPacket {
     pub async fn connect(addr: SocketAddr) -> Result<Self> {
         let socket = Socket::<SeqPacket>::new_seq_packet()?;
         socket.bind(any_bind_addr(&addr))?;
-        socket.connect(addr).await
+        let s = socket.connect(addr).await?;
+        // NOTE: Should set NON-BLOCKING mode AFTER the connect, otherwise, the
+        // host may refuse to connect.
+        Ok(s)
     }
 
     /// Resets `SO_SNDBUF` value to `0`

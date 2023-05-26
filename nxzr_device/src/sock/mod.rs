@@ -1,7 +1,7 @@
 // Excerpt from `bluer` project: https://github.com/bluez/bluer/blob/8ffd4aeef3f8ab0d65dca66eb5a03f223351f586/bluer/src/sock.rs
 //! System socket base.
 use crate::Address;
-use libc::{c_int, sockaddr, socklen_t, Ioctl, SOCK_CLOEXEC, SOCK_NONBLOCK};
+use libc::{c_int, sockaddr, socklen_t, Ioctl, F_GETFL, F_SETFL, SOCK_CLOEXEC, SOCK_NONBLOCK};
 use num_derive::FromPrimitive;
 use std::{
     fmt::Debug,
@@ -106,9 +106,12 @@ pub trait SysSockAddr: Sized {
 
 /// Creates a socket of the specified type and returns its file descriptor.
 ///
-/// The socket is set to non-blocking mode.
+/// Note: From the original code, the socket was set to non-blocking mode.
+/// However, for some reasons, some devices are not accept the asynchronous
+/// client. So, we're letting the caller to set the non-blocking mode on their
+/// own.
 pub fn socket(sa: c_int, ty: c_int, proto: c_int) -> Result<OwnedFd> {
-    let fd = match unsafe { libc::socket(sa, ty | SOCK_NONBLOCK | SOCK_CLOEXEC, proto) } {
+    let fd = match unsafe { libc::socket(sa, ty | SOCK_CLOEXEC, proto) } {
         -1 => return Err(Error::last_os_error()),
         fd => unsafe { OwnedFd::new(fd) },
     };
@@ -420,6 +423,24 @@ pub fn ioctl_read<T>(socket: &OwnedFd, request: Ioctl) -> Result<T> {
 #[allow(dead_code)]
 pub fn ioctl_write<T>(socket: &OwnedFd, request: Ioctl, value: &T) -> Result<c_int> {
     let ret = unsafe { libc::ioctl(socket.as_raw_fd(), request, value as *const _) };
+    if ret == -1 {
+        return Err(Error::last_os_error());
+    }
+    Ok(ret)
+}
+
+/// Perform an FCNTL that reads a single value.
+pub fn fcntl_read(socket: &OwnedFd) -> Result<c_int> {
+    let ret = unsafe { libc::fcntl(socket.as_raw_fd(), F_GETFL, 0) };
+    if ret == -1 {
+        return Err(Error::last_os_error());
+    }
+    Ok(ret)
+}
+
+/// Perform an FCNTL that writes a single value.
+pub fn fcntl_write(socket: &OwnedFd, flags: c_int) -> Result<c_int> {
+    let ret = unsafe { libc::fcntl(socket.as_raw_fd(), F_SETFL, flags) };
     if ret == -1 {
         return Err(Error::last_os_error());
     }
