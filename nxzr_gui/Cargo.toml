@@ -10,4 +10,17 @@ edition = "2021"
 publish = false
 
 [dependencies]
-tokio = { version = "1.26.0", features = ["rt", "sync", "time", "macros"] }
+anyhow = "1.0.71"
+powershell_script = "1.1.0"
+run_script = "0.10.1"
+tempfile = "3.5.0"
+thiserror = "1.0.40"
+tokio = { version = "1.26.0", features = [
+    "rt",
+    "rt-multi-thread",
+    "sync",
+    "time",
+    "macros",
+    "fs",
+    "io-util",
+] }

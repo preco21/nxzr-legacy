@@ -284,6 +284,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastrand"
+version = "1.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e51093e27b0797c359783294ca4f0a911c270184cb10f85783b118614a1501be"
+dependencies = [
+ "instant",
+]
+
+[[package]]
 name = "fsio"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -419,6 +428,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "instant"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
+dependencies = [
+ "cfg-if",
+]
 
 [[package]]
 name = "io-lifetimes"
@@ -625,6 +643,11 @@ dependencies = [
 name = "nxzr_gui"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "powershell_script",
+ "run_script",
+ "tempfile",
+ "thiserror",
  "tokio",
 ]
 
@@ -674,7 +697,7 @@ checksum = "09a279cbf25cb0757810394fbc1e359949b59e348145c643a939a525692e6929"
 dependencies = [
  "cfg-if",
  "libc",
- "redox_syscall",
+ "redox_syscall 0.2.16",
  "smallvec",
  "windows-sys 0.36.1",
 ]
@@ -716,6 +739,12 @@ name = "pkg-config"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ac9a59f73473f1b8d852421e59e64809f025994837ef743615c6d0c5b305160"
+
+[[package]]
+name = "powershell_script"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bef8336090917f3d3a044256bc0e5c51d5420e5d09dfa1df4868083c5231a454"
 
 [[package]]
 name = "ppv-lite86"
@@ -799,12 +828,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_syscall"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567664f262709473930a4bf9e51bf2ebf3348f2e748ccc50dea20646858f8f29"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
 name = "redox_termios"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8440d8acb4fd3d277125b4bd01a6f38aee8d814b3b5fc09b3f2b825d37d3fe8f"
 dependencies = [
- "redox_syscall",
+ "redox_syscall 0.2.16",
 ]
 
 [[package]]
@@ -1024,6 +1062,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tempfile"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9fbec84f381d5795b08656e4912bec604d162bff9291d6189a78f4c8ab87998"
+dependencies = [
+ "cfg-if",
+ "fastrand",
+ "redox_syscall 0.3.5",
+ "rustix",
+ "windows-sys 0.45.0",
+]
+
+[[package]]
 name = "termion"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1031,7 +1082,7 @@ checksum = "659c1f379f3408c7e5e84c7d0da6d93404e3800b6b9d063ba24436419302ec90"
 dependencies = [
  "libc",
  "numtoa",
- "redox_syscall",
+ "redox_syscall 0.2.16",
  "redox_termios",
 ]
 
