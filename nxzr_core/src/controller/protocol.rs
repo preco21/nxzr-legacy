@@ -136,6 +136,7 @@ impl Shared {
             }),
         }
     }
+
     pub fn get(&self) -> State {
         self.state.lock().unwrap().clone()
     }
@@ -317,7 +318,7 @@ impl ControllerProtocol {
             }
             _ => {}
         }
-        self.state.modify(|state: &mut State| {
+        let send_interval = self.state.modify(|state| {
             let mode = match mode {
                 Some(_) => mode,
                 None => state.report_mode,
@@ -330,22 +331,12 @@ impl ControllerProtocol {
             // with `is_pairing` set to `false`, and be setting appropriate
             // send interval for the current report mode.
             if state.is_pairing {
-                state.send_interval = SendInterval::default_byte();
+                Some(SendInterval::default_byte())
             } else {
-                let interval = SendInterval::new(mode).to_byte();
-                match interval {
-                    Some(interval) => state.send_interval = interval,
-                    None => {
-                        self.emit_event(Event::Warning(ControllerProtocolError::Invariant(
-                            format!(
-                        "unknown interval for report mode \"{mode:?}\", assuming it as 15hz.",
-                    ),
-                        )));
-                        state.send_interval = SendInterval::default_byte();
-                    }
-                };
+                None
             }
         });
+        self.set_send_interval(send_interval);
         // TODO: Revisit: Should send set_writer_ready() and start writer thread?
         // if let Some(mode) = mode {
         //     match mode {
@@ -354,6 +345,30 @@ impl ControllerProtocol {
         //     }
         // }
         self.notify_writer_wake.notify_waiters();
+    }
+
+    fn set_send_interval(&self, interval: Option<f64>) {
+        self.state.modify(|state| match interval {
+            Some(interval) => {
+                state.send_interval = interval;
+            }
+            // If `None` is specified, try extracting it from the report mode.
+            None => {
+                let interval = SendInterval::new(state.report_mode).to_byte();
+                match interval {
+                    Some(interval) => state.send_interval = interval,
+                    None => {
+                        self.emit_event(Event::Warning(ControllerProtocolError::Invariant(
+                            format!(
+                                "unknown interval for report mode \"{:?}\", assuming it as 15hz.",
+                                state.report_mode
+                            ),
+                        )));
+                        state.send_interval = SendInterval::default_byte();
+                    }
+                };
+            }
+        })
     }
 
     async fn handle_write(
@@ -487,7 +502,7 @@ impl ControllerProtocol {
                 self.command_enable_6axis_sensor(&mut res_input_report)?;
             }
             Subcommand::EnableVibration => {
-                self.command_enable_vibration(&mut res_input_report)?;
+                self.command_enable_vibration(&mut res_input_report, &sub_command_data)?;
             }
             unsupported_subcommand => {
                 self.emit_event(Event::Warning(ControllerProtocolError::NotImplemented(
@@ -600,7 +615,15 @@ impl ControllerProtocol {
     fn command_enable_vibration(
         &self,
         input_report: &mut InputReport,
+        subcommand_reply_data: &[u8],
     ) -> Result<(), ControllerProtocolError> {
+        let command = subcommand_reply_data[0];
+        match command {
+            // If it's 0x01, then we shell slow down the send frequency.
+            0x01 => self.set_send_interval(Some(SendInterval::default_byte())),
+            // Otherwise, we can release it to match with `report_mode`'s pace.
+            _ => self.set_send_interval(None),
+        }
         input_report.set_ack(0x80);
         input_report.set_response_subcommand(Subcommand::EnableVibration)?;
         Ok(())
