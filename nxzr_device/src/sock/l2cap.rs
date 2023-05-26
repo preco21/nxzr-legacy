@@ -20,8 +20,8 @@ use crate::sock::{
 use crate::Address;
 use libc::{
     AF_BLUETOOTH, EAGAIN, EINPROGRESS, MSG_PEEK, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR,
-    SOCK_SEQPACKET, SOL_BLUETOOTH, SOL_SOCKET, SO_ERROR, SO_RCVBUF, SO_REUSEADDR, SO_SNDBUF,
-    TIOCINQ, TIOCOUTQ,
+    SOCK_NONBLOCK, SOCK_SEQPACKET, SOL_BLUETOOTH, SOL_SOCKET, SO_ERROR, SO_RCVBUF, SO_REUSEADDR,
+    SO_SNDBUF, TIOCINQ, TIOCOUTQ,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
@@ -496,6 +496,18 @@ impl Socket<SeqPacket> {
     /// Creates a new socket of sequential packet type.
     pub fn new_seq_packet() -> Result<Socket<SeqPacket>> {
         Ok(Self {
+            fd: AsyncFd::new(sock::socket(
+                AF_BLUETOOTH,
+                SOCK_SEQPACKET | SOCK_NONBLOCK,
+                BTPROTO_L2CAP,
+            )?)?,
+            _type: PhantomData,
+        })
+    }
+
+    /// Creates a new socket of sequential packet type in blocking mode.
+    pub fn new_blocking_seq_packet() -> Result<Socket<SeqPacket>> {
+        Ok(Self {
             fd: AsyncFd::new(sock::socket(AF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP)?)?,
             _type: PhantomData,
         })
@@ -534,12 +546,21 @@ impl Socket<SeqPacket> {
         Ok(())
     }
 
-    // FIXME: split the type of socket
     /// Establish a sequential packet connection with a peer at the specified socket address.
     ///
     /// Also sets non-blocking mode after the connect.
     pub async fn connect(self, sa: SocketAddr) -> Result<SeqPacket> {
         self.connect_priv(sa).await?;
+        Ok(SeqPacket { socket: self })
+    }
+
+    /// Establish a sequential packet connection with a peer at the specified socket address.
+    ///
+    /// Also sets non-blocking mode after the connect.
+    pub async fn connect_blocking(self, sa: SocketAddr) -> Result<SeqPacket> {
+        self.connect_priv(sa).await?;
+        // NOTE: The `fd` should be set to non-blocking mode AFTER the connect.
+        // Otherwise, some hosts may refuse to connect.
         let flags = sock::fcntl_read(self.fd.get_ref())?;
         sock::fcntl_write(self.fd.get_ref(), flags | O_NONBLOCK)?;
         Ok(SeqPacket { socket: self })
@@ -631,10 +652,13 @@ impl SeqPacket {
     pub async fn connect(addr: SocketAddr) -> Result<Self> {
         let socket = Socket::<SeqPacket>::new_seq_packet()?;
         socket.bind(any_bind_addr(&addr))?;
-        let s = socket.connect(addr).await?;
-        // NOTE: Should set NON-BLOCKING mode AFTER the connect, otherwise, the
-        // host may refuse to connect.
-        Ok(s)
+        socket.connect(addr).await
+    }
+
+    pub async fn connect_blocking(addr: SocketAddr) -> Result<Self> {
+        let socket = Socket::<SeqPacket>::new_blocking_seq_packet()?;
+        socket.bind(any_bind_addr(&addr))?;
+        socket.connect_blocking(addr).await
     }
 
     /// Resets `SO_SNDBUF` value to `0`

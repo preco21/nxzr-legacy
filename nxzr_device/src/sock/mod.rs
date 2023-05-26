@@ -642,6 +642,7 @@ macro_rules! sock_priv {
             Ok(())
         }
 
+        #[allow(dead_code)]
         fn poll_shutdown_priv(&self, _cx: &mut Context, how: Shutdown) -> Poll<Result<()>> {
             self.shutdown_priv(how)?;
             Poll::Ready(Ok(()))

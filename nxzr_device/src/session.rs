@@ -162,9 +162,9 @@ impl PairedSession {
             ..Default::default()
         };
         Ok(Self {
-            ctl_client: l2cap::SeqPacket::connect(ctl_addr).await?,
+            ctl_client: l2cap::SeqPacket::connect_blocking(ctl_addr).await?,
             ctl_sa: ctl_addr,
-            itr_client: l2cap::SeqPacket::connect(itr_addr).await?,
+            itr_client: l2cap::SeqPacket::connect_blocking(itr_addr).await?,
             itr_sa: itr_addr,
         })
     }
