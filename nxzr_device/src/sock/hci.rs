@@ -90,11 +90,7 @@ impl fmt::Debug for Socket {
 impl Socket {
     pub fn new() -> Result<Socket> {
         Ok(Self {
-            fd: AsyncFd::new(sock::socket(
-                AF_BLUETOOTH,
-                SOCK_RAW | SOCK_CLOEXEC,
-                BTPROTO_HCI,
-            )?)?,
+            fd: AsyncFd::new(sock::socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)?)?,
         })
     }
 
