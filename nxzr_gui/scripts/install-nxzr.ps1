@@ -105,5 +105,3 @@ Write-Host "[IMPORTANT] Restart your computer and go to BIOS settings then enabl
 # Save logs.
 Write-Host "> Saving logs to $log_path"
 Stop-Transcript | Out-Null
-
-Read-Host -Prompt "Press enter key to continue"
