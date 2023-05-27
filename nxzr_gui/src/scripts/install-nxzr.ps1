@@ -99,9 +99,6 @@ Start-Process -FilePath "wsl.exe" -ArgumentList "--install --no-launch --web-dow
 Write-Host "> Checking for the `"Windows Subsystem for Linux (WSL)`" updates"
 Start-Process -FilePath "wsl.exe" -ArgumentList "--update --web-download" -Wait -NoNewWindow
 
-# The user will need to restart their computer on their own then make "Virtualization" feature available to the system.
-Write-Host "[IMPORTANT] Restart your computer and go to BIOS settings then enable `"Virtualization`" feature (e.g. AMD SVM Mode, Intel Virtualization Technology(VT))"
-
 # Save logs.
 Write-Host "> Saving logs to $log_path"
 Stop-Transcript | Out-Null
