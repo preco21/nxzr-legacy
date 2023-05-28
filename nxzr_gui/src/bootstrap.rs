@@ -29,7 +29,7 @@ pub enum BootstrapError {
     Command(#[from] SystemCommandError),
 }
 
-#[tracing::instrument(target = "gui_scripts")]
+#[tracing::instrument(target = "application_bootstrap")]
 pub async fn install_system_requirements() -> Result<(), BootstrapError> {
     tracing::info!("installing system requirements");
     // Create a file from embedded install script to temp directory.
@@ -69,12 +69,12 @@ pub async fn install_system_requirements() -> Result<(), BootstrapError> {
 /// it's complete.
 ///
 /// Which means you should not put any long-running tasks here.
+#[tracing::instrument(target = "application_bootstrap")]
 pub async fn bootstrap_program() -> Result<(), BootstrapError> {
     let Some(dirs) = common::get_app_dirs() else {
         return Err(BootstrapError::SetUpFailed);
     };
     // Create new global config dirs.
-    common::mkdir_p(dirs.cache_dir()).await?;
     common::mkdir_p(dirs.config_dir()).await?;
     common::mkdir_p(dirs.data_dir()).await?;
     Ok(())
@@ -105,6 +105,7 @@ pub async fn step_2_check_nxzr_agent() {
 
 /// Step 2. Installs the NXZR agent for the current system.
 pub async fn step_2_install_nxzr_agent() {
+    // 커널 다운로드
     // wsl.conf 생성
     // wsl 이미지 생성
     //
@@ -119,6 +120,7 @@ pub async fn step_2_install_nxzr_agent() {
 pub async fn prepare_daemon() -> Result<(), BootstrapError> {
     // 6. run nxzr_server setup --mode=config
     // 7. enable usbipd using usbipd_attach() below.
+    Ok(())
 }
 
 pub async fn check_wsl_installed() {
@@ -144,6 +146,7 @@ pub async fn install_wsl() {
 pub async fn install_ubuntu() -> Result<(), BootstrapError> {
     // # FIXME: Create an image with Ubuntu. (set password...)
     // # FIXME:
+    Ok(())
 }
 
 pub async fn install_nxzr() {
@@ -160,6 +163,7 @@ pub async fn usbipd_attach() -> Result<(), BootstrapError> {
     // B. usbipd attach
     // C. usbipd detach
     // ㄴ https://github.com/dorssel/usbipd-win/wiki/WSL-support
+    Ok(())
 }
 
 #[derive(Error, Debug)]
