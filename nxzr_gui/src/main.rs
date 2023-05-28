@@ -1,4 +1,6 @@
-mod external_scripts;
+mod bootstrap;
+mod common;
+mod config;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -7,7 +9,8 @@ async fn main() -> anyhow::Result<()> {
         .with_max_level(tracing::Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
+    bootstrap::bootstrap_program().await?;
     // Check whether the program runs with elevated privileges.
-    external_scripts::install_system_requirements().await?;
+    // bootstrap::install_system_requirements().await?;
     Ok(())
 }

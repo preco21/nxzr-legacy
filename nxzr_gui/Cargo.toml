@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.71"
+directories = "5.0.1"
 powershell_script = "1.1.0"
 run_script = "0.10.1"
 tempfile = "3.5.0"
