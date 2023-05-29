@@ -131,7 +131,7 @@ impl Protocol {
             async move {
                 tokio::select! {
                     res = fut => res,
-                    _ = internal_close_rx.recv() => return Result::<(), ProtocolError>::Ok(()),
+                    _ = internal_close_rx.recv() => return Ok::<(), ProtocolError>(()),
                 }
             }
         };
@@ -142,7 +142,7 @@ impl Protocol {
             async move {
                 tokio::select! {
                     res = fut => res,
-                    _ = internal_close_rx.recv() => return Result::<(), ProtocolError>::Ok(()),
+                    _ = internal_close_rx.recv() => return Ok::<(), ProtocolError>(()),
                 }
             }
         };
@@ -157,13 +157,11 @@ impl Protocol {
                 // point) is very important because otherwise, the host will not
                 // send any further responses after last sending `spi_read`
                 // command.
-                let blank_report_sender = {
-                    tokio::spawn(Self::create_blank_report_sender(
-                        transport,
-                        protocol.clone(),
-                        connected_tx,
-                    ))
-                };
+                let blank_report_sender = tokio::spawn(Self::create_blank_report_sender(
+                    transport,
+                    protocol.clone(),
+                    connected_tx,
+                ));
                 tokio::select! {
                     _ = protocol.writer_ready() => {
                         // Allow the task to send one last command.
@@ -176,7 +174,7 @@ impl Protocol {
                 blank_report_sender.await.map_err(|err| {
                     ProtocolError::Internal(ProtocolInternalError::JoinError(err.to_string()))
                 })??;
-                Result::<(), ProtocolError>::Ok(())
+                Ok::<(), ProtocolError>(())
             }
         };
         set.spawn(reader_fut);
@@ -351,7 +349,7 @@ impl Protocol {
                 _ = connected_tx.closed() => break,
             }
         }
-        Result::<(), ProtocolError>::Ok(())
+        Ok::<(), ProtocolError>(())
     }
 }
 
