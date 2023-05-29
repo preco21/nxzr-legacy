@@ -1,10 +1,15 @@
 use crate::config;
+use std::io::SeekFrom;
+use std::process::Stdio;
 use std::{io, path::Path};
 use tempfile::TempDir;
 use thiserror::Error;
 use tokio::fs::{self, File};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::mpsc;
+use tokio::task::JoinError;
+use tokio::time;
 
 pub fn get_app_dirs() -> Option<directories::ProjectDirs> {
     directories::ProjectDirs::from(config::QUALIFIER, config::ORGANIZATION, config::APP_NAME)
@@ -17,6 +22,20 @@ pub async fn mkdir_p<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn trim_string_whitespace(input: String) -> String {
+    input
+        .trim()
+        .lines()
+        .map(|part| {
+            part.trim()
+                .split_inclusive(char::is_whitespace)
+                .filter(|part| !part.trim().is_empty())
+                .collect()
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
 }
 
 pub async fn create_file_from_raw(path: &Path, raw_bytes: &[u8]) -> io::Result<()> {
@@ -33,12 +52,15 @@ pub enum SystemCommandError {
     CommandFailed(String),
     #[error("utf8: {0}")]
     Utf8Error(#[from] std::str::Utf8Error),
+    #[error("join error: {0}")]
+    JoinError(#[from] JoinError),
     #[error("io: {0}")]
     Io(#[from] io::Error),
 }
 
 pub async fn run_system_command(mut command: Command) -> Result<(), SystemCommandError> {
     let output = command.output().await?;
+    println!("{:?}", output);
     if !output.status.success() {
         return Err(SystemCommandError::CommandFailed(
             std::str::from_utf8(&output.stderr)?.to_owned(),
@@ -49,19 +71,11 @@ pub async fn run_system_command(mut command: Command) -> Result<(), SystemComman
 
 pub async fn run_powershell_script(
     script: &str,
+    args: Option<Vec<String>>,
     privileged: bool,
 ) -> Result<(), SystemCommandError> {
     // Create a file from embedded install script to temp directory.
     let dir = TempDir::new()?;
-    let script_path = dir.path().join("script.ps1");
-    let Some(script_path_str) = script_path.to_str() else {
-        return Err(SystemCommandError::CommandFailed("failed to convert script file path".to_string()));
-    };
-    create_file_from_raw(&script_path, script.as_bytes()).await?;
-    tracing::info!(
-        "running PowerShell script temporarily created at: {}",
-        script_path_str
-    );
     if privileged {
         // Current version of the PowerShell does not allow you to redirect
         // "standard output" of the elevated spawned script process.
@@ -69,86 +83,142 @@ pub async fn run_powershell_script(
         // So here we are using a hack to retrieve the output of the script. The
         // idea is that, using "Start-Transcript" to log output into a file,
         // then the program continuously reads it until the script finishes.
-        let uac_helper_logs_path = dir.path().join("output.ps1");
-        let Some(logs_path_str) = uac_helper_logs_path.to_str() else {
-            return Err(SystemCommandError::CommandFailed("failed to convert log file path".to_string()));
-        };
-        #[rustfmt::skip]
-        let uac_helper_str = format!(r#"
-            Set-StrictMode -Version Latest
-            $ErrorActionPreference = "Stop"
-
-            Start-Transcript -Path {logs_path_str}
-            Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File {script_path_str}" -Wait -Verb RunAs
-            Stop-Transcript
-
-            powershell.exe -Command "&{{start-process powershell 'Start-Transcript -Path .\out.txt; write-host test; stop-transcript; read-host foobar' -Wait -Verb RunAs}}"
-        "#);
+        let log_path = dir.path().join("output.txt");
+        let log_path_str = log_path.to_str().ok_or_else(|| {
+            SystemCommandError::CommandFailed("failed to convert log file path".to_string())
+        })?;
+        // powershell.exe -Command "&{{start-process powershell 'Start-Transcript -Path .\out.txt; write-host test; stop-transcript; read-host foobar' -Wait -Verb RunAs}}"
+        // PowerShell.exe -NoProfile -ExecutionPolicy Bypass -Command "& {Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File ""C:\users\plusb\repos\nxzr\nxzr_gui\src\scripts\install-nxzr.ps1""' -Verb RunAs -WindowStyle Hidden -RedirectStandardOutput -Wait}"
         // FIXME: you can't do this, start transcript must be started from the final file...
-        let wrapped_script_path = dir.path().join("uac-helper.ps1");
-        create_file_from_raw(&wrapped_script_path, uac_helper_str.as_bytes()).await?;
-        let Some(wrapped_path_str) = script_path.to_str() else {
-            return Err(SystemCommandError::CommandFailed("failed to convert wrapper script file path".to_string()));
+
+        // powershell.exe -Command "&{{start-process powershell -File {1번} -Wait -Verb RunAs}}"
+        // powershell -command "&{Start-Process -filepath 'cmd' -argumentlist '/c cmd.exe' -verb
+        #[rustfmt::skip]
+        let wrapped_script = trim_string_whitespace(format!(r#"
+            Start-Transcript -Force -Path {log_path_str}
+            {script}
+            Stop-Transcript
+        "#));
+        let wrapper_script_path = dir.path().join("script-runas.ps1");
+        create_file_from_raw(&wrapper_script_path, wrapped_script.as_bytes()).await?;
+        let wrapped_path_str = wrapper_script_path.to_str().ok_or_else(|| {
+            SystemCommandError::CommandFailed(
+                "failed to convert wrapper script file path".to_string(),
+            )
+        })?;
+        tracing::info!(
+            "running PowerShell script temporarily created at: {}",
+            wrapped_path_str
+        );
+        let joined_args = match args {
+            Some(args) => format!(" {}", args.join(" ")),
+            None => "".to_string(),
         };
-        run_system_command({
-            let mut cmd = Command::new("powershell.exe");
-            cmd.args(&[
-                "-NonInteractive",
-                "-NoLogo",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                wrapped_path_str,
-            ]);
-            cmd
-        })
-        .await?;
-        // common::run_system_command({
-        //     let mut cmd = Command::new("powershell.exe");
-        //     cmd.args(&[
-        //         "-NoLogo",
-        //         "-NonInteractive",
-        //         "-NoProfile",
-        //         "-ExecutionPolicy",
-        //         "Bypass",
-        //         "-WindowStyle",
-        //         "Normal",
-        //         "-File",
-        //         str_path,
-        //     ]);
-        //     cmd
-        // })
-        // .await?;
+        let cmd_str = format!(
+            "Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{wrapped_path_str}\"{joined_args}' -Wait -Verb RunAs"
+        );
+        // Touch the log file.
+        File::create(&log_path).await?;
+        // Spawn a task to observe logs.
+        let (close_tx, close_rx) = mpsc::channel::<()>(1);
+        let handle = tokio::spawn(async move {
+            let mut bytes: Vec<u8> = vec![];
+            let mut position: usize = 0;
+            loop {
+                tokio::select! {
+                    res = async {
+                        // HACK: In Windows, it seems a file does not read from
+                        // the most latest changes when reusing the file handle
+                        // that is already open.
+                        //
+                        // So, here we are just re-opening a file every loop
+                        // round as a hack.
+                        //
+                        // For performance and resource implications, this
+                        // function will only be called for the setup, so it
+                        // will be just fine for the case.
+                        let mut log_file = File::open(&log_path).await?;
+                        log_file.seek(SeekFrom::Start(position as u64)).await?;
+                        bytes.truncate(0);
+                        position += log_file.read_to_end(&mut bytes).await?;
+                        let content = String::from_utf8_lossy(&bytes[..]);
+                        // FIXME: to return stream + handle instead
+                        if !content.is_empty() {
+                            print!("{}", content);
+                        }
+                        time::sleep(time::Duration::from_millis(400)).await;
+                        io::Result::<()>::Ok(())
+                    } => res?,
+                    _ = close_tx.closed() => break,
+                }
+            }
+            Ok::<(), SystemCommandError>(())
+        });
+        let ret = tokio::select! {
+            res = handle => {
+                println!("{:?}", res);
+                res.map_err(|err| SystemCommandError::JoinError(err)).and_then(|x| x)
+            },
+            res = run_system_command({
+                let mut cmd = Command::new("powershell.exe");
+                cmd.args(&[
+                    "-NonInteractive",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    cmd_str.as_str(),
+                ]);
+                cmd
+            }) => res,
+        };
+        // Cleanup background tasks.
+        drop(close_rx);
+        ret
     } else {
-        // common::run_system_command({
-        //     let mut cmd = Command::new("powershell.exe");
-        //     cmd.args(&[
-        //         "-NoLogo",
-        //         "-NoProfile",
-        //         "-NonInteractive",
-        //         "-WindowStyle",
-        //         "Normal",
-        //         "-File",
-        //         str_path,
-        //     ]);
-        //     cmd
-        // })
-        // .await?;
-    }
-    // FIXME: this will be closed immediately...
-    run_system_command({
+        let script_path = dir.path().join("script.ps1");
+        let script_path_str = script_path.to_str().ok_or_else(|| {
+            SystemCommandError::CommandFailed("failed to convert script file path".to_string())
+        })?;
+        create_file_from_raw(&script_path, script.as_bytes()).await?;
+        tracing::info!(
+            "running PowerShell script temporarily created at: {}",
+            script_path_str
+        );
         let mut cmd = Command::new("powershell.exe");
         cmd.args(&[
-            "-NoLogo",
             "-NonInteractive",
-            "-WindowStyle",
-            "Normal",
+            "-NoLogo",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
             "-File",
             script_path_str,
         ]);
-        cmd
-    })
-    .await?;
-    Ok(())
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+        let mut child = cmd.spawn()?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stdout".to_string()))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stderr".to_string()))?;
+        let stdout_reader = BufReader::new(stdout);
+        let stderr_reader = BufReader::new(stderr);
+        let combined = stdout_reader.chain(stderr_reader);
+        let mut lines = combined.lines();
+        let handle = tokio::spawn(async move {
+            child.wait().await.unwrap();
+        });
+        while let Some(line) = lines.next_line().await? {
+            // FIXME: to return stream + handle instead of println.
+            println!("{}", line);
+        }
+        handle.await?;
+        Ok(())
+    }
 }

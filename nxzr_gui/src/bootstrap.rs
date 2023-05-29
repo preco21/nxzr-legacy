@@ -1,13 +1,7 @@
 use anyhow::Result;
-use std::{
-    fs,
-    io::{self, Stderr, Stdout},
-    path::Path,
-    process::Stdio,
-};
+use std::io;
 use tempfile::TempDir;
 use thiserror::Error;
-use tokio::{fs::File, io::AsyncWriteExt, process::Command};
 
 use crate::common;
 
@@ -18,15 +12,10 @@ pub enum BootstrapError {
     #[error("setup failed")]
     SetUpFailed,
 
-    #[error("failed to install NXZR: {0}")]
-    NxzrInstallFailed(String),
-    #[error("failed to setup config: {0}")]
-    ConfigSetupFailed(String),
-
     #[error("io: {0}")]
     Io(#[from] io::Error),
     #[error("command failed: {0}")]
-    Command(#[from] SystemCommandError),
+    Command(#[from] common::SystemCommandError),
 }
 
 #[tracing::instrument(target = "application_bootstrap")]
@@ -34,31 +23,27 @@ pub async fn install_system_requirements() -> Result<(), BootstrapError> {
     tracing::info!("installing system requirements");
     // Create a file from embedded install script to temp directory.
     let dir = TempDir::new()?;
-    let script_path = dir.path().join("install.ps1");
-    let mut script_file = File::create(&script_path).await?;
-    script_file
-        .write_all(INSTALL_NXZR_SCRIPT.as_bytes())
-        .await?;
-    let Some(str_path) = script_path.to_str() else {
-        return Err(BootstrapError::NxzrInstallFailed("unable to convert script file path".to_owned()));
-    };
-    drop(script_file);
-    tracing::info!("created temporary install script at: {str_path}");
-    tracing::info!("running command...");
-    // FIXME: this will be closed immediately...
-    run_system_command({
-        let mut cmd = Command::new("powershell.exe");
-        cmd.args(&[
-            "-NoLogo",
-            "-NonInteractive",
-            "-WindowStyle",
-            "Normal",
-            "-File",
-            str_path,
-        ]);
-        cmd
-    })
-    .await?;
+    // let script_path = dir.path().join("install.ps1");
+    // let mut script_file = File::create(&script_path).await?;
+    // script_file
+    //     .write_all(INSTALL_NXZR_SCRIPT.as_bytes())
+    //     .await?;
+    // drop(script_file);
+    // tracing::info!("running command...");
+    // // FIXME: this will be closed immediately...
+    // common::run_system_command({
+    //     let mut cmd = Command::new("powershell.exe");
+    //     cmd.args(&[
+    //         "-NoLogo",
+    //         "-NonInteractive",
+    //         "-WindowStyle",
+    //         "Normal",
+    //         "-File",
+    //         str_path,
+    //     ]);
+    //     cmd
+    // })
+    // .await?;
     Ok(())
 }
 
@@ -97,18 +82,21 @@ pub async fn step_1_install_wsl_infrastructure() {
 
 /// Step 2. Checks for NXZR agent installation and its configuration.
 pub async fn step_2_check_nxzr_agent() {
-    // nxzr 폴더 커널 확인
+    // nxzr data 폴더 커널 확인
     // wsl.conf 확인
     // WSL 이미지 존재 확인
-    // WSL 켜서 드라이버 확인
+    // WSL 켜서 드라이버 확인 (블루투스 agent 작동 여부 확인)
 }
 
 /// Step 2. Installs the NXZR agent for the current system.
 pub async fn step_2_install_nxzr_agent() {
     // 커널 다운로드
     // wsl.conf 생성
-    // wsl 이미지 생성
-    //
+    // wsl 이미지 생성 (비밀번호 설정)
+    // NXZR Server 다운로드 및 적재
+    // nxzr_server setup --install 실행
+    // WSL 재시작
+    // nxzr_server setup --config 실행
 }
 
 // 1. WSL 설치
@@ -163,25 +151,5 @@ pub async fn usbipd_attach() -> Result<(), BootstrapError> {
     // B. usbipd attach
     // C. usbipd detach
     // ㄴ https://github.com/dorssel/usbipd-win/wiki/WSL-support
-    Ok(())
-}
-
-#[derive(Error, Debug)]
-pub enum SystemCommandError {
-    #[error("failed to execute a command: {0}")]
-    CommandFailed(String),
-    #[error("utf8: {0}")]
-    Utf8Error(#[from] std::str::Utf8Error),
-    #[error("io: {0}")]
-    Io(#[from] io::Error),
-}
-
-async fn run_system_command(mut command: Command) -> Result<(), SystemCommandError> {
-    let output = command.output().await?;
-    if !output.status.success() {
-        return Err(SystemCommandError::CommandFailed(
-            std::str::from_utf8(&output.stderr)?.to_owned(),
-        ));
-    }
     Ok(())
 }

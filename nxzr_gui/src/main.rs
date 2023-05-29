@@ -10,6 +10,7 @@ async fn main() -> anyhow::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
     bootstrap::bootstrap_program().await?;
+    common::run_powershell_script(include_str!("scripts/echo-test.ps1"), None, true).await?;
     // Check whether the program runs with elevated privileges.
     // bootstrap::install_system_requirements().await?;
     Ok(())
