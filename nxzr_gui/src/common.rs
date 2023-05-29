@@ -1,12 +1,12 @@
 use crate::config;
-use std::io::SeekFrom;
+use std::io::{self, SeekFrom};
+use std::path::Path;
 use std::process::Stdio;
-use std::{io, path::Path};
 use tempfile::TempDir;
 use thiserror::Error;
 use tokio::fs::{self, File};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
-use tokio::process::Command;
+use tokio::process::{Child, ChildStderr, ChildStdout, Command};
 use tokio::sync::mpsc;
 use tokio::task::JoinError;
 use tokio::time;
@@ -60,13 +60,31 @@ pub enum SystemCommandError {
 
 pub async fn run_system_command(mut command: Command) -> Result<(), SystemCommandError> {
     let output = command.output().await?;
-    println!("{:?}", output);
     if !output.status.success() {
         return Err(SystemCommandError::CommandFailed(
             std::str::from_utf8(&output.stderr)?.to_owned(),
         ));
     }
     Ok(())
+}
+
+pub async fn spawn_system_command(
+    mut command: Command,
+) -> Result<(Child, BufReader<ChildStdout>, BufReader<ChildStderr>), SystemCommandError> {
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+    let mut child = command.spawn()?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stdout".to_string()))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stderr".to_string()))?;
+    let stdout_reader = BufReader::new(stdout);
+    let stderr_reader = BufReader::new(stderr);
+    Ok((child, stdout_reader, stderr_reader))
 }
 
 pub async fn run_powershell_script(
@@ -87,12 +105,6 @@ pub async fn run_powershell_script(
         let log_path_str = log_path.to_str().ok_or_else(|| {
             SystemCommandError::CommandFailed("failed to convert log file path".to_string())
         })?;
-        // powershell.exe -Command "&{{start-process powershell 'Start-Transcript -Path .\out.txt; write-host test; stop-transcript; read-host foobar' -Wait -Verb RunAs}}"
-        // PowerShell.exe -NoProfile -ExecutionPolicy Bypass -Command "& {Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File ""C:\users\plusb\repos\nxzr\nxzr_gui\src\scripts\install-nxzr.ps1""' -Verb RunAs -WindowStyle Hidden -RedirectStandardOutput -Wait}"
-        // FIXME: you can't do this, start transcript must be started from the final file...
-
-        // powershell.exe -Command "&{{start-process powershell -File {1번} -Wait -Verb RunAs}}"
-        // powershell -command "&{Start-Process -filepath 'cmd' -argumentlist '/c cmd.exe' -verb
         #[rustfmt::skip]
         let wrapped_script = trim_string_whitespace(format!(r#"
             Start-Transcript -Force -Path {log_path_str}
@@ -115,7 +127,7 @@ pub async fn run_powershell_script(
             None => "".to_string(),
         };
         let cmd_str = format!(
-            "Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{wrapped_path_str}\"{joined_args}' -Wait -Verb RunAs"
+            "Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{wrapped_path_str}\"{joined_args}' -Wait -Verb RunAs -WindowStyle Hidden"
         );
         // Touch the log file.
         File::create(&log_path).await?;
@@ -147,7 +159,7 @@ pub async fn run_powershell_script(
                             print!("{}", content);
                         }
                         time::sleep(time::Duration::from_millis(400)).await;
-                        io::Result::<()>::Ok(())
+                        Ok::<(), SystemCommandError>(())
                     } => res?,
                     _ = close_tx.closed() => break,
                 }
@@ -155,10 +167,7 @@ pub async fn run_powershell_script(
             Ok::<(), SystemCommandError>(())
         });
         let ret = tokio::select! {
-            res = handle => {
-                println!("{:?}", res);
-                res.map_err(|err| SystemCommandError::JoinError(err)).and_then(|x| x)
-            },
+            res = handle => res.map_err(|err| err.into()).and_then(|x| x),
             res = run_system_command({
                 let mut cmd = Command::new("powershell.exe");
                 cmd.args(&[
@@ -196,29 +205,17 @@ pub async fn run_powershell_script(
             "-File",
             script_path_str,
         ]);
-        cmd.stdout(Stdio::piped());
-        cmd.stderr(Stdio::piped());
-        let mut child = cmd.spawn()?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stdout".to_string()))?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stderr".to_string()))?;
-        let stdout_reader = BufReader::new(stdout);
-        let stderr_reader = BufReader::new(stderr);
-        let combined = stdout_reader.chain(stderr_reader);
-        let mut lines = combined.lines();
+        let (mut child, stdout_reader, stderr_reader) = spawn_system_command(cmd).await?;
+        let mut combined_lines = stdout_reader.chain(stderr_reader).lines();
         let handle = tokio::spawn(async move {
-            child.wait().await.unwrap();
+            child.wait().await?;
+            Ok::<(), SystemCommandError>(())
         });
-        while let Some(line) = lines.next_line().await? {
+        while let Some(line) = combined_lines.next_line().await? {
             // FIXME: to return stream + handle instead of println.
             println!("{}", line);
         }
-        handle.await?;
+        handle.await??;
         Ok(())
     }
 }
