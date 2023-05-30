@@ -107,9 +107,9 @@ pub async fn run_powershell_script(
         })?;
         #[rustfmt::skip]
         let wrapped_script = trim_string_whitespace(format!(r#"
-            Start-Transcript -Force -Path {log_path_str}
+            Start-Transcript -Force -Path {log_path_str} | Out-Null
             {script}
-            Stop-Transcript
+            Stop-Transcript | Out-Null
         "#));
         let wrapper_script_path = dir.path().join("script-runas.ps1");
         create_file_from_raw(&wrapper_script_path, wrapped_script.as_bytes()).await?;
