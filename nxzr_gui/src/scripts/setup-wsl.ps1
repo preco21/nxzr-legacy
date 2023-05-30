@@ -3,8 +3,7 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "> This script will automatically setup WSL for NXZR..."
 
-# FIXME: Make sure the resource kernel is in place
-
+# FIXME: Make sure the resource kernel is in place and replace kernel=*
 # Create a global `.wslconfig` to current user's folder.
 Write-Host "> Creating a global `".wslconfig`" file"
 $wsl_conf_content = @"
@@ -40,12 +39,32 @@ else {
     $wsl_conf_content | Set-Content $wsl_conf_path -Force
 }
 
-# # Enable `systemd` in WSL.
-# $command = @"
-# cat <<'EOF' > /etc/wsl.conf
-# [boot]
-# systemd = true
-# command = "systemctl start dbus-broker.service bluetooth.service"
-# EOF
-# "@.Trim()
-# Start-Process -FilePath "wsl.exe" -ArgumentList "-u root", $command -NoNewWindow -Wait
+# Check if there's existing distro called "nxzr-agent" and remove it.
+
+# FIXME: Create a new distro from scratch and just import it...
+# https://medium.com/nerd-for-tech/create-your-own-wsl-distro-using-docker-226e8c9dbffe
+# https://endjin.com/blog/2021/11/setting-up-multiple-wsl-distribution-instances
+
+# Create a new distro called "nxzr-agent".
+wsl --set-default-version 2
+
+wsl --install Ubuntu --web-download
+
+# Enable `systemd` in "nxzr-agent".
+$command = @"
+cat <<'EOF' > /etc/wsl.conf
+[boot]
+systemd = true
+command = "systemctl start dbus-broker.service bluetooth.service"
+EOF
+"@.Trim()
+Start-Process -FilePath "wsl.exe" -ArgumentList "-u root", "-d nxzr-agent", $command -NoNewWindow -Wait
+
+# Move `nxzr_server` binary into "nxzr-agent".
+
+# Run `nxzr_server --install` to install and upgrade internal dependencies .
+
+# Shutdown WSL for finalizing the setup.
+wsl --shutdown
+
+# Run `nxzr_server --config` to update config. (no restart required)
