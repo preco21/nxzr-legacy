@@ -127,7 +127,7 @@ pub async fn run_powershell_script(
             None => "".to_string(),
         };
         let cmd_str = format!(
-            "Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{wrapped_path_str}\"{joined_args}' -Wait -Verb RunAs -WindowStyle Hidden"
+            "$p = Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{wrapped_path_str}\"{joined_args}' -Wait -Verb RunAs -WindowStyle Hidden -PassThru; if ($p.ExitCode -ne 0) {{ throw \"process exited with non-zero status code\" }}"
         );
         // Touch the log file.
         File::create(&log_path).await?;
@@ -208,7 +208,16 @@ pub async fn run_powershell_script(
         let (mut child, stdout_reader, stderr_reader) = spawn_system_command(cmd).await?;
         let mut combined_lines = stdout_reader.chain(stderr_reader).lines();
         let handle = tokio::spawn(async move {
-            child.wait().await?;
+            let status = child.wait().await?;
+            if !status.success() {
+                return Err(SystemCommandError::CommandFailed(format!(
+                    "process exited with non-zero status code: {}",
+                    status
+                        .code()
+                        .map(|code| code.to_string())
+                        .unwrap_or("n/a".to_string())
+                )));
+            }
             Ok::<(), SystemCommandError>(())
         });
         while let Some(line) = combined_lines.next_line().await? {
