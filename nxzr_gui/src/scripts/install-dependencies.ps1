@@ -1,3 +1,6 @@
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
 function New-TemporaryDirectory {
     $parent = [System.IO.Path]::GetTempPath()
     [string] $name = [System.Guid]::NewGuid()
@@ -53,17 +56,16 @@ function Get-WindowsVersion {
     return [int]$display_version.SubString(0, 2)
 }
 
+# System compatibility checks.
 $windows_version = Get-WindowsVersion
 if ($windows_version -lt 22) {
     Write-Error "Your Windows version ($windows_version) is not compatible with NXZR: Please install the Windows Updates `"22H2`" or higher"
-    Read-Host -Prompt "Press enter key to continue"
-    Exit
+    Exit 1
 }
 
 if (!(Test-CommandAvailable -Command "winget")) {
     Write-Error "Unable to find the command `"winget`". Make sure to open Microsoft Store once to download required components."
-    Read-Host -Prompt "Press enter key to continue"
-    Exit
+    Exit 1
 }
 
 Write-Host "> This script will automatically install required dependencies of NXZR..."
