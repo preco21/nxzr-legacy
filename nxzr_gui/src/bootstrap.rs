@@ -68,6 +68,10 @@ pub async fn bootstrap_program() -> Result<(), BootstrapError> {
 /// These scripts are responsible checking / installing infrastructures and
 /// system requirements that is required to run NXZR for the current system.
 
+// FIMXE: 1. import with wsl version 2...
+// 2. make sure kernel image
+// 3. import
+
 /// Step 1. Checks for WSL infrastructure installation.
 pub async fn step_1_check_wsl_infrastructure() {
     // 1. WSL 설치 여부

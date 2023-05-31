@@ -34,3 +34,7 @@ Install [msvc-wsl-rust](https://github.com/strickczq/msvc-wsl-rust) and make an 
 git clone https://github.com/strickczq/msvc-wsl-rust.git msvc-linker
 chmod a+x msvc-linker/*.sh
 ```
+
+## Building a new distro image for the user's WSL
+
+[WIP]
