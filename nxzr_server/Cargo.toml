@@ -32,3 +32,4 @@ thiserror = "1.0.40"
 [features]
 # Forward `cross` feature to cross-compile linux-specific crates
 cross-linux = ["nxzr_device/cross-linux"]
+setup-support = []

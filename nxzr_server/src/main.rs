@@ -19,6 +19,7 @@ struct Cli {
 enum Cmd {
     /// Run server daemon
     Run(RunOpts),
+    #[cfg(feature = "setup-support")]
     /// Run setup
     Setup(SetupOpts),
 }
