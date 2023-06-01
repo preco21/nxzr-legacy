@@ -95,6 +95,7 @@ impl ValueEnum for SetupMode {
 }
 
 impl SetupOpts {
+    #[allow(dead_code)]
     pub async fn perform(self) -> anyhow::Result<()> {
         match self.mode {
             SetupMode::InstallServer => {
@@ -125,6 +126,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     match args.command {
         Cmd::Run(r) => r.perform().await?,
+        #[cfg(feature = "setup-support")]
         Cmd::Setup(r) => r.perform().await?,
     }
     Ok(())
