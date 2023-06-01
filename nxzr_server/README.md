@@ -1,6 +1,6 @@
 # nxzr_server
 
-> server daemon application
+> Server daemon application
 
 ## Installation
 
