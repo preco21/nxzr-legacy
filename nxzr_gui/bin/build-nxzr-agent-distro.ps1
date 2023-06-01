@@ -3,11 +3,20 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "> This script will build a new agent image for NXZR..."
 
+# Check if there's existing base `Ubuntu` distro, if so, cancel running the script.
+Write-Host "> Checking whether there's base image already exists..."
+$base_distro_name = "Ubuntu"
+$base_ubuntu_distro_exists = (wsl.exe --list --quiet) -contains $base_distro_name
+if ($base_ubuntu_distro_exists) {
+    Write-Error "> The base WSL distribution `"$base_distro_name`" already exists, aborting the script due to dirty status."
+    Exit 1
+}
+
 # Check if there's existing distro called "nxzr-agent" and remove it.
 $distro_name = "nxzr-agent"
 Write-Host "> This script will build a new agent distro image for NXZR..."
-$existing_agent_distro = wsl.exe --list --quiet | Where-Object { $_ -like "*$distro_name*" }
-if ($existing_agent_distro) {
+$agent_distro_exists = (wsl.exe --list --quiet) -contains $distro_name
+if ($agent_distro_exists) {
     # Stop and unregister the distribution.
     wsl.exe --terminate $distro_name
     wsl.exe --unregister $distro_name
@@ -18,14 +27,23 @@ else {
 }
 
 # Set default wsl version to 2
-Start-Process -FilePath "wsl.exe" -ArgumentList "--set-default-version 2" -NoNewWindow -Wait
+wsl.exe --set-default-version 2
 
 # Download a base image.
-Start-Process -FilePath "wsl.exe" -ArgumentList "--install Ubuntu --web-download" -NoNewWindow -Wait
+wsl.exe --install Ubuntu --web-download
 
-# Create a new distro called "nxzr-agent". (export / import?)
+# Create temporary directory to work with.
+$tempdir = New-TemporaryDirectory
+Write-Host "> Using temporary directory: $tempdir"
 
-# FIXME: run script in wsl with -e script...
+# Set a variable pointing to home directory.
+$home_dir = [System.Environment]::ExpandEnvironmentVariables("%USERPROFILE%")
+
+# Create a new distro called "nxzr-agent".
+$nxzr_agent_tar = Join-Path $tempdir "nxzr-agent.tar"
+wsl.exe --export Ubuntu $nxzr_agent_tar
+wsl.exe --import "nxzr-agent" (Join-Path $home_dir ".wsl/nxzr-agent") $nxzr_agent_tar
+
 $command = @"
 cat <<'EOF' > /etc/wsl.conf
 [boot]
@@ -35,9 +53,14 @@ EOF
 "@.Trim()
 Start-Process -FilePath "wsl.exe" -ArgumentList "-u root", "-d nxzr-agent", $command -NoNewWindow -Wait
 
-# Run pre
+# Run pre-installation setup.
+wsl.exe -e "$(Join-Path $PSScriptRoot "pre-wsl-distro.sh")"
 
 # Shutdown WSL for finalizing the setup.
-wsl --shutdown
+wsl.exe --shutdown
 
-# Run post
+# Run post-installation setup.
+wsl.exe -e "$(Join-Path $PSScriptRoot "post-wsl-distro.sh")"
+
+# Cleanup the temporary directory.
+Remove-Item $tempdir -Recurse

@@ -25,7 +25,7 @@ function Get-LatestGitHubReleaseBinary {
     $download_url = "https://github.com/$repo/releases/download/$tag/$asset_name"
     Write-Host "> Downloading binary from the latest release - $asset_name at $tag"
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $outpath = (Join-Path $Dir $asset_name)
+    $outpath = Join-Path $Dir $asset_name
     Invoke-WebRequest $download_url -Out $outpath
     return $outpath
 }
