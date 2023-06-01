@@ -31,8 +31,8 @@ Write-Host "> Setting default WSL version to 2..."
 wsl.exe --set-default-version 2
 
 # Download a base image.
-Write-Host "> Installing WSL distro: Ubuntu..."
-wsl.exe --install Ubuntu --web-download
+Write-Host "> Installing WSL distro: $base_distro_name..."
+wsl.exe --install $base_distro_name --web-download
 
 # Create temporary directory to work with.
 $tempdir = New-TemporaryDirectory
@@ -41,10 +41,10 @@ Write-Host "> Using temporary directory: $tempdir"
 # Set a variable pointing to home directory.
 $home_dir = [System.Environment]::ExpandEnvironmentVariables("%USERPROFILE%")
 
-# Create a new distro called "nxzr-agent".
-$nxzr_agent_tar = Join-Path $tempdir "nxzr-agent.tar"
-wsl.exe --export Ubuntu $nxzr_agent_tar
-wsl.exe --import "nxzr-agent" (Join-Path $home_dir ".wsl/nxzr-agent") $nxzr_agent_tar
+# Create a new distro for the agent.
+$nxzr_agent_tar = Join-Path $tempdir "$distro_name.tar"
+wsl.exe --export $base_distro_name $nxzr_agent_tar
+wsl.exe --import $distro_name (Join-Path $home_dir ".wsl/$distro_name") $nxzr_agent_tar
 
 $command = @"
 cat <<'EOF' > /etc/wsl.conf
@@ -53,7 +53,7 @@ systemd = true
 command = "systemctl start dbus-broker.service bluetooth.service"
 EOF
 "@.Trim()
-Start-Process -FilePath "wsl.exe" -ArgumentList "-u root", "-d nxzr-agent", $command -NoNewWindow -Wait
+Start-Process -FilePath "wsl.exe" -ArgumentList "-u root", "-d $distro_name", $command -NoNewWindow -Wait
 
 # Run pre-installation setup.
 wsl.exe -e "$(Join-Path $PSScriptRoot "pre-wsl-distro.sh")"
