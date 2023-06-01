@@ -27,9 +27,11 @@ else {
 }
 
 # Set default wsl version to 2
+Write-Host "> Setting default WSL version to 2..."
 wsl.exe --set-default-version 2
 
 # Download a base image.
+Write-Host "> Installing WSL distro: Ubuntu..."
 wsl.exe --install Ubuntu --web-download
 
 # Create temporary directory to work with.
