@@ -1,6 +1,12 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function New-TemporaryDirectory {
+    $parent = [System.IO.Path]::GetTempPath()
+    [string] $name = [System.Guid]::NewGuid()
+    New-Item -ItemType Directory -Path (Join-Path $parent $name)
+}
+
 Write-Host "> This script will build a new agent image for NXZR..."
 
 # Check if there's existing base `Ubuntu` distro, if so, cancel running the script.
@@ -8,7 +14,7 @@ Write-Host "> Checking whether there's base image already exists..."
 $base_distro_name = "Ubuntu"
 $base_ubuntu_distro_exists = (wsl.exe --list --quiet) -contains $base_distro_name
 if ($base_ubuntu_distro_exists) {
-    Write-Error "> The base WSL distribution `"$base_distro_name`" already exists, this might result in unclean build of distro."
+    Write-Host "> The base WSL distribution `"$base_distro_name`" already exists, this might result in unclean build of distro."
 }
 
 # Check if there's existing distro called "nxzr-agent" and remove it.
