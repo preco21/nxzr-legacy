@@ -6,41 +6,15 @@ Write-Host "> This script will build a new agent image for NXZR..."
 # Check if there's existing distro called "nxzr-agent" and remove it.
 $distro_name = "nxzr-agent"
 Write-Host "> This script will build a new agent distro image for NXZR..."
-$existing_agent_distro = wsl.exe --list --quiet | where { $_ -like "*$distro_name*" }
-if (!$existing_agent_distro) {
+$agent_distro_not_exists = (wsl.exe --list --quiet) -notcontains $distro_name
+if ($agent_distro_not_exists) {
     Write-Error "> Failed to locate desire distro of name: `"$distro_name`"."
     Exit 1
 }
 
-# Check if there's existing distro called "nxzr-agent" and remove it.
+# Set a variable pointing to home directory.
+$home_dir = [System.Environment]::ExpandEnvironmentVariables("%USERPROFILE%")
 
-# FIXME: Create a new distro from scratch and just import it...
-# https://medium.com/nerd-for-tech/create-your-own-wsl-distro-using-docker-226e8c9dbffe
-# https://endjin.com/blog/2021/11/setting-up-multiple-wsl-distribution-instances
-
-#
-Start-Process -FilePath "wsl.exe"
-
-# Create a new distro called "nxzr-agent".
-wsl --set-default-version 2
-
-wsl --install Ubuntu --web-download
-
-# Enable `systemd` in "nxzr-agent".
-$command = @"
-cat <<'EOF' > /etc/wsl.conf
-[boot]
-systemd = true
-command = "systemctl start dbus-broker.service bluetooth.service"
-EOF
-"@.Trim()
-Start-Process -FilePath "wsl.exe" -ArgumentList "-u root", "-d nxzr-agent", $command -NoNewWindow -Wait
-
-# Move `nxzr_server` binary into "nxzr-agent".
-
-# Run `nxzr_server --install` to install and upgrade internal dependencies .
-
-# Shutdown WSL for finalizing the setup.
-wsl --shutdown
-
-# Run `nxzr_server --config` to update config. (no restart required)
+# Try exports...
+Write-Host "> Exporting `"$distro_name`" to `"$home_dir`" ..."
+wsl --export $distro_name (Join-Path $home_dir "nxzr-agent.tar")
