@@ -16,3 +16,6 @@ Write-Host "> Removing distro: $base_distro_name..."
 wsl.exe --terminate $base_distro_name
 wsl.exe --unregister $base_distro_name
 wsl.exe --shutdown
+
+Write-Host "> Successfully removed the distro: $base_distro_name..."
+Write-Host "> However, you might need to manually remove the distro binary installed separately for your system. Search for the $base_distro_name then click `"Uninstall`"."
