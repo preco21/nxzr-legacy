@@ -8,8 +8,7 @@ Write-Host "> Checking whether there's base image already exists..."
 $base_distro_name = "Ubuntu"
 $base_ubuntu_distro_exists = (wsl.exe --list --quiet) -contains $base_distro_name
 if ($base_ubuntu_distro_exists) {
-    Write-Error "> The base WSL distribution `"$base_distro_name`" already exists, aborting the script due to dirty status."
-    Exit 1
+    Write-Error "> The base WSL distribution `"$base_distro_name`" already exists, this might result in unclean build of distro."
 }
 
 # Check if there's existing distro called "nxzr-agent" and remove it.
@@ -30,9 +29,11 @@ else {
 Write-Host "> Setting default WSL version to 2..."
 wsl.exe --set-default-version 2
 
-# Download a base image.
-Write-Host "> Installing WSL distro: $base_distro_name..."
-wsl.exe --install $base_distro_name --web-download
+# Download a base image if needed.
+if (-not $base_ubuntu_distro_exists) {
+    Write-Host "> Installing WSL distro: $base_distro_name..."
+    wsl.exe --install $base_distro_name --web-download
+}
 
 # Create temporary directory to work with.
 $tempdir = New-TemporaryDirectory
