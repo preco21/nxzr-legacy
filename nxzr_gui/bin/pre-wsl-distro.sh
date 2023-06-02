@@ -14,14 +14,17 @@ unset HISTFILE
 # Go to home directory.
 cd ~
 
+# FIXME: also, remove scripts from nxzr_server then put these on nxzr root/scrips?
+
 ## 2. Install or upgrade dependencies ##
 
+# FIXME: remove this?
 # Mark `needrestart` config to work with a non-interactive TTY.
-sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf
+# sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf
 
 # Upgrade all installed dependencies to latest as well as the distro.
 echo "> Checking for updates..."
-apt update && apt -y dist-upgrade
+apt update && NEEDRESTART_MODE=a apt -y dist-upgrade
 
 # Install required packages.
 #

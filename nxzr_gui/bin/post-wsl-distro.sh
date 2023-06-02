@@ -20,7 +20,7 @@ cd ~
 update-alternatives --install /usr/local/bin/usbip usbip `ls /usr/lib/linux-tools/*/usbip | tail -n1` 20
 
 # Enable `dbus-broker`.
-systemctl enable dbus-broker.service
+systemctl enable dbus-broker.service bluetooth.service
 
 # Prepare NXZR-friendly Bluetooth settings.
 #

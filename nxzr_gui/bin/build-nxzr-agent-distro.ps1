@@ -35,12 +35,14 @@ else {
 Write-Host "> Setting default WSL version to 2..."
 wsl.exe --set-default-version 2
 
+# FIXME: cannot receive stdin as for username/password...
 # Download a base image if needed.
 if (-not $base_ubuntu_distro_exists) {
     Write-Host "> Installing WSL distro: $base_distro_name..."
     wsl.exe --install $base_distro_name --web-download
 }
 
+# FIXME: maybe we do not need this...
 # Create temporary directory to work with.
 $tempdir = New-TemporaryDirectory
 Write-Host "> Using temporary directory: $tempdir"
@@ -48,12 +50,14 @@ Write-Host "> Using temporary directory: $tempdir"
 # Set a variable pointing to home directory.
 $home_dir = [System.Environment]::ExpandEnvironmentVariables("%USERPROFILE%")
 
+# FIXME: This operation is too expensive, can we do it only once?
 # Create a new distro for the agent.
 Write-Host "> Creating a new distro..."
 $nxzr_agent_tar = Join-Path $tempdir "$distro_name.tar"
 wsl.exe --export $base_distro_name $nxzr_agent_tar
 wsl.exe --import $distro_name (Join-Path $home_dir ".wsl/$distro_name") $nxzr_agent_tar
 
+# FIXME: this does not work
 Write-Host "> Setting `"wsl.conf`"..."
 $command = @"
 cat <<'EOF' > /etc/wsl.conf
@@ -64,13 +68,14 @@ EOF
 "@.Trim()
 Start-Process -FilePath "wsl.exe" -ArgumentList "-u root -d $distro_name $command" -NoNewWindow -Wait
 
+# FIXME: this requires ./../ kind of path not .\..\..
 # Run pre-installation setup.
 Write-Host "> Running pre-installation setup..."
 wsl.exe -e "$(Join-Path $PSScriptRoot "pre-wsl-distro.sh")"
 
 # Shutdown WSL for finalizing the setup.
-Write-Host "> Shutting down WSL..."
 wsl.exe --shutdown
+Write-Host "> Shutting down WSL..."
 
 Write-Host "> Wait for WSL to shutdown completely..."
 # Wait for WSL to shutdown completely.
