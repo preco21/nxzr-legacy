@@ -36,7 +36,6 @@ libc = "0.2.140"
 bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
 dbus = { version = "0.9.7", features = ["vendored"], optional = true }
 sudo = "0.6.0"
-systemctl = "0.1.9"
 
 [features]
 # Allows `cross` to cross-compile linux-specific crates

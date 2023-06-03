@@ -6,12 +6,6 @@ use tokio::process::Command;
 pub enum SysCheckError {
     #[error("privilege error, this program is required to run as root user")]
     RootPrivilegeRequired,
-    #[error("systemctl check failed")]
-    SysctlFailed,
-    #[error("Bluetooth service check failed: {0}")]
-    BluetoothFailed(String),
-    #[error("dbus service check failed: {0}")]
-    DBusFailed(String),
     #[error("cli tool presence check failed: {0}")]
     CliToolFailed(String),
     #[error("prepare failed")]
@@ -27,28 +21,6 @@ pub async fn check_privileges() -> Result<(), SysCheckError> {
 }
 
 pub async fn check_system_requirements() -> Result<(), SysCheckError> {
-    // Check if the Bluetooth service is active.
-    if !systemctl::exists("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
-        return Err(SysCheckError::BluetoothFailed(
-            "Bluetooth service does not exist.".to_owned(),
-        ));
-    };
-    if !systemctl::is_active("bluetooth.service").map_err(|_| SysCheckError::SysctlFailed)? {
-        return Err(SysCheckError::BluetoothFailed(
-            "Bluetooth service is not active.".to_owned(),
-        ));
-    }
-    // Check if the `dbus` service is active.
-    if !systemctl::exists("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
-        return Err(SysCheckError::DBusFailed(
-            "DBus service does not exist.".to_owned(),
-        ));
-    };
-    if !systemctl::is_active("dbus.service").map_err(|_| SysCheckError::SysctlFailed)? {
-        return Err(SysCheckError::DBusFailed(
-            "DBus service is not active.".to_owned(),
-        ));
-    }
     // Check if `hciconfig` exists.
     //
     // This will be used to manipulate HCI settings like MAC address, device classes, etc...
@@ -115,7 +87,7 @@ pub(crate) async fn set_adapter_address(
     })
     .await?;
     // Restart Bluetooth service.
-    restart_bluetooth_service()?;
+    restart_bluetooth_service().await?;
     Ok(())
 }
 
@@ -140,8 +112,14 @@ pub(crate) async fn set_device_class(
 }
 
 #[tracing::instrument(target = "system")]
-pub fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
-    systemctl::restart("bluetooth.service")?;
+pub async fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
+    tracing::info!("attempting to restart bluetooth service");
+    run_system_command({
+        let mut cmd = Command::new("service");
+        cmd.args(&["bluetooth", "restart"]);
+        cmd
+    })
+    .await?;
     Ok(())
 }
 
