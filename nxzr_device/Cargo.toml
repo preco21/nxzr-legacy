@@ -34,9 +34,5 @@ tokio = { version = "1.25.0", features = ["full"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2.140"
 bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
-dbus = { version = "0.9.7", features = ["vendored"], optional = true }
+dbus = { version = "0.9.7", features = ["vendored"] }
 sudo = "0.6.0"
-
-[features]
-# Allows `cross` to cross-compile linux-specific crates
-cross-linux = ["dep:dbus"]

@@ -27,7 +27,3 @@ anyhow = "1.0.71"
 termion = "2.0.1"
 clap = { version = "4.3.0", features = ["derive"] }
 thiserror = "1.0.40"
-
-[features]
-# Forward `cross` feature to cross-compile linux-specific crates
-cross-linux = ["nxzr_device/cross-linux"]

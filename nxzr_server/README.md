@@ -6,7 +6,7 @@
 
 ```shell
 # From Alpine Linux
-apk add git curl gcc musl-dev dbus-glib-dev pkgconfig bluez
+apk add git curl gcompat build-base dbus-dev dbus-glib-dev pkgconfig bluez
 
 # From Ubuntu
 apt install libdbus-1-dev pkg-config
