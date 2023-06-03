@@ -683,7 +683,6 @@ dependencies = [
  "clap",
  "nxzr_core",
  "nxzr_device",
- "run_script",
  "termion",
  "thiserror",
  "tokio",

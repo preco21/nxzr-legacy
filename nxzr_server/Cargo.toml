@@ -26,10 +26,8 @@ anyhow = "1.0.71"
 # FIXME: to remove
 termion = "2.0.1"
 clap = { version = "4.3.0", features = ["derive"] }
-run_script = "0.10.1"
 thiserror = "1.0.40"
 
 [features]
 # Forward `cross` feature to cross-compile linux-specific crates
 cross-linux = ["nxzr_device/cross-linux"]
-setup-support = []

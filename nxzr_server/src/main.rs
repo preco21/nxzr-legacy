@@ -5,7 +5,6 @@ use nxzr_device::{system, Address};
 use server::{ReconnectType, ServerOpts};
 use tokio::signal;
 
-mod external_scripts;
 mod server;
 
 #[derive(Parser)]
@@ -19,9 +18,6 @@ struct Cli {
 enum Cmd {
     /// Run server daemon
     Run(RunOpts),
-    #[cfg(feature = "setup-support")]
-    /// Run setup
-    Setup(SetupOpts),
 }
 
 #[derive(Parser)]
@@ -61,52 +57,6 @@ impl RunOpts {
             None => {
                 tracing::info!("running server with initial connection mode.");
                 server::run(ServerOpts::default(), signal::ctrl_c()).await?
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Parser)]
-struct SetupOpts {
-    #[arg(short, long, value_enum)]
-    mode: SetupMode,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum SetupMode {
-    InstallServer,
-    SetupConfig,
-}
-
-impl ValueEnum for SetupMode {
-    fn value_variants<'a>() -> &'a [Self] {
-        &[Self::InstallServer, Self::SetupConfig]
-    }
-
-    fn to_possible_value<'a>(&self) -> Option<PossibleValue> {
-        Some(match self {
-            Self::InstallServer => {
-                PossibleValue::new("install").help("Install system requirements for the daemon")
-            }
-            Self::SetupConfig => PossibleValue::new("config").help("Setup config for the daemon"),
-        })
-    }
-}
-
-impl SetupOpts {
-    #[allow(dead_code)]
-    pub async fn perform(self) -> anyhow::Result<()> {
-        match self.mode {
-            SetupMode::InstallServer => {
-                println!("Running server install...");
-                external_scripts::run_server_install()?;
-                println!("Successfully installed required components.");
-            }
-            SetupMode::SetupConfig => {
-                println!("Running config setup...");
-                external_scripts::run_setup_config()?;
-                println!("Successfully made changes for system config.");
             }
         }
         Ok(())
