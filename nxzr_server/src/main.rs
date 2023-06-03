@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use clap::{builder::PossibleValue, Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use nxzr_device::{system, Address};
 use server::{ReconnectType, ServerOpts};
 use tokio::signal;

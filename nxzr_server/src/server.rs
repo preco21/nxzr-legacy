@@ -202,7 +202,7 @@ async fn establish_initial_connection(
         tracing::warn!("{:?}", err);
         tracing::warn!("fallback: restarting Bluetooth session due to incompatibilities with the bluez `input` plugin, disable this plugin to avoid issues.");
         tracing::info!("restarting Bluetooth service...");
-        system::restart_bluetooth_service()?;
+        system::restart_bluetooth_service().await?;
         time::sleep(time::Duration::from_millis(1000)).await;
         device = Device::new(DeviceConfig { id: dev_id }).await?;
         // If it failed again, just bail out.
