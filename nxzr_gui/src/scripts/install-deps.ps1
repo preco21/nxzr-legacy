@@ -59,7 +59,7 @@ function Get-WindowsVersion {
 # System compatibility checks.
 $windows_version = Get-WindowsVersion
 if ($windows_version -lt 22) {
-    Write-Error "Your Windows version ($windows_version) is not compatible with NXZR: Please install the Windows Updates `"22H2`" or higher"
+    Write-Error "Your Windows version ($windows_version) is not compatible: Please install the Windows Updates `"22H2`" or higher"
     Exit 1
 }
 
@@ -68,7 +68,7 @@ if (!(Test-CommandAvailable -Command "winget")) {
     Exit 1
 }
 
-Write-Host "> This script will automatically install required dependencies of NXZR..."
+Write-Host "> This script will automatically install required dependencies..."
 
 # Create temporary directory to work with.
 $tempdir = New-TemporaryDirectory

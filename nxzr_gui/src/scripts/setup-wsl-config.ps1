@@ -1,14 +1,17 @@
+Param (
+    [Parameter(Mandatory = $True)][ValidateNotNull()][string]$KernelPath
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-Write-Host "> This script will automatically setup WSL for NXZR..."
+Write-Host "> This script will automatically setup WSL config..."
 
-# FIXME: Make sure the resource kernel is in place and replace kernel=*
 # Create a global `.wslconfig` to current user's folder.
 Write-Host "> Creating a global `".wslconfig`" file"
 $wsl_conf_content = @"
 [wsl2]
-kernel=c:\\Users\\plusb\\.wsl\\nxzr-bzImage
+kernel=$kernelPath
 "@
 $home_dir = [System.Environment]::ExpandEnvironmentVariables("%USERPROFILE%")
 $wsl_conf_path = Join-Path $home_dir ".wslconfig"
