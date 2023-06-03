@@ -1,6 +1,6 @@
 # nxzr_device
 
-> NXZR project: A collection of tools, actual transport layer and connection helpers
+> A collection of tools, actual transport layer and connection helpers
 
 ## Cross-compiling
 
