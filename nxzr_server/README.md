@@ -2,6 +2,10 @@
 
 > Server daemon application
 
+## Prerequisite
+
+- [Protoc](https://github.com/protocolbuffers/protobuf): Make sure to install the appropriate protoc binary for your platform.
+
 ## Installation
 
 ```shell
