@@ -18,8 +18,8 @@ pub use crate::controller::protocol::{
 
 #[derive(Clone, Error, Debug)]
 pub enum ProtocolError {
-    #[error("protocol is being closed, aborting the requested action, action: {0}")]
-    ActionAbortedDueToClosing(String),
+    #[error("protocol is being closed, aborting the requested action")]
+    ActionAbortedDueToClosing,
     #[error("internal error: {0}")]
     Internal(ProtocolInternalError),
 }
@@ -274,7 +274,7 @@ impl Protocol {
         tokio::select! {
             _ = fut => {}
             _ = self.term_tx.closed() => {
-                return Err(ProtocolError::ActionAbortedDueToClosing("update_controller_state".to_owned()))
+                return Err(ProtocolError::ActionAbortedDueToClosing)
             },
         }
         Ok(())
