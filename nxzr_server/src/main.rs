@@ -1,10 +1,11 @@
 use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
-use nxzr_device::{system, Address};
-use server::{ReconnectType, ServerOpts};
+use nxzr_device::{system, Address, ReconnectType};
+use server::ServerOpts;
 use tokio::signal;
 
+mod controller;
 mod server;
 
 #[derive(Parser)]
@@ -72,12 +73,14 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
     // Check whether the program runs with elevated privileges.
     system::check_privileges().await?;
-    // Run CLI.
-    let args = Cli::parse();
-    match args.command {
-        Cmd::Run(r) => r.perform().await?,
-        #[cfg(feature = "setup-support")]
-        Cmd::Setup(r) => r.perform().await?,
-    }
+    server::run(ServerOpts::default(), signal::ctrl_c()).await?;
+
+    // // Run CLI.
+    // let args = Cli::parse();
+    // match args.command {
+    //     Cmd::Run(r) => r.perform().await?,
+    //     #[cfg(feature = "setup-support")]
+    //     Cmd::Setup(r) => r.perform().await?,
+    // }
     Ok(())
 }
