@@ -1,3 +1,1 @@
-pub mod api {
-    tonic::include_proto!("dev.preco.nxzr");
-}
+tonic::include_proto!("dev.preco.nxzr");

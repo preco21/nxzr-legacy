@@ -860,6 +860,7 @@ dependencies = [
  "clap",
  "nxzr_core",
  "nxzr_device",
+ "nxzr_proto",
  "prost",
  "thiserror",
  "tokio",
