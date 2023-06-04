@@ -38,6 +38,10 @@ pub enum ControllerProtocolError {
     UnknownInputReportMode,
     #[error("write operation is slower than usual: {0:?}, ignoring")]
     LaggedWrites(time::Duration),
+    #[error("write operation is triggered while paused, ignoring")]
+    WriteWhilePaused,
+    #[error("a report mode has been set, which is identical to previous one")]
+    DuplicatedReportModeSet,
     #[error("not implemented: {0}")]
     NotImplemented(String),
     #[error("invariant violation: {0}")]
@@ -393,7 +397,7 @@ impl ControllerProtocol {
         //     self.emit_event(Event::Log(LogType::PairingSuccessful));
         // }
         if self.is_paused() {
-            self.emit_event(Event::Log(LogType::WriteWhilePaused));
+            self.emit_event(Event::Warning(ControllerProtocolError::WriteWhilePaused));
         }
         transport_write
             .write(Bytes::copy_from_slice(input_report.as_buf()))
@@ -570,7 +574,9 @@ impl ControllerProtocol {
         let mode = subcommand_reply_data[0];
         if let Some(report_mode) = state.report_mode {
             if report_mode == mode {
-                self.emit_event(Event::Log(LogType::RepetitiveSetOfReportMode));
+                self.emit_event(Event::Warning(
+                    ControllerProtocolError::DuplicatedReportModeSet,
+                ));
             }
         }
         self.set_report_mode(Some(mode));
@@ -636,7 +642,7 @@ impl ControllerProtocol {
                 });
                 if pairing_toggled {
                     self.set_report_mode(None);
-                    self.emit_event(Event::Log(LogType::PairingSuccessful));
+                    self.emit_event(Event::Log(LogType::PairingSuccess));
                 } else {
                     self.set_send_interval(None)
                 }
@@ -751,9 +757,7 @@ impl std::fmt::Display for Event {
 
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum LogType {
-    PairingSuccessful,
-    WriteWhilePaused,
-    RepetitiveSetOfReportMode,
+    PairingSuccess,
     SubcommandReceived(Subcommand),
 }
 
