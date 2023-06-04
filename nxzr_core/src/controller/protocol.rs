@@ -293,7 +293,7 @@ impl ControllerProtocol {
             self.notify_writer_wake.notified().await
         } else {
             let send_interval = time::Duration::from_secs_f64(state.send_interval);
-            let elapsed = time::Instant::now() - now;
+            let elapsed = now.elapsed();
             let shim_delay = match send_interval.checked_sub(elapsed) {
                 Some(delay) => delay,
                 None => {
@@ -428,7 +428,7 @@ impl ControllerProtocol {
             _ => {
                 let timer: u64 = match state.connected_at {
                     Some(connected_at) => {
-                        let elapsed = time::Instant::now() - connected_at;
+                        let elapsed = connected_at.elapsed();
                         (elapsed.as_secs_f64() / 0.005).round() as u64
                     }
                     None => 0,
