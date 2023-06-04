@@ -2,40 +2,147 @@ syntax = "proto3";
 
 package dev.preco.nxzr;
 
-// EchoRequest is the request for echo.
-message EchoRequest {
+import "google/protobuf/timestamp.proto";
+
+// Keeps track of `tracing` outputs wired through gRPC requests.
+service Tracing {
+  rpc LogStream(LogStreamRequest) returns (stream LogStreamResponse) {}
+}
+
+message LogStreamRequest {}
+message LogStreamResponse {
+  // The client will need to manually parse the message for log levels, timestamp, etc...
+  string tracing_json = 1;
+}
+
+// Manages connection between the Switch and the server daemon.
+service Connection {
+  // Can be used for cross-checking if the selected connection from the client
+  // side is still valid on the server.
+  rpc GetConnectionStatus(GetConnectionStatusRequest) returns (GetConnectionStatusResponse) {}
+  // FIXME: there's no disconnect method, just drop the stream to disconnect.
+  // follow error design guide: https://jbrandhorst.com/post/grpc-errors/
+  rpc Connect(ConnectRequest) returns (stream ConnectResponse) {}
+  rpc Reconnect(ReconnectRequest) returns (stream ReconnectResponse) {}
+  // rpc Disconnect()
+}
+
+message GetConnectionStatusRequest {}
+message GetConnectionStatusResponse {
+  message Device {
+    uint32 dev_id = 1;
+    string address = 2;
+  }
+  repeated Device paired_devices = 1;
+  string adapter_address = 2;
+}
+
+message ConnectRequest {
+  optional uint32 dev_id = 1;
+}
+message ConnectResponse {
+  ConnectionInfo conn_info = 1;
+}
+
+message ReconnectRequest {
+  optional uint32 dev_id = 1;
+  string reconnect_address = 2;
+}
+message ReconnectResponse {
+  ConnectionInfo conn_info = 1;
+}
+
+message ConnectionInfo {
+  uint32 dev_id = 1;
+  string adapter_address = 2;
+  string target_address = 3;
+}
+
+// For protocol inquiry.
+service Protocol {
+  rpc ProtocolEventStream(ProtocolEventStreamRequest) returns (stream ProtocolEventStreamResponse) {}
+  rpc GetProtocolState(GetProtocolStateRequest) returns (GetProtocolStateResponse) {}
+}
+
+message ProtocolEventStreamRequest {}
+message ProtocolEventStreamResponse {
+  message LogObj {
+    enum LogType {
+      UNSPECIFIED = 0;
+      CLOSING = 1;
+      CLOSED = 2;
+      PAIRING_SUCCESS = 3;
+      SUBCOMMAND_RECEIVED = 4;
+    }
+    LogType type = 1;
+    string message = 2;
+  }
+  oneof event {
+    LogObj log = 1;
+    Error error = 2;
+    Error warning = 3;
+  };
+}
+
+message GetProtocolStateRequest {}
+message GetProtocolStateResponse {
+  bool is_pairing = 1;
+  double send_interval = 2;
+  optional uint32 report_mode = 3;
+  google.protobuf.Timestamp connected_at = 4;
+  string controller_state_dump = 5;
+}
+
+// For high-frequency controller state updates.
+service Controller {
+  rpc ButtonStream(stream ButtonStreamRequest) returns (stream ButtonStreamResponse) {}
+  rpc StickStream(stream StickStreamRequest) returns (stream StickStreamResponse) {}
+  rpc ImuStream(stream ImuStreamRequest) returns (stream ImuStreamResponse) {}
+}
+
+message ButtonStreamRequest {
+  message Button {
+    enum KeyAction {
+      UNSPECIFIED = 0;
+      PRESS = 1;
+      UP = 2;
+      DOWN = 3;
+    }
+    string key_type = 2;
+    KeyAction key_action = 3;
+  }
+  string action_id = 1;
+  Button button = 2;
+}
+message ButtonStreamResponse {
+  string action_id = 1;
+  bool success = 2;
+}
+
+message StickStreamRequest {
+  string action_id = 1;
+  Position position = 2;
+}
+message StickStreamResponse {
+  string action_id = 1;
+  bool success = 2;
+}
+
+message ImuStreamRequest {
+  string action_id = 1;
+  Position position = 2;
+}
+message ImuStreamResponse {
+  string action_id = 1;
+  bool success = 2;
+}
+
+message Error {
   string message = 1;
+  google.protobuf.Timestamp timestamp = 2;
 }
 
-// EchoResponse is the response for echo.
-message EchoResponse {
-  string message = 1;
-}
-
-// Echo is the echo service.
-service Echo {
-  // UnaryEcho is unary echo.
-  rpc UnaryEcho(EchoRequest) returns (EchoResponse) {}
-  // ServerStreamingEcho is server side streaming.
-  rpc ServerStreamingEcho(EchoRequest) returns (stream EchoResponse) {}
-  // ClientStreamingEcho is client side streaming.
-  rpc ClientStreamingEcho(stream EchoRequest) returns (EchoResponse) {}
-  // BidirectionalStreamingEcho is bidi streaming.
-  rpc BidirectionalStreamingEcho(stream EchoRequest) returns (stream EchoResponse) {}
-}
-
-// The greeting service definition.
-service Greeter {
-  // Sends a greeting
-  rpc SayHello (HelloRequest) returns (HelloReply) {}
-}
-
-// The request message containing the user's name.
-message HelloRequest {
-  string name = 1;
-}
-
-// The response message containing the greetings
-message HelloReply {
-  string message = 1;
+message Position {
+  uint32 x = 1;
+  uint32 y = 2;
 }
