@@ -16,7 +16,7 @@ const MTU_THRESHOLD: usize = 400;
 const DEFAULT_FLOW_CONTROL_PERMITS: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum TransportError {
     #[error("operation called when transport is closed")]
     OperationWhileClosed,
@@ -32,23 +32,17 @@ pub enum TransportError {
     Internal(TransportInternalError),
 }
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum TransportInternalError {
-    #[error("io: {message}")]
-    Io {
-        kind: std::io::ErrorKind,
-        message: String,
-    },
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
     #[error("semaphore acquire failed")]
     SemaphoreFailed,
 }
 
 impl From<std::io::Error> for TransportError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(TransportInternalError::Io {
-            kind: err.kind(),
-            message: err.to_string(),
-        })
+        Self::Internal(err.into())
     }
 }
 

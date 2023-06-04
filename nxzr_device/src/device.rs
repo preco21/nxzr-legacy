@@ -10,7 +10,7 @@ const SWITCH_MAC_PREFIX: &[u8] = &[0x94, 0x59, 0xCB];
 const SWITCH_SDP_RECORD_STRING: &str = include_str!("sdp/switch-controller.xml");
 const SWITCH_HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum DeviceError {
     #[error("failed to create a session, maybe Bluetooth is disabled?; bluer: {0}")]
     SessionCreationFailed(bluer::Error),
@@ -24,13 +24,10 @@ pub enum DeviceError {
     Internal(DeviceInternalError),
 }
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum DeviceInternalError {
-    #[error("io: {message}")]
-    Io {
-        kind: std::io::ErrorKind,
-        message: String,
-    },
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
     #[error("bluer: {} {}", .0.kind, .0.message)]
     Bluer(bluer::Error),
     #[error("uuid: {0}")]
@@ -41,10 +38,7 @@ pub enum DeviceInternalError {
 
 impl From<std::io::Error> for DeviceError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(DeviceInternalError::Io {
-            kind: err.kind(),
-            message: err.to_string(),
-        })
+        Self::Internal(err.into())
     }
 }
 
@@ -165,7 +159,6 @@ impl Device {
         if uuids.len() > 3 {
             // https://btprodspecificationrefs.blob.core.windows.net/assigned-numbers/Assigned%20Number%20Types/Assigned_Numbers.pdf
             tracing::warn!("there's too many SDP-records active, Switch might refuse connection.");
-            tracing::warn!("try modifying \"/lib/systemd/system/bluetooth.service\" file.");
             tracing::trace!("UUIDs: {:?}", &uuids);
             if disconnect {
                 for target in self.paired_switches().await? {

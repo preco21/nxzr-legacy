@@ -7,29 +7,27 @@ use thiserror::Error;
 const DEFAULT_CTL_PSM: u16 = 17;
 const DEFAULT_ITR_PSM: u16 = 19;
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum SessionError {
     #[error("control/interrupt socket address must match with each other")]
     CtlItrSocketAddrMismatch,
+    #[error(
+        "failed to bind the target address, make sure that no `input` plugin enabled for bluetooth"
+    )]
+    BindFailed(std::io::Error),
     #[error("internal error: {0}")]
     Internal(SessionInternalError),
 }
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum SessionInternalError {
-    #[error("io: {message}")]
-    Io {
-        kind: std::io::ErrorKind,
-        message: String,
-    },
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 impl From<std::io::Error> for SessionError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(SessionInternalError::Io {
-            kind: err.kind(),
-            message: err.to_string(),
-        })
+        Self::Internal(err.into())
     }
 }
 
@@ -85,7 +83,8 @@ impl SessionListener {
                 addr_type: sock::AddressType::BrEdr,
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(|err| SessionError::BindFailed(err))?;
         self.itr_sock
             .bind(l2cap::SocketAddr {
                 addr: self.addr_def.addr.into(),
@@ -93,7 +92,8 @@ impl SessionListener {
                 addr_type: sock::AddressType::BrEdr,
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(|err| SessionError::BindFailed(err))?;
         Ok(())
     }
 
