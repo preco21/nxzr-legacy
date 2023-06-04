@@ -636,7 +636,7 @@ impl ControllerProtocol {
                 });
                 if pairing_toggled {
                     self.set_report_mode(None);
-                    self.emit_event(Event::Log(LogType::PairingSuccessful));
+                    self.emit_event(Event::Log(LogType::PairingSuccess));
                 } else {
                     self.set_send_interval(None)
                 }
@@ -751,7 +751,7 @@ impl std::fmt::Display for Event {
 
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum LogType {
-    PairingSuccessful,
+    PairingSuccess,
     WriteWhilePaused,
     RepetitiveSetOfReportMode,
     SubcommandReceived(Subcommand),
