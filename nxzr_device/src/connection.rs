@@ -5,7 +5,7 @@ use tokio::time;
 
 use crate::{device, session, system, Address};
 
-#[derive(Debug, Error)]
+#[derive(Error, Debug)]
 pub enum DeviceConnectionError {
     #[error("failed to resolve paired switches automatically")]
     FailedToResolvePairedSwitches,

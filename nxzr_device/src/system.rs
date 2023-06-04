@@ -137,7 +137,7 @@ async fn prepare_bluetooth_service() -> Result<(), SystemCommandError> {
     Ok(())
 }
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum SystemCommandError {
     #[error("failed to execute a command: {0}")]
     CommandFailed(String),
@@ -145,15 +145,12 @@ pub enum SystemCommandError {
     Internal(SystemCommandInternalError),
 }
 
-#[derive(Clone, Error, Debug)]
+#[derive(Error, Debug)]
 pub enum SystemCommandInternalError {
     #[error("utf8: {0}")]
     Utf8Error(std::str::Utf8Error),
-    #[error("io: {message}")]
-    Io {
-        kind: std::io::ErrorKind,
-        message: String,
-    },
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 impl From<std::str::Utf8Error> for SystemCommandError {
@@ -164,10 +161,7 @@ impl From<std::str::Utf8Error> for SystemCommandError {
 
 impl From<std::io::Error> for SystemCommandError {
     fn from(err: std::io::Error) -> Self {
-        Self::Internal(SystemCommandInternalError::Io {
-            kind: err.kind(),
-            message: err.to_string(),
-        })
+        Self::Internal(err.into())
     }
 }
 
