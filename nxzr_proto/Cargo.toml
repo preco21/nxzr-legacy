@@ -1,0 +1,17 @@
+[package]
+name = "nxzr_proto"
+version = { workspace = true }
+description = "NXZR Project: The gRPC IDLs"
+readme = "README.md"
+authors = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+edition = "2021"
+publish = false
+
+[dependencies]
+prost = "0.11.9"
+tonic = "0.9.2"
+
+[build-dependencies]
+tonic-build = "0.9.2"
