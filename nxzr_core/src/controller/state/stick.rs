@@ -240,3 +240,23 @@ fn to_u16_bytes(bytes: &[u8]) -> Vec<u16> {
         .map(|e| u16::from(e))
         .collect::<Vec<_>>()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{StickCalibration, StickState};
+    use crate::controller::spi_flash::SpiFlash;
+
+    #[test]
+    fn stick_calibration() {
+        let spi_flash = SpiFlash::new();
+        let l_cal =
+            StickCalibration::with_left_stick_bytes(&spi_flash.factory_l_stick_calibration())
+                .unwrap();
+        let stick_cal = StickState::with_config(super::StickStateConfig {
+            calibration: Some(l_cal),
+            ..Default::default()
+        });
+
+        println!("{:?}", &stick_cal);
+    }
+}
