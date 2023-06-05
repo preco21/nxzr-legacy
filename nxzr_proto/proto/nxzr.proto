@@ -17,27 +17,25 @@ message LogStreamResponse {
 
 // Manages connection between the Switch and the server daemon.
 service Nxzr {
-  // Can be used for cross-checking if the selected connection from the client
-  // side is still valid on the server.
-  rpc GetConnectionStatus(GetConnectionStatusRequest) returns (GetConnectionStatusResponse) {}
-  // FIXME: there's no disconnect method, just drop the stream to disconnect.
-  // follow error design guide: https://jbrandhorst.com/post/grpc-errors/
+  // Can be used for cross-checking if the selected device from the client side
+  // is still valid on the server.
+  rpc GetDeviceStatus(GetDeviceStatusRequest) returns (GetDeviceStatusResponse) {}
+
+  // For connection management.
   rpc Connect(ConnectRequest) returns (stream ConnectResponse) {}
   rpc Reconnect(ReconnectRequest) returns (stream ReconnectResponse) {}
-  // rpc Disconnect()
 
-  // For protocol inquiry.
-  rpc ProtocolEventStream(ProtocolEventStreamRequest) returns (stream ProtocolEventStreamResponse) {}
+  // For protocol inquiry. (requires connection to device)
   rpc GetProtocolState(GetProtocolStateRequest) returns (GetProtocolStateResponse) {}
 
-  // For high-frequency controller state updates.
+  // For high-frequency controller state updates. (requires connection to device)
   rpc ButtonStream(stream ButtonStreamRequest) returns (stream ButtonStreamResponse) {}
   rpc StickStream(stream StickStreamRequest) returns (stream StickStreamResponse) {}
   rpc ImuStream(stream ImuStreamRequest) returns (stream ImuStreamResponse) {}
 }
 
-message GetConnectionStatusRequest {}
-message GetConnectionStatusResponse {
+message GetDeviceStatusRequest {}
+message GetDeviceStatusResponse {
   message Device {
     uint32 dev_id = 1;
     string address = 2;
@@ -50,7 +48,10 @@ message ConnectRequest {
   optional uint32 dev_id = 1;
 }
 message ConnectResponse {
-  ConnectionInfo conn_info = 1;
+  oneof data {
+    ConnectionInfo connection_info = 1;
+    ConnectionEvent connection_event = 2;
+  }
 }
 
 message ReconnectRequest {
@@ -58,18 +59,21 @@ message ReconnectRequest {
   string reconnect_address = 2;
 }
 message ReconnectResponse {
-  ConnectionInfo conn_info = 1;
+  oneof data {
+    ConnectionInfo connection_info = 1;
+    ConnectionEvent connection_event = 2;
+  }
 }
 
-message ProtocolEventStreamRequest {}
-message ProtocolEventStreamResponse {
+message ConnectionEvent {
   message LogObj {
     enum LogType {
       UNSPECIFIED = 0;
       CLOSING = 1;
       CLOSED = 2;
-      PAIRING_SUCCESS = 3;
-      SUBCOMMAND_RECEIVED = 4;
+      CONNECTING = 3;
+      CONNECTED = 4;
+      SUBCOMMAND_RECEIVED = 5;
     }
     LogType type = 1;
     string message = 2;
