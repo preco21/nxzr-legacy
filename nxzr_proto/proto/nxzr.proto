@@ -21,9 +21,9 @@ service Nxzr {
   // is still valid on the server.
   rpc GetDeviceStatus(GetDeviceStatusRequest) returns (GetDeviceStatusResponse) {}
 
-  // For connection management.
-  rpc ConnectDevice(ConnectDeviceRequest) returns (stream ConnectDeviceResponse) {}
-  rpc ReconnectDevice(ReconnectDeviceRequest) returns (stream ReconnectDeviceResponse) {}
+  // For Switch connection management.
+  rpc ConnectSwitch(ConnectSwitchRequest) returns (stream ConnectSwitchResponse) {}
+  rpc ReconnectSwitch(ReconnectSwitchRequest) returns (stream ReconnectSwitchResponse) {}
 
   // For protocol inquiry. (requires connection to device)
   rpc GetProtocolState(GetProtocolStateRequest) returns (GetProtocolStateResponse) {}
@@ -44,21 +44,21 @@ message GetDeviceStatusResponse {
   string adapter_address = 2;
 }
 
-message ConnectDeviceRequest {
+message ConnectSwitchRequest {
   optional uint32 dev_id = 1;
 }
-message ConnectDeviceResponse {
+message ConnectSwitchResponse {
   oneof data {
     ConnectionInfo connection_info = 1;
     ConnectionEvent connection_event = 2;
   }
 }
 
-message ReconnectDeviceRequest {
+message ReconnectSwitchRequest {
   optional uint32 dev_id = 1;
   string reconnect_address = 2;
 }
-message ReconnectDeviceResponse {
+message ReconnectSwitchResponse {
   oneof data {
     ConnectionInfo connection_info = 1;
     ConnectionEvent connection_event = 2;
