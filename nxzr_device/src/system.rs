@@ -1,6 +1,6 @@
 use crate::Address;
 use thiserror::Error;
-use tokio::process::Command;
+use tokio::{process::Command, time};
 
 #[derive(Clone, Error, Debug)]
 pub enum SysCheckError {
@@ -127,13 +127,13 @@ pub async fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
 async fn prepare_bluetooth_service() -> Result<(), SystemCommandError> {
     // Turn off bluetooth scanning.
     //
-    // This may fail for unknown reason, in that case, just ignore it.
-    let _ = run_system_command({
+    // This may fail for unknown reason, or timeout. In that case, just ignore it.
+    let command_fut = run_system_command({
         let mut cmd = Command::new("bluetoothctl");
         cmd.args(&["scan", "off"]);
         cmd
-    })
-    .await;
+    });
+    let _ = time::timeout(time::Duration::from_millis(1000), command_fut).await;
     Ok(())
 }
 
