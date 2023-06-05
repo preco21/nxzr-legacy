@@ -48,7 +48,6 @@ pub struct Server {
 impl Server {
     #[tracing::instrument(target = "server")]
     async fn run(opts: ServerOpts) -> anyhow::Result<(Self, ServerHandle)> {
-        system::prepare_device().await?;
         let (paired_session, address, reconnect) = match opts.reconnect {
             Some(reconnect) => {
                 let (paired_session, address) =
@@ -62,6 +61,7 @@ impl Server {
                 (paired_session, address, false)
             }
         };
+
         // Use that paired session for the further processing.
         let (transport, transport_handle) =
             Transport::register(paired_session, TransportConfig::default()).await?;
@@ -74,6 +74,7 @@ impl Server {
             },
         )
         .await?;
+
         // Start listening for protocol events.
         let mut event_rx = protocol.events().await?;
         tokio::spawn(async move {
@@ -81,6 +82,7 @@ impl Server {
                 tracing::info!("protocol: {}", &evt.to_string());
             }
         });
+
         let (close_tx, close_rx) = mpsc::channel(1);
         let (will_close_tx, will_close_rx) = mpsc::channel(1);
         let protocol = Arc::new(protocol);
@@ -98,6 +100,7 @@ impl Server {
                 drop(transport_handle);
             }
         });
+
         Ok((
             Self {
                 protocol,
