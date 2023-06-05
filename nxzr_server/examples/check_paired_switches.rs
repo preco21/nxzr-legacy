@@ -11,7 +11,9 @@ async fn main() -> anyhow::Result<()> {
 
     let device = device::Device::new(device::DeviceConfig::default()).await?;
     let paired_switches = device.paired_switches().await?;
+    let adapter_addr = device.address().await?;
 
+    tracing::info!("paired dev: {:?}", adapter_addr);
     tracing::info!("paired switches: {:?}", paired_switches);
 
     Ok(())
