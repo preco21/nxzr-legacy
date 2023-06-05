@@ -1,6 +1,9 @@
 use crate::Address;
 use thiserror::Error;
-use tokio::{process::Command, time};
+use tokio::{
+    process::Command,
+    time::{self, error::Elapsed},
+};
 
 #[derive(Clone, Error, Debug)]
 pub enum SysCheckError {
@@ -8,6 +11,8 @@ pub enum SysCheckError {
     RootPrivilegeRequired,
     #[error("cli tool presence check failed: {0}")]
     CliToolFailed(String),
+    #[error("failed to power on Bluetooth device")]
+    BluetoothActivationFailed,
     #[error("prepare failed")]
     PrepareFailed,
 }
@@ -56,7 +61,7 @@ pub async fn prepare_device() -> Result<(), SysCheckError> {
     check_system_requirements().await?;
     prepare_bluetooth_service()
         .await
-        .map_err(|_| SysCheckError::PrepareFailed)?;
+        .map_err(|_| SysCheckError::BluetoothActivationFailed)?;
     Ok(())
 }
 
@@ -128,12 +133,18 @@ async fn prepare_bluetooth_service() -> Result<(), SystemCommandError> {
     // Turn off bluetooth scanning.
     //
     // This may fail for unknown reason, or timeout. In that case, just ignore it.
-    let command_fut = run_system_command({
+    let power_on_fut = run_system_command({
+        let mut cmd = Command::new("bluetoothctl");
+        cmd.args(&["power", "on"]);
+        cmd
+    });
+    time::timeout(time::Duration::from_millis(1000), power_on_fut).await??;
+    let scan_off_fut = run_system_command({
         let mut cmd = Command::new("bluetoothctl");
         cmd.args(&["scan", "off"]);
         cmd
     });
-    let _ = time::timeout(time::Duration::from_millis(1000), command_fut).await;
+    let _ = time::timeout(time::Duration::from_millis(1000), scan_off_fut).await;
     Ok(())
 }
 
@@ -141,6 +152,8 @@ async fn prepare_bluetooth_service() -> Result<(), SystemCommandError> {
 pub enum SystemCommandError {
     #[error("failed to execute a command: {0}")]
     CommandFailed(String),
+    #[error("timeout: {0}")]
+    Timeout(#[from] Elapsed),
     #[error("internal error: {0}")]
     Internal(SystemCommandInternalError),
 }
