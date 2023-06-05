@@ -34,7 +34,7 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     // Check if `bluetoothctl` exists.
     run_system_command({
         let mut cmd = Command::new("bluetoothctl");
-        cmd.args(&["-h"]);
+        cmd.args(&["--version"]);
         cmd
     })
     .await
