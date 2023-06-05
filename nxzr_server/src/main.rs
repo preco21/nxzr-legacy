@@ -1,18 +1,19 @@
-use std::str::FromStr;
-
-use nxzr_device::{system, Address, ReconnectType};
+use nxzr_device::system;
 use server::ServerOpts;
 use tokio::signal;
+use tracing_subscriber::prelude::*;
 
 mod controller;
 mod server;
+mod service;
+// mod tracing;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Setup a tracer.
-    let subscriber = tracing_subscriber::fmt::Subscriber::builder()
-        .with_max_level(tracing::Level::TRACE)
-        .finish();
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_subscriber::filter::LevelFilter::TRACE)
+        .with(tracing_subscriber::fmt::Layer::default());
     tracing::subscriber::set_global_default(subscriber)?;
 
     // Run system checks.
