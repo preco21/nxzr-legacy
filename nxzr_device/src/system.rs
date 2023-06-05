@@ -13,8 +13,6 @@ pub enum SysCheckError {
     CliToolFailed(String),
     #[error("failed to power on Bluetooth device")]
     BluetoothActivationFailed,
-    #[error("prepare failed")]
-    PrepareFailed,
 }
 
 pub async fn check_privileges() -> Result<(), SysCheckError> {
@@ -63,6 +61,10 @@ pub async fn prepare_device() -> Result<(), SysCheckError> {
         .await
         .map_err(|_| SysCheckError::BluetoothActivationFailed)?;
     Ok(())
+}
+
+pub async fn cleanup_device() {
+    cleanup_bluetooth_service().await;
 }
 
 #[tracing::instrument(target = "system")]
@@ -146,6 +148,17 @@ async fn prepare_bluetooth_service() -> Result<(), SystemCommandError> {
     });
     let _ = time::timeout(time::Duration::from_millis(1000), scan_off_fut).await;
     Ok(())
+}
+
+#[tracing::instrument(target = "system")]
+async fn cleanup_bluetooth_service() {
+    let power_off_fut = run_system_command({
+        let mut cmd = Command::new("bluetoothctl");
+        cmd.args(&["power", "off"]);
+        cmd
+    });
+    // Not so graceful, but it's okay.
+    let _ = time::timeout(time::Duration::from_millis(1000), power_off_fut).await;
 }
 
 #[derive(Error, Debug)]
