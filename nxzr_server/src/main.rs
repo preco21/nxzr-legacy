@@ -35,7 +35,9 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::Layer::default().event_format(event_format));
     tracing::subscriber::set_global_default(subscriber)?;
 
-    // Tonic service requires cloneable channel so that normal mpsc channels cannot be used.
+    // Tonic service requires cloneable channel so that normal mpsc channels
+    // cannot be used. FIXME: Current implementation of a relay channel does not
+    // retain messages so emitting logs before subscription may be lost.
     let (tracing_tx, _tracing_rx) = broadcast::channel(1024);
     tokio::spawn({
         let tracing_tx = tracing_tx.clone();
