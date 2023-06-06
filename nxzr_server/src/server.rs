@@ -7,19 +7,8 @@ use nxzr_device::{
     transport::{Transport, TransportConfig},
     ReconnectType,
 };
-use std::{future::Future, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::mpsc;
-
-pub async fn run(opts: ServerOpts, shutdown: impl Future) -> anyhow::Result<()> {
-    let (server, server_handle) = Server::run(opts).await?;
-    tokio::select! {
-        _ = server.will_close() => {},
-        _ = shutdown => {},
-    }
-    drop(server_handle);
-    server.closed().await;
-    Ok(())
-}
 
 #[derive(Debug, Default)]
 pub struct ServerOpts {
@@ -47,7 +36,7 @@ pub struct Server {
 
 impl Server {
     #[tracing::instrument(target = "server")]
-    async fn run(opts: ServerOpts) -> anyhow::Result<(Self, ServerHandle)> {
+    pub async fn run(opts: ServerOpts) -> anyhow::Result<(Self, ServerHandle)> {
         let (paired_session, address, reconnect) = match opts.reconnect {
             Some(reconnect) => {
                 let (paired_session, address) =
