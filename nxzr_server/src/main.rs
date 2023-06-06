@@ -59,6 +59,8 @@ fn setup_tracer() -> anyhow::Result<()> {
 // )
 
 pub async fn run(opts: ServerOpts, shutdown: impl Future) -> anyhow::Result<()> {
+    // FIXME: Must handle device.set_powered(false) on disconnect
+
     let (server, server_handle) = Server::run(opts).await?;
     tokio::select! {
         _ = server.will_close() => {},
