@@ -42,6 +42,11 @@ pub enum ControllerProtocolError {
     WriteWhilePaused,
     #[error("a report mode has been set, which is identical to previous one")]
     DuplicatedReportModeSet,
+    #[error("transport error: {message}")]
+    Transport {
+        kind: std::io::ErrorKind,
+        message: String,
+    },
     #[error("not implemented: {0}")]
     NotImplemented(String),
     #[error("invariant violation: {0}")]
@@ -52,26 +57,12 @@ pub enum ControllerProtocolError {
 
 #[derive(Clone, Error, Debug)]
 pub enum ControllerProtocolInternalError {
-    #[error("io: {message}")]
-    Io {
-        kind: std::io::ErrorKind,
-        message: String,
-    },
     #[error("event: {0}")]
     Event(EventError),
     #[error("report: {0}")]
     Report(ReportError),
     #[error("state: {0}")]
     State(StateError),
-}
-
-impl From<std::io::Error> for ControllerProtocolError {
-    fn from(err: std::io::Error) -> Self {
-        Self::Internal(ControllerProtocolInternalError::Io {
-            kind: err.kind(),
-            message: err.to_string(),
-        })
-    }
 }
 
 impl From<EventError> for ControllerProtocolError {
@@ -247,7 +238,13 @@ impl ControllerProtocol {
         T: TransportRead + TransportWrite,
     {
         self.notify_data_received.notify_waiters();
-        let buf = transport.read().await?;
+        let buf = transport
+            .read()
+            .await
+            .map_err(|err| ControllerProtocolError::Transport {
+                kind: err.kind(),
+                message: err.to_string(),
+            })?;
         let output_report = match OutputReport::with_raw(buf) {
             Ok(output_report) => output_report,
             Err(_) => {
@@ -401,7 +398,11 @@ impl ControllerProtocol {
         }
         transport_write
             .write(Bytes::copy_from_slice(input_report.as_buf()))
-            .await?;
+            .await
+            .map_err(|err| ControllerProtocolError::Transport {
+                kind: err.kind(),
+                message: err.to_string(),
+            })?;
         Ok(())
     }
 
