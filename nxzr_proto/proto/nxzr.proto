@@ -4,17 +4,6 @@ package dev.preco.nxzr;
 
 import "google/protobuf/timestamp.proto";
 
-// Keeps track of `tracing` outputs wired through gRPC requests.
-service Tracing {
-  rpc LogStream(LogStreamRequest) returns (stream LogStreamResponse) {}
-}
-
-message LogStreamRequest {}
-message LogStreamResponse {
-  // The client will need to manually parse the message for log levels, timestamp, etc...
-  string tracing_json = 1;
-}
-
 // Manages connection between the Switch and the server daemon.
 service Nxzr {
   // Can be used for cross-checking if the selected device from the client side

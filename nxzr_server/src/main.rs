@@ -2,15 +2,10 @@ use std::{future::Future, net::ToSocketAddrs};
 
 use crate::server::Server;
 use nxzr_device::system;
-use nxzr_proto::tracing_server;
 use server::ServerOpts;
-use tokio::{
-    signal,
-    sync::{broadcast, mpsc},
-};
+use tokio::signal;
 use tracing_subscriber::prelude::*;
 
-mod common;
 mod controller;
 mod server;
 mod service;
@@ -18,53 +13,34 @@ mod service;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Setup a tracer.
-    let (log_tx, mut log_rx) = mpsc::unbounded_channel();
-    let writer_channel = common::WriterChannel::new(log_tx);
     let module_filter = tracing_subscriber::filter::Targets::new()
         .with_target("nxzr_core", tracing::Level::TRACE)
         .with_target("nxzr_device", tracing::Level::TRACE)
         .with_target("nxzr_server", tracing::Level::TRACE);
     // Conditionally sets event format between debug/release mode.
     #[cfg(debug_assertions)]
-    let event_format = tracing_subscriber::fmt::format().compact();
+    let event_format = tracing_subscriber::fmt::format();
     #[cfg(not(debug_assertions))]
     let event_format = tracing_subscriber::fmt::format().json();
     let subscriber = tracing_subscriber::registry()
         .with(module_filter)
-        .with(tracing_subscriber::fmt::Layer::default().with_writer(writer_channel))
         .with(tracing_subscriber::fmt::Layer::default().event_format(event_format));
     tracing::subscriber::set_global_default(subscriber)?;
-
-    // Tonic service requires cloneable channel so that normal mpsc channels
-    // cannot be used. FIXME: Current implementation of a relay channel does not
-    // retain messages so emitting logs before subscription may be lost.
-    let (tracing_tx, _tracing_rx) = broadcast::channel(1024);
-    tokio::spawn({
-        let tracing_tx = tracing_tx.clone();
-        async move {
-            while let Some(log) = log_rx.recv().await {
-                let _ = tracing_tx.send(log);
-            }
-        }
-    });
 
     // Run system checks.
     system::check_privileges().await?;
     system::prepare_device().await?;
 
-    tokio::spawn(async move {
-        // Run the main service.
-        run(ServerOpts::default(), signal::ctrl_c()).await.unwrap();
-    });
+    // tokio::spawn(async move {
+    //     // Run the main service.
+    // });
+    run(ServerOpts::default(), signal::ctrl_c()).await.unwrap();
 
     // Setup the tracing service.
-    tonic::transport::Server::builder()
-        .add_service(tracing_server::TracingServer::new(
-            service::TracingService::new(tracing_tx),
-        ))
-        .serve("[::1]:50051".to_socket_addrs().unwrap().next().unwrap())
-        .await
-        .unwrap();
+    // tonic::transport::Server::builder()
+    //     .serve("[::1]:50051".to_socket_addrs().unwrap().next().unwrap())
+    //     .await
+    //     .unwrap();
 
     // Run cleanup.
     system::cleanup_device().await;

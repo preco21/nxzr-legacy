@@ -3,7 +3,7 @@ use nxzr_core::{
     protocol::{Protocol, ProtocolConfig},
 };
 use nxzr_device::{
-    establish_initial_connection, establish_reconnect_connection, system,
+    establish_initial_connection, establish_reconnect_connection,
     transport::{Transport, TransportConfig},
     ReconnectType,
 };
