@@ -12,22 +12,8 @@ mod service;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Setup a tracer.
-    let module_filter = tracing_subscriber::filter::Targets::new()
-        .with_target("nxzr_core", tracing::Level::TRACE)
-        .with_target("nxzr_device", tracing::Level::TRACE)
-        .with_target("nxzr_server", tracing::Level::TRACE);
-    // Conditionally sets event format between debug/release mode.
-    #[cfg(debug_assertions)]
-    let event_format = tracing_subscriber::fmt::format();
-    #[cfg(not(debug_assertions))]
-    let event_format = tracing_subscriber::fmt::format().json();
-    let subscriber = tracing_subscriber::registry()
-        .with(module_filter)
-        .with(tracing_subscriber::fmt::Layer::default().event_format(event_format));
-    tracing::subscriber::set_global_default(subscriber)?;
+    setup_tracer()?;
 
-    // Run system checks.
     system::check_privileges().await?;
     system::prepare_device().await?;
 
@@ -42,8 +28,24 @@ async fn main() -> anyhow::Result<()> {
     //     .await
     //     .unwrap();
 
-    // Run cleanup.
     system::cleanup_device().await;
+    Ok(())
+}
+
+fn setup_tracer() -> anyhow::Result<()> {
+    let module_filter = tracing_subscriber::filter::Targets::new()
+        .with_target("nxzr_core", tracing::Level::TRACE)
+        .with_target("nxzr_device", tracing::Level::TRACE)
+        .with_target("nxzr_server", tracing::Level::TRACE);
+    // Conditionally sets event format between debug/release mode.
+    #[cfg(debug_assertions)]
+    let event_format = tracing_subscriber::fmt::format();
+    #[cfg(not(debug_assertions))]
+    let event_format = tracing_subscriber::fmt::format().json();
+    let subscriber = tracing_subscriber::registry()
+        .with(module_filter)
+        .with(tracing_subscriber::fmt::Layer::default().event_format(event_format));
+    tracing::subscriber::set_global_default(subscriber)?;
     Ok(())
 }
 
