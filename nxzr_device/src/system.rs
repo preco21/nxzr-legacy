@@ -11,7 +11,7 @@ pub enum SysCheckError {
     RootPrivilegeRequired,
     #[error("cli tool presence check failed: {0}")]
     CliToolFailed(String),
-    #[error("failed to power on Bluetooth device")]
+    #[error("failed to activate a Bluetooth device")]
     BluetoothActivationFailed,
 }
 
