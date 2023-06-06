@@ -18,9 +18,9 @@ service Nxzr {
   rpc GetProtocolState(GetProtocolStateRequest) returns (GetProtocolStateResponse) {}
 
   // For high-frequency controller state updates. (requires connection to device)
-  rpc ButtonStream(stream ButtonStreamRequest) returns (stream ButtonStreamResponse) {}
-  rpc StickStream(stream StickStreamRequest) returns (stream StickStreamResponse) {}
-  rpc ImuStream(stream ImuStreamRequest) returns (stream ImuStreamResponse) {}
+  rpc ButtonControlStream(stream ButtonControlStreamRequest) returns (stream ButtonControlStreamResponse) {}
+  rpc StickControlStream(stream StickControlStreamRequest) returns (stream StickControlStreamResponse) {}
+  rpc ImuControlStream(stream ImuControlStreamRequest) returns (stream ImuControlStreamResponse) {}
 }
 
 message GetDeviceStatusRequest {}
@@ -83,7 +83,7 @@ message GetProtocolStateResponse {
   string controller_state_dump = 5;
 }
 
-message ButtonStreamRequest {
+message ButtonControlStreamRequest {
   message Button {
     enum KeyAction {
       UNSPECIFIED = 0;
@@ -97,25 +97,25 @@ message ButtonStreamRequest {
   string action_id = 1;
   Button button = 2;
 }
-message ButtonStreamResponse {
+message ButtonControlStreamResponse {
   string action_id = 1;
   bool success = 2;
 }
 
-message StickStreamRequest {
+message StickControlStreamRequest {
   string action_id = 1;
   Position position = 2;
 }
-message StickStreamResponse {
+message StickControlStreamResponse {
   string action_id = 1;
   bool success = 2;
 }
 
-message ImuStreamRequest {
+message ImuControlStreamRequest {
   string action_id = 1;
   Position position = 2;
 }
-message ImuStreamResponse {
+message ImuControlStreamResponse {
   string action_id = 1;
   bool success = 2;
 }
