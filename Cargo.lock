@@ -739,6 +739,7 @@ name = "nxzr_proto"
 version = "0.1.0"
 dependencies = [
  "prost",
+ "prost-types",
  "tonic",
  "tonic-build",
 ]
@@ -1309,6 +1310,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
