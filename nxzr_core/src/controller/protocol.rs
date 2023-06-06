@@ -381,21 +381,21 @@ impl ControllerProtocol {
         input_report: InputReport,
     ) -> Result<(), ControllerProtocolError> {
         // FIXME: this is fragile, need to revisit after testing if the vibration subcommand method works properly.
-        // let mut pairing_bytes: [u8; 4] = [0; 4];
-        // pairing_bytes[1..4].copy_from_slice(&input_report.as_buf()[4..7]);
-        // let close_pairing_mask = self.controller.close_pairing_masks();
-        // let is_pairing_ended = self.state.modify(|state| {
-        //     if state.is_pairing && (u32::from_be_bytes(pairing_bytes) & close_pairing_mask) != 0 {
-        //         state.is_pairing = false;
-        //         true
-        //     } else {
-        //         false
-        //     }
-        // });
-        // if is_pairing_ended {
-        //     self.set_report_mode(None);
-        //     self.emit_event(Event::Log(LogType::PairingSuccessful));
-        // }
+        let mut pairing_bytes: [u8; 4] = [0; 4];
+        pairing_bytes[1..4].copy_from_slice(&input_report.as_buf()[4..7]);
+        let close_pairing_mask = self.controller_type.close_pairing_masks();
+        let is_pairing_ended = self.state.modify(|state| {
+            if state.is_pairing && (u32::from_be_bytes(pairing_bytes) & close_pairing_mask) != 0 {
+                state.is_pairing = false;
+                true
+            } else {
+                false
+            }
+        });
+        if is_pairing_ended {
+            self.set_report_mode(None);
+            self.emit_event(Event::Log(LogType::PairingSuccess));
+        }
         if self.is_paused() {
             self.emit_event(Event::Warning(ControllerProtocolError::WriteWhilePaused));
         }
@@ -632,20 +632,21 @@ impl ControllerProtocol {
             //
             // Also, we toggle `is_pairing` flag to `true` if not toggled previously.
             _ => {
-                let pairing_toggled = self.state.modify(|state| {
-                    if state.is_pairing {
-                        state.is_pairing = false;
-                        true
-                    } else {
-                        false
-                    }
-                });
-                if pairing_toggled {
-                    self.set_report_mode(None);
-                    self.emit_event(Event::Log(LogType::PairingSuccess));
-                } else {
-                    self.set_send_interval(None)
-                }
+                // FIXME: still fragile...
+                // let pairing_toggled = self.state.modify(|state| {
+                //     if state.is_pairing {
+                //         state.is_pairing = false;
+                //         true
+                //     } else {
+                //         false
+                //     }
+                // });
+                // if pairing_toggled {
+                //     self.set_report_mode(None);
+                //     self.emit_event(Event::Log(LogType::PairingSuccess));
+                // } else {
+                self.set_send_interval(None)
+                // }
             }
         }
         input_report.set_ack(0x80);
