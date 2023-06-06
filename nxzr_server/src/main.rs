@@ -20,10 +20,19 @@ async fn main() -> anyhow::Result<()> {
     // Setup a tracer.
     let (log_tx, mut log_rx) = mpsc::unbounded_channel();
     let writer_channel = common::WriterChannel::new(log_tx);
+    let module_filter = tracing_subscriber::filter::Targets::new()
+        .with_target("nxzr_core", tracing::Level::TRACE)
+        .with_target("nxzr_device", tracing::Level::TRACE)
+        .with_target("nxzr_server", tracing::Level::TRACE);
+    // Conditionally sets event format between debug/release mode.
+    #[cfg(debug_assertions)]
+    let event_format = tracing_subscriber::fmt::format().compact();
+    #[cfg(not(debug_assertions))]
+    let event_format = tracing_subscriber::fmt::format().json();
     let subscriber = tracing_subscriber::registry()
-        .with(tracing_subscriber::filter::LevelFilter::TRACE)
+        .with(module_filter)
         .with(tracing_subscriber::fmt::Layer::default().with_writer(writer_channel))
-        .with(tracing_subscriber::fmt::Layer::default());
+        .with(tracing_subscriber::fmt::Layer::default().event_format(event_format));
     tracing::subscriber::set_global_default(subscriber)?;
 
     // Tonic service requires cloneable channel so that normal mpsc channels cannot be used.
