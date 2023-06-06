@@ -25,11 +25,11 @@ service Nxzr {
 
 message GetDeviceStatusRequest {}
 message GetDeviceStatusResponse {
-  message Device {
-    uint32 dev_id = 1;
+  message SwitchDevice {
+    uint32 bound_dev_id = 1;
     string address = 2;
   }
-  repeated Device paired_devices = 1;
+  repeated SwitchDevice paired_switches = 1;
   string adapter_address = 2;
 }
 

@@ -24,7 +24,10 @@ pub async fn establish_initial_connection(
     dev_id: Option<String>,
     controller_type: ControllerType,
 ) -> Result<(session::PairedSession, Address), DeviceConnectionError> {
-    let mut device = device::Device::new(device::DeviceConfig { id: dev_id.clone() }).await?;
+    let mut device = device::Device::new(device::DeviceConfig {
+        dev_id: dev_id.clone(),
+    })
+    .await?;
     device.check_paired_switches(true).await?;
 
     let address = device.address().await?;
@@ -40,7 +43,7 @@ pub async fn establish_initial_connection(
         tracing::info!("restarting Bluetooth service...");
         system::restart_bluetooth_service().await?;
         time::sleep(time::Duration::from_millis(1000)).await;
-        device = device::Device::new(device::DeviceConfig { id: dev_id }).await?;
+        device = device::Device::new(device::DeviceConfig { dev_id: dev_id }).await?;
         // If it failed again, just bail out.
         session.bind().await?;
     };
@@ -83,7 +86,10 @@ pub async fn establish_reconnect_connection(
     controller_type: ControllerType,
     reconnect: ReconnectType,
 ) -> Result<(session::PairedSession, Address), DeviceConnectionError> {
-    let device = device::Device::new(device::DeviceConfig { id: dev_id.clone() }).await?;
+    let device = device::Device::new(device::DeviceConfig {
+        dev_id: dev_id.clone(),
+    })
+    .await?;
     let target_addr: Address = match reconnect {
         ReconnectType::Auto => {
             let paired_switches = device.paired_switches().await?;

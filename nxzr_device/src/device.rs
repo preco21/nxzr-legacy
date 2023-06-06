@@ -69,7 +69,7 @@ pub struct DeviceConfig {
     ///
     /// If None, it will automatically choose the first one by sorting adapter
     /// names in lexicographic order.
-    pub id: Option<String>,
+    pub dev_id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -84,7 +84,7 @@ impl Device {
         let session = bluer::Session::new()
             .await
             .map_err(|err| DeviceError::SessionCreationFailed(err))?;
-        let adapter = match config.id {
+        let adapter = match config.dev_id {
             Some(adapter_name) => {
                 let mut found_adapter = None;
                 for name in session
@@ -130,7 +130,7 @@ impl Device {
             // We need to re-instantiate device.
             drop(self);
             let new_self = Self::new(DeviceConfig {
-                id: Some(adapter_name.to_owned()),
+                dev_id: Some(adapter_name.to_owned()),
             })
             .await?;
             let cur_addr: Address = new_self.address().await?.into();
