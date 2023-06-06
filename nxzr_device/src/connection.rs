@@ -44,7 +44,7 @@ pub async fn establish_initial_connection(
         tracing::info!("restarting Bluetooth service...");
         system::restart_bluetooth_service().await?;
         time::sleep(time::Duration::from_millis(1000)).await;
-        device = device::Device::new(device::DeviceConfig { dev_id: dev_id }).await?;
+        device = device::Device::new(device::DeviceConfig { dev_id }).await?;
         // If it failed again, just bail out.
         session.bind().await?;
     };
