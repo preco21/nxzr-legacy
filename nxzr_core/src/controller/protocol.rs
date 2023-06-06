@@ -168,7 +168,7 @@ impl Shared {
 
 #[derive(Debug, Default)]
 pub struct ControllerProtocolConfig {
-    pub controller: ControllerType,
+    pub controller_type: ControllerType,
     pub dev_address: Address,
     pub reconnect: bool,
 }
@@ -176,7 +176,7 @@ pub struct ControllerProtocolConfig {
 #[derive(Debug)]
 pub struct ControllerProtocol {
     state: Shared,
-    controller: ControllerType,
+    controller_type: ControllerType,
     dev_addr: Address,
     notify_data_received: Notify,
     notify_writer_wake: Notify,
@@ -193,12 +193,12 @@ impl ControllerProtocol {
         Event::handle_events(msg_rx, event_sub_rx)?;
         let spi_flash = SpiFlash::new();
         let controller_state = ControllerState::with_config(super::state::ControllerStateConfig {
-            controller: config.controller,
+            controller: config.controller_type,
             spi_flash: Some(spi_flash.clone()),
         })?;
         Ok(Self {
             state: Shared::new(controller_state, Some(spi_flash), config.reconnect),
-            controller: config.controller,
+            controller_type: config.controller_type,
             dev_addr: config.dev_address,
             notify_data_received: Notify::new(),
             notify_writer_wake: Notify::new(),
@@ -414,7 +414,7 @@ impl ControllerProtocol {
             Some(_) => mode,
             None => state.report_mode,
         };
-        if self.controller != state.controller_state.controller() {
+        if self.controller_type != state.controller_state.controller() {
             return Err(
                 ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one that's passed on `Protocol` init.".to_owned())
             );
@@ -428,7 +428,7 @@ impl ControllerProtocol {
         };
         input_report.set_input_report_id(id);
         match id {
-            InputReportId::Default => input_report.fill_default_report(self.controller),
+            InputReportId::Default => input_report.fill_default_report(self.controller_type),
             _ => {
                 let timer: u64 = match state.connected_at {
                     Some(connected_at) => {
@@ -525,7 +525,7 @@ impl ControllerProtocol {
         input_report: &mut InputReport,
     ) -> Result<(), ControllerProtocolError> {
         input_report.set_ack(0x82);
-        input_report.sub_0x02_device_info(*self.dev_addr, None, self.controller)?;
+        input_report.sub_0x02_device_info(*self.dev_addr, None, self.controller_type)?;
         Ok(())
     }
 
@@ -593,7 +593,7 @@ impl ControllerProtocol {
         input_report.set_response_subcommand(Subcommand::TriggerButtonsElapsedTime)?;
         // HACK: We assume this command is only used during pairing, sets values
         // and let the Switch to assign a player number.
-        match self.controller {
+        match self.controller_type {
             // INFO: Currently we don't support a combined JoyCon.
             ControllerType::JoyConL | ControllerType::JoyConR => input_report
                 .sub_0x04_trigger_buttons_elapsed_time(&[
