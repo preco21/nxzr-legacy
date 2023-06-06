@@ -58,6 +58,7 @@ impl Server {
             transport.clone(),
             ProtocolConfig {
                 dev_address: address.into(),
+                controller_type: opts.controller_type,
                 reconnect,
                 ..Default::default()
             },
