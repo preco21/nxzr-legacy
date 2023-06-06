@@ -1,10 +1,11 @@
-use std::{future::Future, net::ToSocketAddrs};
+use std::{future::Future, net::ToSocketAddrs, str::FromStr};
 
-use crate::server::Server;
-use nxzr_device::system;
+use nxzr_device::{system, Address, ReconnectType};
 use server::ServerOpts;
 use tokio::signal;
 use tracing_subscriber::prelude::*;
+
+use crate::server::Server;
 
 mod controller;
 mod server;
@@ -15,20 +16,18 @@ async fn main() -> anyhow::Result<()> {
     setup_tracer()?;
 
     system::check_privileges().await?;
-    system::prepare_device().await?;
+    system::check_system_requirements().await?;
 
     // tokio::spawn(async move {
     //     // Run the main service.
     // });
-    run(ServerOpts::default(), signal::ctrl_c()).await.unwrap();
+    run(ServerOpts::default(), signal::ctrl_c()).await?;
 
     // Setup the tracing service.
     // tonic::transport::Server::builder()
     //     .serve("[::1]:50051".to_socket_addrs().unwrap().next().unwrap())
     //     .await
     //     .unwrap();
-
-    system::cleanup_device().await;
     Ok(())
 }
 

@@ -28,6 +28,7 @@ pub async fn establish_initial_connection(
         dev_id: dev_id.clone(),
     })
     .await?;
+    device.set_powered(true).await?;
     device.check_paired_switches(true).await?;
 
     let address = device.address().await?;
@@ -50,7 +51,8 @@ pub async fn establish_initial_connection(
 
     // Start listening on the session and prepare for connection.
     session.listen().await?;
-    device.set_powered(true).await?;
+    // FIXME: must be powered at very first of the routine.
+    // device.set_powered(true).await?;
     device.set_pairable(true).await?;
 
     tracing::info!("setting device alias to {}", controller_type.name());
@@ -90,6 +92,7 @@ pub async fn establish_reconnect_connection(
         dev_id: dev_id.clone(),
     })
     .await?;
+    device.set_powered(true).await?;
     let target_addr: Address = match reconnect {
         ReconnectType::Auto => {
             let paired_switches = device.paired_switches().await?;

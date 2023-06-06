@@ -11,8 +11,6 @@ pub enum SysCheckError {
     RootPrivilegeRequired,
     #[error("cli tool presence check failed: {0}")]
     CliToolFailed(String),
-    #[error("failed to activate a Bluetooth device")]
-    BluetoothActivationFailed,
 }
 
 pub async fn check_privileges() -> Result<(), SysCheckError> {
@@ -53,18 +51,6 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     // .await
     // .map_err(|_| SysCheckError::CliToolFailed("bdaddr".to_owned()))?;
     Ok(())
-}
-
-pub async fn prepare_device() -> Result<(), SysCheckError> {
-    check_system_requirements().await?;
-    prepare_bluetooth_service()
-        .await
-        .map_err(|_| SysCheckError::BluetoothActivationFailed)?;
-    Ok(())
-}
-
-pub async fn cleanup_device() {
-    cleanup_bluetooth_service().await;
 }
 
 #[tracing::instrument(target = "system")]
@@ -128,37 +114,6 @@ pub async fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
     })
     .await?;
     Ok(())
-}
-
-#[tracing::instrument(target = "system")]
-async fn prepare_bluetooth_service() -> Result<(), SystemCommandError> {
-    // Turn off bluetooth scanning.
-    //
-    // This may fail for unknown reason, or timeout. In that case, just ignore it.
-    let power_on_fut = run_system_command({
-        let mut cmd = Command::new("bluetoothctl");
-        cmd.args(&["power", "on"]);
-        cmd
-    });
-    time::timeout(time::Duration::from_millis(1000), power_on_fut).await??;
-    let scan_off_fut = run_system_command({
-        let mut cmd = Command::new("bluetoothctl");
-        cmd.args(&["scan", "off"]);
-        cmd
-    });
-    let _ = time::timeout(time::Duration::from_millis(1000), scan_off_fut).await;
-    Ok(())
-}
-
-#[tracing::instrument(target = "system")]
-async fn cleanup_bluetooth_service() {
-    let power_off_fut = run_system_command({
-        let mut cmd = Command::new("bluetoothctl");
-        cmd.args(&["power", "off"]);
-        cmd
-    });
-    // Not so graceful, but it's okay.
-    let _ = time::timeout(time::Duration::from_millis(1000), power_off_fut).await;
 }
 
 #[derive(Error, Debug)]
