@@ -64,16 +64,6 @@ pub struct Protocol {
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
 
-pub struct ProtocolHandle {
-    _close_rx: mpsc::Receiver<()>,
-}
-
-impl Drop for ProtocolHandle {
-    fn drop(&mut self) {
-        // Required for drop order
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct StateSendReq {
     ready_tx: oneshot::Sender<()>,
@@ -351,6 +341,10 @@ impl Protocol {
         }
         Ok::<(), ProtocolError>(())
     }
+}
+
+pub struct ProtocolHandle {
+    _close_rx: mpsc::Receiver<()>,
 }
 
 #[derive(Debug, Clone)]

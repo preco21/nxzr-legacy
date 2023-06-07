@@ -17,16 +17,6 @@ pub struct ServerOpts {
     pub controller_type: ControllerType,
 }
 
-pub struct ServerHandle {
-    _close_rx: mpsc::Receiver<()>,
-}
-
-impl Drop for ServerHandle {
-    fn drop(&mut self) {
-        // Required for drop order
-    }
-}
-
 #[derive(Debug)]
 pub struct Server {
     protocol: Arc<Protocol>,
@@ -119,4 +109,8 @@ impl Server {
         self.protocol.closed().await;
         self.transport.closed().await;
     }
+}
+
+pub struct ServerHandle {
+    _close_rx: mpsc::Receiver<()>,
 }

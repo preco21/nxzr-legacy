@@ -183,12 +183,6 @@ pub struct TransportHandle {
     _close_rx: mpsc::Receiver<()>,
 }
 
-impl Drop for TransportHandle {
-    fn drop(&mut self) {
-        // Required for drop order
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct TransportInner {
     write_window: hci::Datagram,
