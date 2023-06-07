@@ -32,14 +32,6 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     })
     .await
     .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()))?;
-    // Check if `bluetoothctl` exists.
-    run_system_command({
-        let mut cmd = Command::new("bluetoothctl");
-        cmd.args(&["--version"]);
-        cmd
-    })
-    .await
-    .map_err(|_| SysCheckError::CliToolFailed("bluetoothctl".to_owned()))?;
     // FIXME: Maybe we do not need to change bdaddr
     // Revisit for revise: https://github.com/thxomas/bdaddr
     // Check if `bdaddr` exists
