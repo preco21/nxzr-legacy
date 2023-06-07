@@ -1,3 +1,5 @@
+use crate::server::Server;
+use nxzr_device::device;
 use nxzr_proto::{
     nxzr_server::Nxzr, ButtonControlStreamRequest, ButtonControlStreamResponse,
     ConnectSwitchRequest, ConnectSwitchResponse, GetDeviceStatusRequest, GetDeviceStatusResponse,
@@ -5,7 +7,8 @@ use nxzr_proto::{
     ImuControlStreamResponse, ReconnectSwitchRequest, ReconnectSwitchResponse,
     StickControlStreamRequest, StickControlStreamResponse,
 };
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
+use tokio::sync::{mpsc, Mutex};
 use tokio_stream::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 
@@ -13,9 +16,25 @@ type ServiceResult<T> = Result<Response<T>, Status>;
 type ResponseStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send>>;
 
 #[derive(Debug)]
-pub struct NxzrService {}
+pub struct NxzrService {
+    device: device::Device,
+    server: Mutex<Option<Server>>,
+}
 
-impl NxzrService {}
+impl NxzrService {
+    pub async fn new() -> anyhow::Result<Self> {
+        Ok(Self {
+            // Note that the device will only rely on the first adapter (e.g.
+            // hci0), and will never restart due to incompatibilities with the
+            // bluez `input` plugin.
+            //
+            // This is guaranteed to not happen because we will only serve the
+            // daemon in managed container of the WSL.
+            device: device::Device::new(device::DeviceConfig::default()).await?,
+            server: Mutex::new(None),
+        })
+    }
+}
 
 #[async_trait]
 impl Nxzr for NxzrService {
@@ -23,6 +42,13 @@ impl Nxzr for NxzrService {
         &self,
         req: Request<GetDeviceStatusRequest>,
     ) -> ServiceResult<GetDeviceStatusResponse> {
+        let protocol = {
+            let guard = self.server.lock().await;
+            let Some(server) = &*guard else {
+                return Err(tonic::Status::aborted("foo"));
+            };
+            server.protocol()
+        };
         unimplemented!()
     }
 
@@ -31,6 +57,7 @@ impl Nxzr for NxzrService {
         &self,
         req: Request<ConnectSwitchRequest>,
     ) -> ServiceResult<Self::ConnectSwitchStream> {
+        self.server.lock().await;
         unimplemented!()
     }
 
@@ -84,4 +111,8 @@ impl Nxzr for NxzrService {
     //         .map(|val| Ok::<_, Status>(LogStreamResponse { tracing_json: val }));
     //     Ok(Response::new(Box::pin(out_stream) as Self::LogStreamStream))
     // }
+}
+
+pub struct NxzrServiceHandle {
+    _close_rx: mpsc::Receiver<()>,
 }
