@@ -59,7 +59,7 @@ pub trait TransportPause {
 pub struct Protocol {
     protocol: Arc<ControllerProtocol>,
     state_send_tx: mpsc::Sender<StateSendReq>,
-    term_tx: mpsc::Sender<()>,
+    closing_tx: mpsc::Sender<()>,
     closed_tx: mpsc::Sender<()>,
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
 }
@@ -75,9 +75,8 @@ impl Protocol {
         config: ProtocolConfig,
     ) -> Result<(Self, ProtocolHandle), ProtocolError> {
         let protocol = Arc::new(ControllerProtocol::new(config)?);
-        let (close_tx, close_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let (internal_close_tx, mut internal_close_rx) = broadcast::channel(1);
+        let (close_signal_tx, mut close_signal_rx) = broadcast::channel(1);
         let (state_send_tx, state_send_rx) = mpsc::channel(1);
         let (msg_tx, msg_rx) = mpsc::channel(256);
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
@@ -116,23 +115,23 @@ impl Protocol {
         let mut set = JoinSet::<Result<(), ProtocolError>>::new();
         // Setup protocol reader task
         let reader_fut = {
-            let mut internal_close_rx = internal_close_tx.subscribe();
+            let mut close_signal_rx = close_signal_tx.subscribe();
             let fut = Self::setup_reader(transport.clone(), protocol.clone());
             async move {
                 tokio::select! {
                     res = fut => res,
-                    _ = internal_close_rx.recv() => return Ok::<(), ProtocolError>(()),
+                    _ = close_signal_rx.recv() => return Ok::<(), ProtocolError>(()),
                 }
             }
         };
         // Setup protocol writer task
         let writer_fut = {
-            let mut internal_close_rx = internal_close_tx.subscribe();
+            let mut close_signal_rx = close_signal_tx.subscribe();
             let fut = Self::setup_writer(transport.clone(), protocol.clone(), state_send_rx);
             async move {
                 tokio::select! {
                     res = fut => res,
-                    _ = internal_close_rx.recv() => return Ok::<(), ProtocolError>(()),
+                    _ = close_signal_rx.recv() => return Ok::<(), ProtocolError>(()),
                 }
             }
         };
@@ -157,7 +156,7 @@ impl Protocol {
                         // Allow the task to send one last command.
                         time::sleep(time::Duration::from_millis(1000)).await;
                     },
-                    _ = internal_close_rx.recv() => {},
+                    _ = close_signal_rx.recv() => {},
                 }
                 // Notifies the sender task to close then wait for it until closed.
                 drop(connected_rx);
@@ -170,7 +169,8 @@ impl Protocol {
         set.spawn(reader_fut);
         set.spawn(writer_fut);
         set.spawn(conn_handler_fut);
-        let (term_tx, term_rx) = mpsc::channel(1);
+        let (close_tx, close_rx) = mpsc::channel(1);
+        let (closing_tx, closing_rx) = mpsc::channel(1);
         // Close handling and graceful shutdown
         tokio::spawn({
             async move {
@@ -184,7 +184,7 @@ impl Protocol {
                             match inner {
                                 Ok(Err(err)) => {
                                     let _ = msg_tx.try_send(Event::Error(err));
-                                    let _ = internal_close_tx.send(());
+                                    let _ = close_signal_tx.send(());
                                     break;
                                 }
                                 Err(err) => {
@@ -193,14 +193,14 @@ impl Protocol {
                                     let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
                                         ProtocolInternalError::JoinError(err.to_string()),
                                     )));
-                                    let _ = internal_close_tx.send(());
+                                    let _ = close_signal_tx.send(());
                                     break;
                                 }
                                 _ => {}
                             }
                         },
                         _ = close_tx.closed() => {
-                            let _ = internal_close_tx.send(());
+                            let _ = close_signal_tx.send(());
                             break;
                         },
                     }
@@ -208,9 +208,9 @@ impl Protocol {
                 let _ = msg_tx.try_send(Event::Log(LogType::Closing));
                 // Trigger a pause for transport.
                 transport.pause();
-                // Drop the `term_rx` so that, relevant action methods to get
+                // Drop the `closing_rx` so that, relevant action methods to get
                 // notified when closing happens.
-                drop(term_rx);
+                drop(closing_rx);
                 // Wait for the rest of the tasks to finish.
                 while let Some(res) = set.join_next().await {
                     match res {
@@ -238,7 +238,7 @@ impl Protocol {
         Ok((
             Self {
                 protocol,
-                term_tx,
+                closing_tx,
                 closed_tx,
                 event_sub_tx,
                 state_send_tx,
@@ -263,7 +263,7 @@ impl Protocol {
         };
         tokio::select! {
             _ = fut => {}
-            _ = self.term_tx.closed() => {
+            _ = self.closing_tx.closed() => {
                 return Err(ProtocolError::ActionAbortedDueToClosing)
             },
         }
