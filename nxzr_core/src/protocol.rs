@@ -55,13 +55,9 @@ pub trait TransportPause {
     fn pause(&self);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Protocol {
-    protocol: Arc<ControllerProtocol>,
-    state_send_tx: mpsc::Sender<StateSendReq>,
-    closing_tx: mpsc::Sender<()>,
-    closed_tx: mpsc::Sender<()>,
-    event_sub_tx: mpsc::Sender<SubscriptionReq>,
+    inner: Arc<ProtocolInner>,
 }
 
 #[derive(Debug)]
@@ -74,19 +70,30 @@ impl Protocol {
         transport: impl Transport,
         config: ProtocolConfig,
     ) -> Result<(Self, ProtocolHandle), ProtocolError> {
-        let protocol = Arc::new(ControllerProtocol::new(config)?);
+        let (closing_tx, closing_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
         let (close_signal_tx, mut close_signal_rx) = broadcast::channel(1);
+
         let (state_send_tx, state_send_rx) = mpsc::channel(1);
+
         let (msg_tx, msg_rx) = mpsc::channel(256);
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
+
+        let inner = Arc::new(ProtocolInner::new(
+            config,
+            state_send_tx,
+            event_sub_tx,
+            closing_tx,
+            closed_tx,
+        )?);
+
         // Relay inner protocol events.
         //
         // Please note that, this task must survive even after the protocol
         // tasks panic, so it can notify the caller what went wrong by sending
         // the events that has raised from the protocol handler itself.
-        let mut inner_event_rx = protocol.events().await?;
+        let mut inner_event_rx = inner.protocol.events().await?;
         tokio::spawn({
             let msg_tx = msg_tx.clone();
             async move {
@@ -103,6 +110,7 @@ impl Protocol {
                 }
             }
         });
+
         // Although we use [JoinSet] which is already capable of managing
         // shutdown for all tasks that belongs to, it will not handle graceful
         // shutdown. So, we're employing another close signal to let each task
@@ -116,7 +124,7 @@ impl Protocol {
         // Setup protocol reader task
         let reader_fut = {
             let mut close_signal_rx = close_signal_tx.subscribe();
-            let fut = Self::setup_reader(transport.clone(), protocol.clone());
+            let fut = setup_reader(inner.protocol.clone(), transport.clone());
             async move {
                 tokio::select! {
                     res = fut => res,
@@ -127,7 +135,7 @@ impl Protocol {
         // Setup protocol writer task
         let writer_fut = {
             let mut close_signal_rx = close_signal_tx.subscribe();
-            let fut = Self::setup_writer(transport.clone(), protocol.clone(), state_send_rx);
+            let fut = setup_writer(inner.protocol.clone(), transport.clone(), state_send_rx);
             async move {
                 tokio::select! {
                     res = fut => res,
@@ -138,7 +146,7 @@ impl Protocol {
         // Setup protocol connection handler
         let conn_handler_fut = {
             let transport = transport.clone();
-            let protocol = protocol.clone();
+            let controller_protocol = inner.protocol.clone();
             async move {
                 let (connected_tx, connected_rx) = mpsc::channel::<()>(1);
                 // Please note that sending blank reports after the initial
@@ -146,13 +154,13 @@ impl Protocol {
                 // point) is very important because otherwise, the host will not
                 // send any further responses after last sending `spi_read`
                 // command.
-                let blank_report_sender = tokio::spawn(Self::create_blank_report_sender(
+                let blank_report_sender = tokio::spawn(setup_blank_report_sender(
+                    controller_protocol.clone(),
                     transport,
-                    protocol.clone(),
                     connected_tx,
                 ));
                 tokio::select! {
-                    _ = protocol.writer_ready() => {
+                    _ = controller_protocol.writer_ready() => {
                         // Allow the task to send one last command.
                         time::sleep(time::Duration::from_millis(1000)).await;
                     },
@@ -169,9 +177,9 @@ impl Protocol {
         set.spawn(reader_fut);
         set.spawn(writer_fut);
         set.spawn(conn_handler_fut);
-        let (close_tx, close_rx) = mpsc::channel(1);
-        let (closing_tx, closing_rx) = mpsc::channel(1);
+
         // Close handling and graceful shutdown
+        let (close_tx, close_rx) = mpsc::channel(1);
         tokio::spawn({
             async move {
                 loop {
@@ -234,15 +242,12 @@ impl Protocol {
                 drop(closed_rx);
             }
         });
-        protocol.establish_connection();
+
+        // Mark connection established.
+        inner.protocol.establish_connection();
+
         Ok((
-            Self {
-                protocol,
-                closing_tx,
-                closed_tx,
-                event_sub_tx,
-                state_send_tx,
-            },
+            Self { inner },
             ProtocolHandle {
                 _close_rx: close_rx,
             },
@@ -250,6 +255,51 @@ impl Protocol {
     }
 
     // Update controller state in-place and wait for it to complete.
+    pub async fn update_controller_state(
+        &self,
+        f: impl FnOnce(&mut ControllerState),
+    ) -> Result<(), ProtocolError> {
+        self.inner.update_controller_state(f).await
+    }
+
+    // Listen for the protocol control events.
+    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, ProtocolError> {
+        self.inner.events().await
+    }
+
+    // Wait for the internal tasks to exit completely.
+    pub fn closed(&self) -> impl Future<Output = ()> {
+        self.inner.closed()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ProtocolInner {
+    pub protocol: Arc<ControllerProtocol>,
+    state_send_tx: mpsc::Sender<StateSendReq>,
+    event_sub_tx: mpsc::Sender<SubscriptionReq>,
+    closing_tx: mpsc::Sender<()>,
+    closed_tx: mpsc::Sender<()>,
+}
+
+impl ProtocolInner {
+    pub fn new(
+        config: ProtocolConfig,
+        state_send_tx: mpsc::Sender<StateSendReq>,
+        event_sub_tx: mpsc::Sender<SubscriptionReq>,
+        closing_tx: mpsc::Sender<()>,
+        closed_tx: mpsc::Sender<()>,
+    ) -> Result<Self, ProtocolError> {
+        let protocol = Arc::new(ControllerProtocol::new(config)?);
+        Ok(Self {
+            protocol,
+            state_send_tx,
+            closing_tx,
+            closed_tx,
+            event_sub_tx,
+        })
+    }
+
     pub async fn update_controller_state(
         &self,
         f: impl FnOnce(&mut ControllerState),
@@ -270,77 +320,75 @@ impl Protocol {
         Ok(())
     }
 
-    // Listen for the protocol control events.
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, ProtocolError> {
         Event::subscribe(&mut self.event_sub_tx.clone())
             .await
             .map_err(|err| ProtocolError::from(err))
     }
 
-    // Wait for the internal tasks to exit completely.
     pub fn closed(&self) -> impl Future<Output = ()> {
         let closed_tx = self.closed_tx.clone();
         async move { closed_tx.closed().await }
     }
+}
 
-    async fn setup_reader(
-        transport: impl Transport,
-        protocol: Arc<ControllerProtocol>,
-    ) -> Result<(), ProtocolError> {
-        loop {
-            protocol.process_read(&transport).await?;
-        }
+async fn setup_reader(
+    protocol: Arc<ControllerProtocol>,
+    transport: impl Transport,
+) -> Result<(), ProtocolError> {
+    loop {
+        protocol.process_read(&transport).await?;
     }
+}
 
-    async fn setup_writer(
-        transport: impl Transport,
-        protocol: Arc<ControllerProtocol>,
-        mut ctrl_state_send_req_rx: mpsc::Receiver<StateSendReq>,
-    ) -> Result<(), ProtocolError> {
-        protocol.writer_ready().await;
+async fn setup_writer(
+    protocol: Arc<ControllerProtocol>,
+    transport: impl Transport,
+    mut ctrl_state_send_req_rx: mpsc::Receiver<StateSendReq>,
+) -> Result<(), ProtocolError> {
+    protocol.writer_ready().await;
+    loop {
+        // Collect all pending waiters before proceed to write for batching.
+        let mut pending_subs: Vec<oneshot::Sender<()>> = vec![];
         loop {
-            // Collect all pending waiters before proceed to write for batching.
-            let mut pending_subs: Vec<oneshot::Sender<()>> = vec![];
-            loop {
-                match ctrl_state_send_req_rx.try_recv() {
-                    Ok(StateSendReq { ready_tx }) => {
-                        pending_subs.push(ready_tx);
-                    }
-                    Err(mpsc::error::TryRecvError::Empty) => break,
-                    Err(_) => {}
-                };
-            }
-            let ready_fut = if !pending_subs.is_empty() {
-                Some(async move {
-                    for ready_tx in pending_subs {
-                        let _ = ready_tx.send(());
-                    }
-                })
-            } else {
-                None
+            match ctrl_state_send_req_rx.try_recv() {
+                Ok(StateSendReq { ready_tx }) => {
+                    pending_subs.push(ready_tx);
+                }
+                Err(mpsc::error::TryRecvError::Empty) => break,
+                Err(_) => {}
             };
-            protocol.process_write(&transport, ready_fut).await?;
         }
+        let ready_fut = if !pending_subs.is_empty() {
+            Some(async move {
+                for ready_tx in pending_subs {
+                    let _ = ready_tx.send(());
+                }
+            })
+        } else {
+            None
+        };
+        protocol.process_write(&transport, ready_fut).await?;
     }
+}
 
-    async fn create_blank_report_sender(
-        transport: impl Transport,
-        protocol: Arc<ControllerProtocol>,
-        connected_tx: mpsc::Sender<()>,
-    ) -> Result<(), ProtocolError> {
-        // Send blank input reports up to 10 times until the host decides to reply.
-        for _ in 0..10 {
-            tokio::select! {
-                res = protocol.send_blank_input_report(&transport) => {
-                    // Propagate errors immediately to the caller if any.
-                    res?;
-                    time::sleep(time::Duration::from_millis(1000)).await;
-                },
-                _ = connected_tx.closed() => break,
-            }
+async fn setup_blank_report_sender(
+    protocol: Arc<ControllerProtocol>,
+    transport: impl Transport,
+    connected_tx: mpsc::Sender<()>,
+) -> Result<(), ProtocolError> {
+    // Send blank input reports up to 10 times until the host decides to reply.
+    for _ in 0..10 {
+        tokio::select! {
+            res = protocol.send_blank_input_report(&transport) => {
+                // Propagate errors immediately to the caller if any.
+                res?;
+                time::sleep(time::Duration::from_millis(1000)).await;
+            },
+            _ = connected_tx.closed() => break,
         }
-        Ok::<(), ProtocolError>(())
     }
+    Ok::<(), ProtocolError>(())
 }
 
 pub struct ProtocolHandle {
