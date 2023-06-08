@@ -7,7 +7,6 @@ use nxzr_device::{
     transport::{Transport, TransportConfig},
     ReconnectType,
 };
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
 #[derive(Debug, Default)]
@@ -19,7 +18,7 @@ pub struct ServerOpts {
 
 #[derive(Debug)]
 pub struct Server {
-    protocol: Arc<Protocol>,
+    protocol: Protocol,
     transport: Transport,
     will_close_tx: mpsc::Sender<()>,
 }
@@ -65,7 +64,6 @@ impl Server {
 
         let (close_tx, close_rx) = mpsc::channel(1);
         let (will_close_tx, will_close_rx) = mpsc::channel(1);
-        let protocol = Arc::new(protocol);
         tokio::spawn({
             let protocol = protocol.clone();
             let transport = transport.clone();
@@ -93,7 +91,7 @@ impl Server {
         ))
     }
 
-    pub fn protocol(&self) -> Arc<Protocol> {
+    pub fn protocol(&self) -> Protocol {
         self.protocol.clone()
     }
 
