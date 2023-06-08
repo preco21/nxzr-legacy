@@ -60,11 +60,6 @@ pub struct Protocol {
     inner: Arc<ProtocolInner>,
 }
 
-#[derive(Debug)]
-pub(crate) struct StateSendReq {
-    ready_tx: oneshot::Sender<()>,
-}
-
 impl Protocol {
     pub async fn connect(
         transport: impl Transport,
@@ -280,6 +275,11 @@ pub(crate) struct ProtocolInner {
     event_sub_tx: mpsc::Sender<SubscriptionReq>,
     closing_tx: mpsc::Sender<()>,
     closed_tx: mpsc::Sender<()>,
+}
+
+#[derive(Debug)]
+pub(crate) struct StateSendReq {
+    ready_tx: oneshot::Sender<()>,
 }
 
 impl ProtocolInner {
