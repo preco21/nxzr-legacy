@@ -1,12 +1,11 @@
-use nxzr_core::controller::ControllerType;
-use strum::Display;
-use thiserror::Error;
-use tokio::time;
-
 use crate::{
     device::{self, DeviceHandle},
     session, system, Address,
 };
+use nxzr_core::controller::ControllerType;
+use strum::Display;
+use thiserror::Error;
+use tokio::time;
 
 #[derive(Error, Debug)]
 pub enum DeviceConnectionError {
