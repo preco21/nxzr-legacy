@@ -25,17 +25,11 @@ service Nxzr {
 
 message GetDeviceStatusRequest {}
 message GetDeviceStatusResponse {
-  message SwitchDevice {
-    uint32 bound_dev_id = 1;
-    string address = 2;
-  }
-  repeated SwitchDevice paired_switches = 1;
   string adapter_address = 2;
+  repeated string paired_switch_addresses = 1;
 }
 
-message ConnectSwitchRequest {
-  optional uint32 dev_id = 1;
-}
+message ConnectSwitchRequest {}
 message ConnectSwitchResponse {
   oneof data {
     ConnectionInfo connection_info = 1;
@@ -44,7 +38,6 @@ message ConnectSwitchResponse {
 }
 
 message ReconnectSwitchRequest {
-  optional uint32 dev_id = 1;
   string reconnect_address = 2;
 }
 message ReconnectSwitchResponse {
@@ -126,7 +119,6 @@ message Position {
 }
 
 message ConnectionInfo {
-  uint32 dev_id = 1;
   string adapter_address = 2;
   string target_address = 3;
 }
