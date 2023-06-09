@@ -3,7 +3,10 @@ use strum::Display;
 use thiserror::Error;
 use tokio::time;
 
-use crate::{device, session, system, Address};
+use crate::{
+    device::{self, DeviceHandle},
+    session, system, Address,
+};
 
 #[derive(Error, Debug)]
 pub enum DeviceConnectionError {
@@ -23,12 +26,11 @@ pub enum DeviceConnectionError {
 pub async fn establish_initial_connection(
     dev_id: Option<String>,
     controller_type: ControllerType,
-) -> Result<(session::PairedSession, Address), DeviceConnectionError> {
-    let mut device = device::Device::new(device::DeviceConfig {
+) -> Result<(session::PairedSession, Address, DeviceHandle), DeviceConnectionError> {
+    let (mut device, mut handle) = device::Device::create(device::DeviceConfig {
         dev_id: dev_id.clone(),
     })
     .await?;
-    device.set_powered(true).await?;
     device.check_paired_switches(true).await?;
 
     let address = device.address().await?;
@@ -44,15 +46,13 @@ pub async fn establish_initial_connection(
         tracing::info!("restarting Bluetooth service...");
         system::restart_bluetooth_service().await?;
         time::sleep(time::Duration::from_millis(1000)).await;
-        device = device::Device::new(device::DeviceConfig { dev_id }).await?;
+        (device, handle) = device::Device::create(device::DeviceConfig { dev_id }).await?;
         // If it failed again, just bail out.
         session.bind().await?;
     };
 
     // Start listening on the session and prepare for connection.
     session.listen().await?;
-    // FIXME: must be powered at very first of the routine.
-    // device.set_powered(true).await?;
     device.set_pairable(true).await?;
 
     tracing::info!("setting device alias to {}", controller_type.name());
@@ -73,7 +73,7 @@ pub async fn establish_initial_connection(
 
     // Drop SDP-record advertisement.
     drop(record_handle);
-    Ok((paired_session, address))
+    Ok((paired_session, address, handle))
 }
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -87,12 +87,11 @@ pub async fn establish_reconnect_connection(
     dev_id: Option<String>,
     controller_type: ControllerType,
     reconnect: ReconnectType,
-) -> Result<(session::PairedSession, Address), DeviceConnectionError> {
-    let device = device::Device::new(device::DeviceConfig {
+) -> Result<(session::PairedSession, Address, DeviceHandle), DeviceConnectionError> {
+    let (device, handle) = device::Device::create(device::DeviceConfig {
         dev_id: dev_id.clone(),
     })
     .await?;
-    device.set_powered(true).await?;
     let target_addr: Address = match reconnect {
         ReconnectType::Auto => {
             let paired_switches = device.paired_switches().await?;
@@ -113,5 +112,5 @@ pub async fn establish_reconnect_connection(
         ..Default::default()
     })
     .await?;
-    Ok((paired_session, target_addr))
+    Ok((paired_session, target_addr, handle))
 }
