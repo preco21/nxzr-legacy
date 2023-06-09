@@ -1,6 +1,7 @@
 use crate::{system, Address, Uuid};
-use std::{collections::HashSet, str::FromStr};
+use std::{collections::HashSet, future::Future, str::FromStr};
 use thiserror::Error;
+use tokio::sync::mpsc;
 
 // Gamepad/Joystick device class
 const DEVICE_CLASS: u32 = 0x002508;
@@ -76,11 +77,14 @@ pub struct DeviceConfig {
 pub struct Device {
     adapter: bluer::Adapter,
     session: bluer::Session,
+    closed_tx: mpsc::Sender<()>,
 }
 
 impl Device {
     #[tracing::instrument(target = "device")]
-    pub async fn new(config: DeviceConfig) -> Result<Self, DeviceError> {
+    pub async fn create(config: DeviceConfig) -> Result<(Self, DeviceHandle), DeviceError> {
+        let (close_tx, close_rx) = mpsc::channel(1);
+        let (closed_tx, closed_rx) = mpsc::channel(1);
         let session = bluer::Session::new()
             .await
             .map_err(|err| DeviceError::SessionCreationFailed(err))?;
@@ -111,44 +115,31 @@ impl Device {
                 .await
                 .map_err(|err| DeviceError::SessionCreationFailed(err))?,
         };
-        Ok(Self { adapter, session })
-    }
-
-    #[tracing::instrument(target = "device")]
-    pub async fn ensure_adapter_compatible_address(self) -> Result<Self, DeviceError> {
-        tracing::info!(
-            "attempting to change MAC address of Bluetooth adapter to target compatible one."
-        );
-        let addr = self.address().await?;
-        if &addr[..3] != SWITCH_MAC_PREFIX {
-            let adapter_name = self.adapter_name().to_owned();
-            let mut addr_bytes: [u8; 6] = [0; 6];
-            addr_bytes[..3].copy_from_slice(SWITCH_MAC_PREFIX);
-            addr_bytes[3..].copy_from_slice(&addr[3..]);
-            let new_addr = Address::new(addr_bytes);
-            system::set_adapter_address(adapter_name.as_str(), new_addr).await?;
-            // We need to re-instantiate device.
-            drop(self);
-            let new_self = Self::new(DeviceConfig {
-                dev_id: Some(adapter_name.to_owned()),
-            })
-            .await?;
-            let cur_addr: Address = new_self.address().await?.into();
-            if cur_addr != new_addr {
-                tracing::error!(
-                    "failed to change MAC address of Bluetooth adapter: current={:?} desired={:?}",
-                    cur_addr,
-                    new_addr
-                );
-                return Err(DeviceError::MacAddrChangeFailed);
+        // Set the adapter to be powered for use.
+        adapter.set_powered(true).await?;
+        // Wait for the handle to drop, then run cleanups.
+        tokio::spawn({
+            let adapter = adapter.clone();
+            async move {
+                close_tx.closed().await;
+                tracing::info!("close signal received, terminating device.");
+                // Turn off the device as a cleanup after use, silently fails if it's not successful.
+                if let Err(err) = adapter.set_powered(false).await {
+                    tracing::error!("failed to power off the device: {}", err.to_string());
+                };
+                drop(closed_rx)
             }
-            tracing::info!(
-                "successfully changed MAC address of Bluetooth adapter to {}.",
-                new_addr
-            );
-            return Ok(new_self);
-        }
-        Ok(self)
+        });
+        Ok((
+            Self {
+                adapter,
+                session,
+                closed_tx,
+            },
+            DeviceHandle {
+                _close_rx: close_rx,
+            },
+        ))
     }
 
     #[tracing::instrument(target = "device")]
@@ -260,4 +251,55 @@ impl Device {
         let uuids = self.adapter.uuids().await?;
         Ok(uuids)
     }
+
+    pub fn closed(&self) -> impl Future<Output = ()> {
+        let closed_tx = self.closed_tx.clone();
+        async move { closed_tx.closed().await }
+    }
+}
+
+#[derive(Debug)]
+pub struct DeviceHandle {
+    _close_rx: mpsc::Receiver<()>,
+}
+
+#[tracing::instrument(target = "device_helper")]
+pub async fn ensure_adapter_compatible_address(
+    dev_pair: (Device, DeviceHandle),
+) -> Result<(Device, DeviceHandle), DeviceError> {
+    let (dev, handle) = dev_pair;
+    tracing::info!(
+        "attempting to change MAC address of Bluetooth adapter to target compatible one."
+    );
+    let addr = dev.address().await?;
+    if &addr[..3] != SWITCH_MAC_PREFIX {
+        let adapter_name = dev.adapter_name().to_owned();
+        let mut addr_bytes: [u8; 6] = [0; 6];
+        addr_bytes[..3].copy_from_slice(SWITCH_MAC_PREFIX);
+        addr_bytes[3..].copy_from_slice(&addr[3..]);
+        let new_addr = Address::new(addr_bytes);
+        system::set_adapter_address(adapter_name.as_str(), new_addr).await?;
+        // We need to re-instantiate device.
+        drop(dev);
+        drop(handle);
+        let (new_dev, new_handle) = Device::create(DeviceConfig {
+            dev_id: Some(adapter_name.to_owned()),
+        })
+        .await?;
+        let cur_addr: Address = new_dev.address().await?.into();
+        if cur_addr != new_addr {
+            tracing::error!(
+                "failed to change MAC address of Bluetooth adapter: current={:?} desired={:?}",
+                cur_addr,
+                new_addr
+            );
+            return Err(DeviceError::MacAddrChangeFailed);
+        }
+        tracing::info!(
+            "successfully changed MAC address of Bluetooth adapter to {}.",
+            new_addr
+        );
+        return Ok((new_dev, new_handle));
+    }
+    Ok((dev, handle))
 }

@@ -8,9 +8,9 @@ async fn main() -> anyhow::Result<()> {
         .with_max_level(tracing::Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
-    system::prepare_device().await?;
+    system::check_system_requirements().await?;
 
-    let device = device::Device::new(device::DeviceConfig::default()).await?;
+    let (device, _handle) = device::Device::create(device::DeviceConfig::default()).await?;
 
     loop {
         let fut = async {
