@@ -3,17 +3,18 @@ use nxzr_core::{
     protocol::{Protocol, ProtocolConfig},
 };
 use nxzr_device::{
-    establish_initial_connection, establish_reconnect_connection,
+    session::PairedSession,
     transport::{Transport, TransportConfig},
-    ReconnectType,
+    Address,
 };
 use tokio::sync::mpsc;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ServerOpts {
-    pub dev_id: Option<String>,
-    pub reconnect: Option<ReconnectType>,
+    pub paired_session: PairedSession,
+    pub adapter_address: Address,
     pub controller_type: ControllerType,
+    pub reconnect: bool,
 }
 
 #[derive(Debug)]
@@ -26,19 +27,12 @@ pub struct Server {
 impl Server {
     #[tracing::instrument(target = "server")]
     pub async fn run(opts: ServerOpts) -> anyhow::Result<(Self, ServerHandle)> {
-        let (paired_session, address, reconnect) = match opts.reconnect {
-            Some(reconnect) => {
-                let (paired_session, address) =
-                    establish_reconnect_connection(opts.dev_id, opts.controller_type, reconnect)
-                        .await?;
-                (paired_session, address, true)
-            }
-            None => {
-                let (paired_session, address) =
-                    establish_initial_connection(opts.dev_id, opts.controller_type).await?;
-                (paired_session, address, false)
-            }
-        };
+        let ServerOpts {
+            paired_session,
+            adapter_address,
+            controller_type,
+            reconnect,
+        } = opts;
 
         // Use that paired session for the further processing.
         let (transport, transport_handle) =
@@ -46,8 +40,8 @@ impl Server {
         let (protocol, protocol_handle) = Protocol::connect(
             transport.clone(),
             ProtocolConfig {
-                dev_address: address.into(),
-                controller_type: opts.controller_type,
+                dev_address: adapter_address.into(),
+                controller_type,
                 reconnect,
                 ..Default::default()
             },
@@ -93,10 +87,6 @@ impl Server {
 
     pub fn protocol(&self) -> Protocol {
         self.protocol.clone()
-    }
-
-    pub fn transport(&self) -> Transport {
-        self.transport.clone()
     }
 
     pub async fn will_close(&self) {
