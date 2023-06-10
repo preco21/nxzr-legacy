@@ -10,7 +10,7 @@ use nxzr_device::{
 use tokio::sync::mpsc;
 
 #[derive(Debug)]
-pub struct ServerOpts {
+pub struct ConnectionConfig {
     pub paired_session: PairedSession,
     pub adapter_address: Address,
     pub controller_type: ControllerType,
@@ -18,21 +18,21 @@ pub struct ServerOpts {
 }
 
 #[derive(Debug)]
-pub struct Server {
+pub struct Connection {
     protocol: Protocol,
     transport: Transport,
     will_close_tx: mpsc::Sender<()>,
 }
 
-impl Server {
+impl Connection {
     #[tracing::instrument(target = "server")]
-    pub async fn run(opts: ServerOpts) -> anyhow::Result<(Self, ServerHandle)> {
-        let ServerOpts {
+    pub async fn run(config: ConnectionConfig) -> anyhow::Result<(Self, ServerHandle)> {
+        let ConnectionConfig {
             paired_session,
             adapter_address,
             controller_type,
             reconnect,
-        } = opts;
+        } = config;
 
         // Use that paired session for the further processing.
         let (transport, transport_handle) =
