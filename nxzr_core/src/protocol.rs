@@ -175,67 +175,65 @@ impl Protocol {
 
         // Close handling and graceful shutdown
         let (close_tx, close_rx) = mpsc::channel(1);
-        tokio::spawn({
-            async move {
-                loop {
-                    tokio::select! {
-                        res = set.join_next() => {
-                            // When all tasks in set are closed ok, break the loop.
-                            let Some(inner) = res else {
-                                break;
-                            };
-                            match inner {
-                                Ok(Err(err)) => {
-                                    let _ = msg_tx.try_send(Event::Error(err));
-                                    let _ = close_signal_tx.send(());
-                                    break;
-                                }
-                                Err(err) => {
-                                    // [JoinError] is usually occurred when there's panic in spawned tasks in the set.
-                                    // In such case, we immediately abort the protocol tasks then bail.
-                                    let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
-                                        ProtocolInternalError::JoinError(err.to_string()),
-                                    )));
-                                    let _ = close_signal_tx.send(());
-                                    break;
-                                }
-                                _ => {}
-                            }
-                        },
-                        _ = close_tx.closed() => {
-                            let _ = close_signal_tx.send(());
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    res = set.join_next() => {
+                        // When all tasks in set are closed ok, break the loop.
+                        let Some(inner) = res else {
                             break;
-                        },
-                    }
-                }
-                let _ = msg_tx.try_send(Event::Log(LogType::Closing));
-                // Trigger a pause for transport.
-                transport.pause();
-                // Drop the `closing_rx` so that, relevant action methods to get
-                // notified when closing happens.
-                drop(closing_rx);
-                // Wait for the rest of the tasks to finish.
-                while let Some(res) = set.join_next().await {
-                    match res {
-                        Ok(Err(err)) => {
-                            let _ = msg_tx.try_send(Event::Error(err));
+                        };
+                        match inner {
+                            Ok(Err(err)) => {
+                                let _ = msg_tx.try_send(Event::Error(err));
+                                let _ = close_signal_tx.send(());
+                                break;
+                            }
+                            Err(err) => {
+                                // [JoinError] is usually occurred when there's panic in spawned tasks in the set.
+                                // In such case, we immediately abort the protocol tasks then bail.
+                                let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
+                                    ProtocolInternalError::JoinError(err.to_string()),
+                                )));
+                                let _ = close_signal_tx.send(());
+                                break;
+                            }
+                            _ => {}
                         }
-                        Err(err) => {
-                            // Notify the caller that there's join error occurred,
-                            // so that they can choose what to do next.
-                            //
-                            // Note that this kind of errors is normally not recoverable.
-                            let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
-                                ProtocolInternalError::JoinError(err.to_string()),
-                            )));
-                        }
-                        _ => {}
-                    }
+                    },
+                    _ = close_tx.closed() => {
+                        let _ = close_signal_tx.send(());
+                        break;
+                    },
                 }
-                let _ = msg_tx.try_send(Event::Log(LogType::Closed));
-                // Mark the protocol is fully closed.
-                drop(closed_rx);
             }
+            let _ = msg_tx.try_send(Event::Log(LogType::Closing));
+            // Trigger a pause for transport.
+            transport.pause();
+            // Drop the `closing_rx` so that, relevant action methods to get
+            // notified when closing happens.
+            drop(closing_rx);
+            // Wait for the rest of the tasks to finish.
+            while let Some(res) = set.join_next().await {
+                match res {
+                    Ok(Err(err)) => {
+                        let _ = msg_tx.try_send(Event::Error(err));
+                    }
+                    Err(err) => {
+                        // Notify the caller that there's join error occurred,
+                        // so that they can choose what to do next.
+                        //
+                        // Note that this kind of errors is normally not recoverable.
+                        let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
+                            ProtocolInternalError::JoinError(err.to_string()),
+                        )));
+                    }
+                    _ => {}
+                }
+            }
+            let _ = msg_tx.try_send(Event::Log(LogType::Closed));
+            // Mark the protocol is fully closed.
+            drop(closed_rx);
         });
 
         // Mark connection established.
