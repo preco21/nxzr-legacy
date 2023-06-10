@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 #[derive(Debug)]
 pub struct ConnectionConfig {
     pub paired_session: PairedSession,
-    pub adapter_address: Address,
+    pub dev_address: Address,
     pub controller_type: ControllerType,
     pub reconnect: bool,
 }
@@ -25,11 +25,11 @@ pub struct Connection {
 }
 
 impl Connection {
-    #[tracing::instrument(target = "server")]
+    #[tracing::instrument(target = "connection")]
     pub async fn run(config: ConnectionConfig) -> anyhow::Result<(Self, ServerHandle)> {
         let ConnectionConfig {
             paired_session,
-            adapter_address,
+            dev_address,
             controller_type,
             reconnect,
         } = config;
@@ -40,21 +40,13 @@ impl Connection {
         let (protocol, protocol_handle) = Protocol::connect(
             transport.clone(),
             ProtocolConfig {
-                dev_address: adapter_address.into(),
+                dev_address: dev_address.into(),
                 controller_type,
                 reconnect,
                 ..Default::default()
             },
         )
         .await?;
-
-        // Start listening for protocol events.
-        let mut event_rx = protocol.events().await?;
-        tokio::spawn(async move {
-            while let Some(evt) = event_rx.recv().await {
-                tracing::info!("protocol: {}", &evt.to_string());
-            }
-        });
 
         let (close_tx, close_rx) = mpsc::channel(1);
         let (will_close_tx, will_close_rx) = mpsc::channel(1);
