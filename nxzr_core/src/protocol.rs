@@ -1,5 +1,9 @@
 use crate::controller::{
-    protocol::{self, ControllerProtocol, ControllerProtocolError},
+    protocol::{
+        ControllerProtocol, ControllerProtocolError, Event as ProtocolEvent,
+        LogType as ProtocolLogType,
+    },
+    report::subcommand::Subcommand,
     state::ControllerState,
 };
 use crate::event::{setup_event, EventError};
@@ -95,10 +99,8 @@ impl Protocol {
                 loop {
                     if let Some(orig) = inner_event_rx.recv().await {
                         let evt = match orig {
-                            protocol::Event::Warning(err) => Event::Warning(err.into()),
-                            protocol::Event::Log(log) => {
-                                Event::Log(LogType::ControllerProtocol(log))
-                            }
+                            ProtocolEvent::Warning(err) => Event::Warning(err.into()),
+                            ProtocolEvent::Log(log) => Event::Log(log.into()),
                         };
                         let _ = msg_tx.try_send(evt);
                     }
@@ -403,9 +405,9 @@ pub enum Event {
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Log(log) => write!(f, "event log: {:?}", log),
-            Self::Error(err) => write!(f, "event error: {}", err.to_string()),
-            Self::Warning(err) => write!(f, "event warn: {}", err.to_string()),
+            Self::Log(log) => write!(f, "[log]: {:?}", log),
+            Self::Error(err) => write!(f, "[error]: {}", err.to_string()),
+            Self::Warning(err) => write!(f, "[warn]: {}", err.to_string()),
         }
     }
 }
@@ -414,7 +416,17 @@ impl std::fmt::Display for Event {
 pub enum LogType {
     Closing,
     Closed,
-    ControllerProtocol(protocol::LogType),
+    PairingEnded,
+    SubcommandReceived(Subcommand),
+}
+
+impl From<ProtocolLogType> for LogType {
+    fn from(log_type: ProtocolLogType) -> Self {
+        match log_type {
+            ProtocolLogType::PairingEnded => Self::PairingEnded,
+            ProtocolLogType::SubcommandReceived(subcommand) => Self::SubcommandReceived(subcommand),
+        }
+    }
 }
 
 #[derive(Debug)]

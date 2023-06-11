@@ -391,7 +391,7 @@ impl ControllerProtocol {
         });
         if is_pairing_ended {
             self.set_report_mode(None);
-            self.emit_event(Event::Log(LogType::PairingSuccess));
+            self.emit_event(Event::Log(LogType::PairingEnded));
         }
         if self.is_paused() {
             self.emit_event(Event::Warning(ControllerProtocolError::WriteWhilePaused));
@@ -748,18 +748,9 @@ pub enum Event {
     Warning(ControllerProtocolError),
 }
 
-impl std::fmt::Display for Event {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Self::Log(log) => write!(f, "event log: {:?}", log),
-            Self::Warning(err) => write!(f, "event warning: {}", err.to_string()),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, IntoStaticStr)]
 pub enum LogType {
-    PairingSuccess,
+    PairingEnded,
     SubcommandReceived(Subcommand),
 }
 
