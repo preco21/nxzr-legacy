@@ -33,7 +33,7 @@ impl From<std::io::Error> for SessionError {
 
 #[derive(Debug, Default)]
 pub struct SessionConfig {
-    pub address: Option<Address>,
+    pub dev_address: Option<Address>,
     pub control_psm: Option<u16>,
     pub interrupt_psm: Option<u16>,
 }
@@ -42,7 +42,7 @@ pub struct SessionConfig {
 pub struct SessionListener {
     ctl_sock: l2cap::LazySeqPacketListener,
     itr_sock: l2cap::LazySeqPacketListener,
-    addr_def: SessionAddress,
+    session_addr: SessionAddress,
 }
 
 #[derive(Debug)]
@@ -65,10 +65,10 @@ impl SessionListener {
         Ok(Self {
             ctl_sock,
             itr_sock,
-            addr_def: SessionAddress {
+            session_addr: SessionAddress {
                 ctl_psm: control_psm,
                 itr_psm: interrupt_psm,
-                addr: config.address.unwrap_or(Address::default()),
+                addr: config.dev_address.unwrap_or(Address::default()),
             },
         })
     }
@@ -78,8 +78,8 @@ impl SessionListener {
         tracing::info!("binding the session.");
         self.ctl_sock
             .bind(l2cap::SocketAddr {
-                addr: self.addr_def.addr.into(),
-                psm: self.addr_def.ctl_psm,
+                addr: self.session_addr.addr,
+                psm: self.session_addr.ctl_psm,
                 addr_type: sock::AddressType::BrEdr,
                 ..Default::default()
             })
@@ -87,8 +87,8 @@ impl SessionListener {
             .map_err(|err| SessionError::BindFailed(err))?;
         self.itr_sock
             .bind(l2cap::SocketAddr {
-                addr: self.addr_def.addr.into(),
-                psm: self.addr_def.itr_psm,
+                addr: self.session_addr.addr,
+                psm: self.session_addr.itr_psm,
                 addr_type: sock::AddressType::BrEdr,
                 ..Default::default()
             })
@@ -124,6 +124,7 @@ impl SessionListener {
             return Err(SessionError::CtlItrSocketAddrMismatch);
         }
         Ok(PairedSession::from_socket(
+            self.session_addr.addr,
             (ctl_client, ctl_sa),
             (itr_client, itr_sa),
         ))
@@ -132,6 +133,7 @@ impl SessionListener {
 
 #[derive(Debug, Default)]
 pub struct PairedSessionConfig {
+    pub dev_address: Address,
     pub reconnect_address: Address,
     pub control_psm: Option<u16>,
     pub interrupt_psm: Option<u16>,
@@ -139,10 +141,12 @@ pub struct PairedSessionConfig {
 
 #[derive(Debug)]
 pub struct PairedSession {
-    ctl_client: l2cap::SeqPacket,
-    ctl_sa: l2cap::SocketAddr,
-    itr_client: l2cap::SeqPacket,
-    itr_sa: l2cap::SocketAddr,
+    pub dev_address: Address,
+    pub ctl_client: l2cap::SeqPacket,
+    pub ctl_sa: l2cap::SocketAddr,
+    pub itr_client: l2cap::SeqPacket,
+    pub itr_sa: l2cap::SocketAddr,
+    pub is_reconnect: bool,
 }
 
 impl PairedSession {
@@ -162,40 +166,29 @@ impl PairedSession {
             ..Default::default()
         };
         Ok(Self {
+            dev_address: config.dev_address,
             ctl_client: l2cap::SeqPacket::connect_blocking(ctl_addr).await?,
             ctl_sa: ctl_addr,
             itr_client: l2cap::SeqPacket::connect_blocking(itr_addr).await?,
             itr_sa: itr_addr,
+            is_reconnect: true,
         })
     }
 
     pub(crate) fn from_socket(
+        dev_address: Address,
         ctl_pair: (l2cap::SeqPacket, l2cap::SocketAddr),
         itr_pair: (l2cap::SeqPacket, l2cap::SocketAddr),
     ) -> Self {
         let (ctl_client, ctl_sa) = ctl_pair;
         let (itr_client, itr_sa) = itr_pair;
         Self {
+            dev_address,
             ctl_client,
             ctl_sa,
             itr_client,
             itr_sa,
+            is_reconnect: false,
         }
-    }
-
-    pub fn ctl_client(&self) -> &l2cap::SeqPacket {
-        &self.ctl_client
-    }
-
-    pub fn ctl_socket_addr(&self) -> l2cap::SocketAddr {
-        self.ctl_sa
-    }
-
-    pub fn itr_client(&self) -> &l2cap::SeqPacket {
-        &self.itr_client
-    }
-
-    pub fn itr_socket_addr(&self) -> l2cap::SocketAddr {
-        self.itr_sa
     }
 }

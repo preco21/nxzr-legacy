@@ -204,8 +204,8 @@ impl TransportInner {
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, TransportError> {
         tracing::info!("initializing a transport.");
-        let ctl_mtu = paired_session.ctl_client().send_mtu()?;
-        let itr_mtu = paired_session.itr_client().send_mtu()?;
+        let ctl_mtu = paired_session.ctl_client.send_mtu()?;
+        let itr_mtu = paired_session.itr_client.send_mtu()?;
         tracing::trace!("MTU: ctl={} itr={}", ctl_mtu, itr_mtu);
         if ctl_mtu < MTU_THRESHOLD || itr_mtu < MTU_THRESHOLD {
             tracing::warn!(
@@ -277,7 +277,7 @@ impl TransportInner {
         self.running().await;
         let mut buf = BytesMut::with_capacity(self.read_buf_size);
         buf.resize(self.read_buf_size, 0);
-        match self.session.itr_client().recv(&mut buf).await {
+        match self.session.itr_client.recv(&mut buf).await {
             Ok(0) => Err(TransportError::ReaderClosed),
             Ok(_) => Ok(buf),
             Err(err) => Err(err.into()),
@@ -293,7 +293,7 @@ impl TransportInner {
         self.writable().await;
         // Writing a buffer in length more than MTU may fail, however, L2CAP's
         // [SeqPacket] socket seems allows writing buf regardless of the MTU length.
-        match self.session.itr_client().send(&buf).await {
+        match self.session.itr_client.send(&buf).await {
             Ok(0) => Err(TransportError::WriterClosed),
             Ok(_) => Ok(()),
             Err(err) => Err(err.into()),
