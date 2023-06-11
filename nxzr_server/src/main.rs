@@ -10,7 +10,6 @@ use tokio_util::sync::CancellationToken;
 use tracing_subscriber::prelude::*;
 
 mod controller;
-mod server;
 mod service;
 
 #[tokio::main]
@@ -38,8 +37,6 @@ async fn main() -> anyhow::Result<()> {
 
 pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     let shutdown_token = CancellationToken::new();
-    let (will_close_tx, mut will_close_rx) = mpsc::channel::<()>(1);
-    let (notify_shutdown_tx, notify_shutdown_rx) = mpsc::channel::<()>(1);
     let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel::<()>(1);
 
     // Setup a device.
@@ -59,30 +56,36 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
         .to_socket_addrs()?
         .next()
         .ok_or(anyhow::anyhow!("failed to select an address to bind"))?;
-    let nxzr_task_handle = tokio::spawn(async move {
-        let nxzr_service = NxzrService::new(device.clone(), notify_shutdown_tx.closed(), shutdown_complete_tx.).await?;
-        let svc = nxzr_proto::nxzr_server::NxzrServer::new(nxzr_service);
-        tonic::transport::Server::builder()
-            .add_service(svc)
-            .serve_with_shutdown(addr, notify_shutdown_tx.closed())
-            .await?;
-        let _ = will_close_tx.send(()).await;
-        Ok(())
+    let nxzr_task_handle = tokio::spawn({
+        let device = device.clone();
+        let shutdown_token = shutdown_token.clone();
+        let shutdown_complete_tx = shutdown_complete_tx.clone();
+        async move {
+            let _shutdown_guard = shutdown_token.clone().drop_guard();
+            let nxzr_service =
+                NxzrService::new(device, shutdown_token.clone(), shutdown_complete_tx.clone())
+                    .await?;
+            let svc = nxzr_proto::nxzr_server::NxzrServer::new(nxzr_service);
+            tonic::transport::Server::builder()
+                .add_service(svc)
+                .serve_with_shutdown(addr, shutdown_token.cancelled())
+                .await?;
+            Ok(())
+        }
     });
 
     tokio::select! {
         _ = shutdown => {},
-        // When spawned tasks which have `will_close_tx` use it in case a
-        // shutdown was issued from inside of that task, this will also be
-        // considered as a shutdown signal.
-        _ = will_close_rx.recv() => {},
+        // A cloned `shutdown_token` can be passed to each task so that the task
+        // can issue a shutdown from inside of it, which will also have to be
+        // considered as a normal shutdown signal.
+        _ = shutdown_token.cancelled() => {},
     }
     tracing::info!("shutdown signal received, terminating...");
 
-    // When `notify_shutdown_rx` is dropped, all tasks which have called
-    // `notify_shutdown_tx.closed()` will receive the shutdown signal and can
-    // exit.
-    drop(notify_shutdown_rx);
+    // When this called, all tasks which have subscribed for `.cancelled()` will
+    // receive the shutdown signal and can exit.
+    shutdown_token.cancel();
     // Drop final `Sender` of `shutdown_complete_tx` so the `Receiver` below can complete.
     drop(shutdown_complete_tx);
 

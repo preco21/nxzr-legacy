@@ -31,9 +31,9 @@ message GetDeviceStatusResponse {
 
 message ConnectSwitchRequest {}
 message ConnectSwitchResponse {
-  oneof data {
-    ConnectionInfo connection_info = 1;
-    ConnectionEvent connection_event = 2;
+  oneof res {
+    ConnectionMetadata metadata = 1;
+    ConnectionEvent event = 2;
   }
 }
 
@@ -41,30 +41,31 @@ message ReconnectSwitchRequest {
   string reconnect_address = 2;
 }
 message ReconnectSwitchResponse {
-  oneof data {
-    ConnectionInfo connection_info = 1;
-    ConnectionEvent connection_event = 2;
+  oneof res {
+    ConnectionMetadata metadata = 1;
+    ConnectionEvent event = 2;
   }
 }
 
 message ConnectionEvent {
-  message LogObj {
-    enum LogType {
-      UNSPECIFIED = 0;
-      CLOSING = 1;
-      CLOSED = 2;
-      CONNECTING = 3;
-      CONNECTED = 4;
-      SUBCOMMAND_RECEIVED = 5;
-    }
-    LogType type = 1;
+  enum EventLogKind {
+    UNSPECIFIED = 0;
+    CONNECTING = 1;
+    CONNECTED = 2;
+    CLOSING = 3;
+    CLOSED = 4;
+    SUBCOMMAND_RECEIVED = 5;
+    PAIRING_ENDED = 6;
+  }
+  message EventLog {
+    EventLogKind kind = 1;
     string message = 2;
   }
-  oneof event {
-    LogObj log = 1;
-    Error error = 2;
-    Error warning = 3;
-  };
+  oneof kind {
+    EventLog log = 1;
+    Error error = 3;
+    Warning warning = 4;
+  }
 }
 
 message GetProtocolStateRequest {}
@@ -118,12 +119,17 @@ message Position {
   uint32 y = 2;
 }
 
-message ConnectionInfo {
+message ConnectionMetadata {
   string adapter_address = 2;
   string target_address = 3;
 }
 
 message Error {
+  string message = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message Warning {
   string message = 1;
   google.protobuf.Timestamp timestamp = 2;
 }

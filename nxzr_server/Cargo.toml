@@ -24,7 +24,9 @@ tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json"] }
 tonic = "0.9.2"
 prost = "0.11.9"
-tokio-stream = { version = "0.1.14", features = ["sync"] }
+tokio-stream = "0.1.14"
 nxzr_core = { path = "../nxzr_core" }
 nxzr_device = { path = "../nxzr_device" }
 nxzr_proto = { path = "../nxzr_proto" }
+tokio-util = "0.7.8"
+prost-types = "0.11.9"

@@ -753,9 +753,11 @@ dependencies = [
  "nxzr_device",
  "nxzr_proto",
  "prost",
+ "prost-types",
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tonic",
  "tracing",
  "tracing-subscriber",
@@ -1310,7 +1312,6 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
- "tokio-util",
 ]
 
 [[package]]
