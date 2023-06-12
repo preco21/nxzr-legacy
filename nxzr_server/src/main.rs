@@ -5,7 +5,7 @@ use nxzr_device::{
 };
 use service::NxzrService;
 use std::{future::Future, net::ToSocketAddrs, sync::Arc};
-use tokio::sync::mpsc;
+use tokio::{signal, sync::mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::prelude::*;
 
@@ -32,6 +32,8 @@ async fn main() -> anyhow::Result<()> {
     system::check_privileges().await?;
     system::check_system_requirements().await?;
 
+    run(signal::ctrl_c()).await?;
+
     Ok(())
 }
 
@@ -51,11 +53,11 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     let (device, device_handle) = device::Device::create(DeviceConfig::default()).await?;
     let device = Arc::new(device);
 
-    tracing::info!("setting up NXZR services...");
     let addr = "[::1]:50051"
         .to_socket_addrs()?
         .next()
         .ok_or(anyhow::anyhow!("failed to select an address to bind"))?;
+    tracing::info!("service listening on {}", addr.to_string());
     let nxzr_task_handle = tokio::spawn({
         let device = device.clone();
         let shutdown_token = shutdown_token.clone();
@@ -108,6 +110,6 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     drop(device_handle);
     device.closed().await;
 
-    tracing::info!("successfully shutdown the service gracefully.");
+    tracing::info!("shutdown completed.");
     Ok(())
 }

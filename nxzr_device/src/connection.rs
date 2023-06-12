@@ -97,7 +97,7 @@ pub async fn establish_initial_connection(
     session_listener.listen().await?;
     device.set_pairable(true).await?;
 
-    tracing::info!("setting device alias to {}", controller_type.name());
+    tracing::info!("setting device alias to \"{}\"", controller_type.name());
     device.set_alias(controller_type.name()).await?;
 
     tracing::info!("advertising Bluetooth SDP record...");

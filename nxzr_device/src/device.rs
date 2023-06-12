@@ -122,7 +122,7 @@ impl Device {
             let adapter = adapter.clone();
             async move {
                 close_tx.closed().await;
-                tracing::info!("close signal received, terminating device.");
+                tracing::info!("close signal received, terminating the device.");
                 // Turn off the device as a cleanup after use, silently fails if it's not successful.
                 if let Err(err) = adapter.set_powered(false).await {
                     tracing::error!("failed to power off the device: {}", err.to_string());

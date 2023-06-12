@@ -191,4 +191,8 @@ impl PairedSession {
             is_reconnect: false,
         }
     }
+
+    pub fn target_address(&self) -> Address {
+        self.ctl_sa.addr
+    }
 }
