@@ -12,7 +12,7 @@ publish = false
 [dependencies]
 thiserror = "1.0.40"
 strum = { version = "0.24.1", features = ["derive"] }
-tokio = { version = "1.25.0", features = [
+tokio = { version = "1.28.2", features = [
     "rt",
     "sync",
     "time",
@@ -29,7 +29,7 @@ num-traits = "0.2.15"
 nxzr_core = { path = "../nxzr_core" }
 
 [dev-dependencies]
-tokio = { version = "1.25.0", features = ["full"] }
+tokio = { version = "1.28.2", features = ["full"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2.140"

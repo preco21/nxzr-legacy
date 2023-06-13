@@ -15,4 +15,4 @@ bytes = "1.4.0"
 macaddr = "1.0.1"
 strum = { version = "0.24.1", features = ["derive"] }
 thiserror = "1.0.40"
-tokio = { version = "1.25.0", features = ["rt", "sync", "time", "macros"] }
+tokio = { version = "1.28.2", features = ["rt", "sync", "time", "macros"] }

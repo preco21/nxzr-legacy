@@ -12,7 +12,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.71"
 thiserror = "1.0.40"
-tokio = { version = "1.25.0", features = [
+tokio = { version = "1.28.2", features = [
     "rt",
     "rt-multi-thread",
     "sync",
