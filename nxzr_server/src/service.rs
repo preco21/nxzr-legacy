@@ -143,6 +143,7 @@ impl Nxzr for NxzrService {
                             let mut guard = conn_state.lock().unwrap();
                             *guard = ConnectionState::Connected(conn.clone());
                         }
+                        // FIXME: Handle/move Send Evnet: Connecting here
                         // Wait for either ends to be closed.
                         tokio::select! {
                             _ = conn.will_close() => {
