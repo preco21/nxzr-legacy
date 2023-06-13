@@ -145,10 +145,24 @@ impl Nxzr for NxzrService {
                         }
                         // Wait for either ends to be closed.
                         tokio::select! {
-                            _ = conn.will_close() => {},
-                            _ = stream_tx.closed() => {},
-                            _ = shutdown_token.cancelled() => {},
+                            _ = conn.will_close() => {
+                                tracing::warn!("terminating connection due to connection lost");
+                            },
+                            _ = stream_tx.closed() => {
+                                tracing::warn!("terminating connection due to stream closed");
+                            },
+                            _ = shutdown_token.cancelled() => {
+                                tracing::warn!("terminating connection due to shutdown signal");
+                            },
                         }
+                        // Send Event: Disconnecting
+                        let _ = stream_tx.send(create_res(create_event(
+                            connection_event::Kind::Log(connection_event::EventLog {
+                                kind: connection_event::EventLogKind::Disconnecting.into(),
+                                message: "Disconnecting in progress...".to_string(),
+                                ..Default::default()
+                            }),
+                        )));
                         drop(conn_handle);
                         conn.closed().await;
                     }
