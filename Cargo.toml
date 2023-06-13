@@ -1,5 +1,11 @@
 [workspace]
-members = ["nxzr_core", "nxzr_device", "nxzr_proto", "nxzr_server", "nxzr_gui"]
+members = [
+    "nxzr_core",
+    "nxzr_device",
+    "nxzr_proto",
+    "nxzr_server",
+    "nxzr_gui/src-tauri",
+]
 
 [workspace.package]
 version = "0.1.0"
