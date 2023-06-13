@@ -1,6 +1,7 @@
 {
   "recommendations": [
-    "bungcip.better-toml",
-    "rust-lang.rust-analyzer"
+    "tamasfe.even-better-toml",
+    "rust-lang.rust-analyzer",
+    "tauri-apps.tauri-vscode"
   ]
 }

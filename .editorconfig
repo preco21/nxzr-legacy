@@ -12,5 +12,8 @@ indent_size = 4
 [*.{yml,json,xml}]
 indent_size = 2
 
+[*.{js,jsx,ts,tsx}]
+indent_size = 2
+
 [*.proto]
 indent_size = 2

@@ -37,4 +37,4 @@ chmod a+x msvc-linker/*.sh
 
 ## Building a new distro image for the user's WSL
 
-Please refer to https://github.com/preco21/nxzr-helper
+[WIP]
