@@ -1,9 +1,5 @@
 {
-  "compilerOptions": {
-    "composite": true,
-    "module": "ESNext",
-    "moduleResolution": "Node",
-    "allowSyntheticDefaultImports": true
-  },
-  "include": ["vite.config.ts"]
+  "extends": "@preco21/tsconfig",
+  "include": ["vite.config.ts"],
+  "exclude": ["node_modules"]
 }

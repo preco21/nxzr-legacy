@@ -2,6 +2,16 @@
 
 > NXZR project: Host GUI application
 
+## Prerequisite
+
+Please take a look https://tauri.app/v1/guides/getting-started/prerequisites for prerequisites.
+
+## Installation
+
+```shell
+yarn
+```
+
 ## Building
 
 You can build this project by choosing either of following options:
