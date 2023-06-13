@@ -145,6 +145,7 @@ impl Nxzr for NxzrService {
                         }
                         // Wait for either ends to be closed.
                         tokio::select! {
+                            _ = conn.will_close() => {},
                             _ = stream_tx.closed() => {},
                             _ = shutdown_token.cancelled() => {},
                         }
