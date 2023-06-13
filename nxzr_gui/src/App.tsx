@@ -15,7 +15,7 @@ function App(): React.ReactElement {
 
   return (
     <div className="container">
-      <h1>Welcome to Tauri!</h1>
+      <h1>NXZR 셋업 끝</h1>
 
       <div className="row">
         <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
