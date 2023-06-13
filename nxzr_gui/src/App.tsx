@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
+import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api/tauri';
-
 import reactLogo from './assets/react.svg';
-
 import './App.css';
 
 function App(): React.ReactElement {
@@ -16,6 +15,10 @@ function App(): React.ReactElement {
   return (
     <div className="container">
       <h1>NXZR 셋업 끝</h1>
+
+      <div>
+        <Button variant="contained">Hello World</Button>
+      </div>
 
       <div className="row">
         <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
