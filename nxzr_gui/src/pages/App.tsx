@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { MainContainer } from '../components/MainContainer';
 import './App.css';
 import { css } from 'styled-components';
-import { Header } from '../components/Header';
+import { TitleBar } from '../components/TitleBar';
 
 function App(): React.ReactElement {
   const [greetMsg, setGreetMsg] = useState('');
@@ -16,8 +16,8 @@ function App(): React.ReactElement {
 
   return (
     <MainContainer>
-      <Header />
-      {APP_VERSION}
+      <TitleBar />
+
       <div css={css`background-color: purple;`}>
         <Button>Hello World</Button>
         <Button>Hello World</Button>

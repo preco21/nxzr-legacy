@@ -3,11 +3,11 @@ import React from 'react';
 import styled from 'styled-components';
 import { Button, Colors } from '@blueprintjs/core';
 
-export interface HeaderProps {
+export interface TitleBarProps {
   className?: string;
 }
 
-export function Header(props: HeaderProps): React.ReactElement {
+export function TitleBar(props: TitleBarProps): React.ReactElement {
   const { className } = props;
   return (
     <Container className={className} data-tauri-drag-region>
