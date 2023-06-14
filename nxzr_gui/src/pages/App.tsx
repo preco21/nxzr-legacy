@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Button } from '@mui/material';
+import { Button } from '@blueprintjs/core';
 import { invoke } from '@tauri-apps/api/tauri';
-import reactLogo from './assets/react.svg';
+import { PageContainer } from '../components/PageContainer';
 import './App.css';
+import { css } from 'styled-components';
 
 function App(): React.ReactElement {
   const [greetMsg, setGreetMsg] = useState('');
@@ -13,23 +14,12 @@ function App(): React.ReactElement {
   };
 
   return (
-    <div className="container">
+    <PageContainer>
       <h1>NXZR 셋업 끝</h1>
 
-      <div>
-        <Button variant="contained">Hello World</Button>
-      </div>
-
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank" rel="noreferrer">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank" rel="noreferrer">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      <div css={css`background-color: purple;`}>
+        <Button>Hello World</Button>
+        <Button>Hello World</Button>
       </div>
 
       <p>Click on the Tauri, Vite, and React logos to learn more.</p>
@@ -50,7 +40,7 @@ function App(): React.ReactElement {
       </form>
 
       <p>{greetMsg}</p>
-    </div>
+    </PageContainer>
   );
 }
 
