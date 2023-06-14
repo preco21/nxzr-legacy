@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Button } from '@blueprintjs/core';
 import { invoke } from '@tauri-apps/api/tauri';
-import { PageContainer } from '../components/PageContainer';
+import { MainContainer } from '../components/MainContainer';
 import './App.css';
 import { css } from 'styled-components';
+import { Header } from '../components/Header';
 
 function App(): React.ReactElement {
   const [greetMsg, setGreetMsg] = useState('');
@@ -14,9 +15,9 @@ function App(): React.ReactElement {
   };
 
   return (
-    <PageContainer>
-      <h1>NXZR 셋업 끝</h1>
-
+    <MainContainer>
+      <Header />
+      {APP_VERSION}
       <div css={css`background-color: purple;`}>
         <Button>Hello World</Button>
         <Button>Hello World</Button>
@@ -40,7 +41,7 @@ function App(): React.ReactElement {
       </form>
 
       <p>{greetMsg}</p>
-    </PageContainer>
+    </MainContainer>
   );
 }
 

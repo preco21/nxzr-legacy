@@ -12,7 +12,12 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false
+      "all": false,
+      "window": {
+        "close": true,
+        "minimize": true,
+        "startDragging": true
+      }
     },
     "bundle": {
       "active": true,
@@ -33,6 +38,7 @@
     "windows": [
       {
         "fullscreen": false,
+        "decorations": false,
         "center": true,
         "resizable": true,
         "title": "NXZR",
