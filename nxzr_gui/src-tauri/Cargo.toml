@@ -16,9 +16,10 @@ tauri = { version = "1.3", features = ["window-close", "window-minimize", "windo
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.28.2", features = ["sync", "time", "macros"] }
-tracing-subscriber = "0.3.17"
+tracing-subscriber = { version = "0.3.17", features = ["json"] }
 tracing = "0.1.37"
 anyhow = "1.0.71"
+thiserror = "1.0.40"
 
 [build-dependencies]
 tauri-build = { version = "1.3", features = [] }

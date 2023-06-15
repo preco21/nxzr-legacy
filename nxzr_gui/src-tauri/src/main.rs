@@ -6,6 +6,7 @@ use tokio::sync::{mpsc, Mutex};
 use tracing_subscriber::prelude::*;
 
 mod commands;
+mod error;
 
 struct AsyncProcInputTx {
     inner: Mutex<mpsc::Sender<String>>,
@@ -29,7 +30,11 @@ async fn main() -> anyhow::Result<()> {
         .manage(AsyncProcInputTx {
             inner: Mutex::new(async_proc_input_tx),
         })
-        .invoke_handler(tauri::generate_handler![js2rs, greet])
+        .invoke_handler(tauri::generate_handler![
+            js2rs,
+            greet,
+            commands::open_logs_window
+        ])
         .setup(|app| {
             let app_handle = app.handle();
             tokio::spawn(async move { async_process_model(async_proc_input_rx, app_handle).await });
@@ -55,11 +60,11 @@ fn greet(name: &str) -> String {
 
 async fn async_process_model(
     mut input_rx: mpsc::Receiver<String>,
-    app_handle: tauri::AppHandle,
+    handle: tauri::AppHandle,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     while let Some(input) = input_rx.recv().await {
         let output = input;
-        rs2js(output, &app_handle);
+        rs2js(output, &handle);
     }
     Ok(())
 }

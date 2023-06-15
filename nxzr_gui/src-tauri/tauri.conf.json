@@ -37,7 +37,6 @@
     },
     "windows": [
       {
-        "fullscreen": false,
         "decorations": false,
         "center": true,
         "resizable": true,
