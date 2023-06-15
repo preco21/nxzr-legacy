@@ -1,4 +1,5 @@
 import './bootstrap';
+import { invoke } from '@tauri-apps/api';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { FocusStyleManager } from '@blueprintjs/core';
@@ -12,3 +13,5 @@ ReactDOM.createRoot(document.getElementById('__root__') as HTMLElement).render(
     <LogPage />
   </React.StrictMode>,
 );
+
+invoke('window_ready', { name: 'logs' });

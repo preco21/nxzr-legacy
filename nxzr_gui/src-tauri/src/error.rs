@@ -1,5 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("failed to show window on ready")]
+    WindowReadyFailed,
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

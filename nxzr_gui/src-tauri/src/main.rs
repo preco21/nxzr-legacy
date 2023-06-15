@@ -44,8 +44,6 @@ async fn main() -> anyhow::Result<()> {
         );
     tracing::subscriber::set_global_default(subscriber)?;
 
-    tauri::async_runtime::set(tokio::runtime::Handle::current());
-
     let (logs_sub_tx, _logs_sub_rx) = broadcast::channel(1024);
     tokio::spawn({
         let tracing_tx = logs_sub_tx.clone();
@@ -58,15 +56,18 @@ async fn main() -> anyhow::Result<()> {
 
     let (async_proc_input_tx, async_proc_input_rx) = mpsc::channel(1);
 
+    tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(State {
             inner: Mutex::new(async_proc_input_tx),
             logs_queue: logs_sub_tx,
         })
+        // FIXME: find good way to specify this
         .invoke_handler(tauri::generate_handler![
+            commands::window_ready,
             js2rs,
             greet,
-            commands::open_logs_window
+            commands::open_logs_window,
         ])
         .setup(|app| {
             let app_handle = app.handle();

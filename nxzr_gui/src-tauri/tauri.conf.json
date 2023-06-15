@@ -37,6 +37,7 @@
     },
     "windows": [
       {
+        "visible": false,
         "decorations": false,
         "center": true,
         "resizable": true,
