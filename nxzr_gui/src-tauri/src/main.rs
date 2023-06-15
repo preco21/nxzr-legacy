@@ -23,6 +23,7 @@ async fn main() -> anyhow::Result<()> {
     let Some(app_dirs) = util::get_app_dirs() else {
         return Err(anyhow::anyhow!("failed to resolve app dirs"));
     };
+
     let module_filter =
         tracing_subscriber::filter::Targets::new().with_target("nxzr_gui", tracing::Level::TRACE);
     let (logs_tx, mut logs_rx) = mpsc::unbounded_channel();
