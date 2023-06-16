@@ -1988,6 +1988,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "directories",
+ "nxzr_shared",
  "ringbuf",
  "serde",
  "serde_json",

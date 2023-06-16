@@ -1,6 +1,7 @@
 use crate::config;
 use std::{io, path::Path};
-use tokio::fs;
+use tokio::{fs, sync::mpsc};
+use tracing_subscriber::fmt::MakeWriter;
 
 pub fn get_app_dirs() -> Option<directories::ProjectDirs> {
     directories::ProjectDirs::from(config::QUALIFIER, config::ORGANIZATION, config::APP_NAME)
@@ -23,20 +24,21 @@ pub async fn mkdir_p<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
 }
 
 #[derive(Debug, Clone)]
-pub struct TracingChannelWriter {
-    writer_tx: mpsc::UnboundedSender<String>,
+pub struct TracingChannelWriter<T: From<String> + Clone> {
+    writer_tx: mpsc::Sender<T>,
 }
 
-impl TracingChannelWriter {
-    pub fn new(writer_tx: mpsc::UnboundedSender<String>) -> Self {
+impl<T: From<String> + Clone> TracingChannelWriter<T> {
+    pub fn new(writer_tx: mpsc::Sender<T>) -> Self {
         Self { writer_tx }
     }
 }
 
-impl io::Write for TracingChannelWriter {
+impl<T: From<String> + Clone> io::Write for TracingChannelWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let json = String::from_utf8_lossy(buf).into_owned();
-        let _ = self.writer_tx.send(json);
+        // Allow failure to send if the channel capacity is full.
+        let _ = self.writer_tx.try_send(json.into());
         Ok(buf.len())
     }
 
@@ -45,7 +47,7 @@ impl io::Write for TracingChannelWriter {
     }
 }
 
-impl<'a> MakeWriter<'a> for TracingChannelWriter {
+impl<'a, T: From<String> + Clone> MakeWriter<'a> for TracingChannelWriter<T> {
     type Writer = Self;
 
     fn make_writer(&'a self) -> Self::Writer {
