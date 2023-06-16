@@ -44,7 +44,7 @@ pub async fn open_logs_window(handle: tauri::AppHandle) -> Result<(), AppError> 
     Ok(())
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 pub struct SubscribeLoggingResponse {
     logs: Vec<String>,
     task_name: String,

@@ -92,6 +92,11 @@ async fn main() -> anyhow::Result<()> {
 
             Ok(())
         })
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            tracing::info!("{}, {:?}, {}", app.package_info().name, argv, cwd);
+            app.emit_all("single-instance", Payload { args: argv, cwd })
+                .unwrap();
+        }))
         .run(tauri::generate_context!())
         .map_err(|err| anyhow::anyhow!("error while running application: {}", err))?;
 
