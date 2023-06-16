@@ -27,9 +27,6 @@ macaddr = "1.0.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 nxzr_core = { path = "../nxzr_core" }
-nxzr_shared = { version = "0.1.0", path = "../nxzr_shared", features = [
-    "bluer",
-] }
 
 [dev-dependencies]
 tokio = { version = "1.28.2", features = ["full"] }
@@ -39,3 +36,6 @@ libc = "0.2.140"
 bluer = { version = "0.15.7", features = ["bluetoothd", "rfcomm"] }
 dbus = { version = "0.9.7", features = ["vendored"] }
 sudo = "0.6.0"
+nxzr_shared = { version = "0.1.0", path = "../nxzr_shared", features = [
+    "bluer",
+] }
