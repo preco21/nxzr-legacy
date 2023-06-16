@@ -20,6 +20,16 @@ pub async fn cancel_task(
 }
 
 #[tauri::command]
+pub fn log(kind: String, message: String) {
+    match kind.as_str() {
+        "info" => tracing::info!("JS: {}", message),
+        "warn" => tracing::warn!("JS: {}", message),
+        "error" => tracing::error!("JS: {}", message),
+        _ => tracing::debug!("JS: {}", message),
+    }
+}
+
+#[tauri::command]
 pub async fn open_logs_window(handle: tauri::AppHandle) -> Result<(), AppError> {
     let logs_window = tauri::WindowBuilder::from_config(
         &handle,
@@ -55,19 +65,19 @@ pub async fn subscribe_logging(
     window: tauri::Window,
     state: tauri::State<'_, AppState>,
 ) -> Result<SubscribeLoggingResponse, AppError> {
-    let task_name = "log".to_string();
+    let task_name = "logging".to_string();
     if state.is_task_running(&task_name).await {
         return Err(AppError::TaskAlreadyRunning);
     }
-    let mut log_rx = state.logging.events().await?;
     let logs = state.logging.logs().await;
+    let mut log_rx = state.logging.events().await?;
     let task_handle = tokio::spawn({
         let logging = state.logging.clone();
         async move {
             while let Some(event) = log_rx.recv().await {
                 let log_string = event.to_string();
                 logging.push_log(log_string.as_str()).await;
-                window.emit("log", log_string).unwrap();
+                window.emit("logging:log", log_string).unwrap();
             }
             Ok::<(), AppError>(())
         }

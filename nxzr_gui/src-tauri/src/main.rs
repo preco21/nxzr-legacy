@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::Arc;
+
 use nxzr_shared::event::EventError;
 use state::{AppState, LoggingEvent};
 use tauri::Manager;
@@ -48,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     let module_filter =
         tracing_subscriber::filter::Targets::new().with_target("nxzr_gui", tracing::Level::TRACE);
     let (log_out_tx, log_out_rx) = mpsc::channel(1024);
-    let log_chan_writer = util::TracingChannelWriter::new(log_out_tx);
+    let log_chan_writer = util::TracingChannelWriter::new(Arc::new(log_out_tx));
     let file_appender = tracing_appender::rolling::hourly(app_dirs.data_dir(), "output.log");
     let (log_file_appender, _guard) = tracing_appender::non_blocking(file_appender);
     let subscriber = tracing_subscriber::registry()
@@ -57,6 +59,10 @@ async fn main() -> anyhow::Result<()> {
             tracing_subscriber::fmt::Layer::default()
                 .event_format(tracing_subscriber::fmt::format().json())
                 .with_writer(log_chan_writer),
+        )
+        .with(
+            tracing_subscriber::fmt::Layer::default()
+                .event_format(tracing_subscriber::fmt::format().compact()),
         )
         .with(
             tracing_subscriber::fmt::Layer::default()
@@ -69,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
     LoggingEvent::handle_events(log_out_rx, log_sub_rx)?;
 
     // let (async_proc_input_tx, async_proc_input_rx) = mpsc::channel(1);
-    let app_state = state::AppState::new(log_sub_tx);
+    let app_state = AppState::new(log_sub_tx);
 
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
@@ -77,8 +83,9 @@ async fn main() -> anyhow::Result<()> {
         .invoke_handler(tauri::generate_handler![
             commands::window_ready,
             commands::cancel_task,
-            commands::subscribe_logging,
+            commands::log,
             commands::open_logs_window,
+            commands::subscribe_logging,
         ])
         .setup(|app| {
             // let app_handle = app.handle();
@@ -94,8 +101,6 @@ async fn main() -> anyhow::Result<()> {
         })
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             tracing::info!("{}, {:?}, {}", app.package_info().name, argv, cwd);
-            app.emit_all("single-instance", Payload { args: argv, cwd })
-                .unwrap();
         }))
         .run(tauri::generate_context!())
         .map_err(|err| anyhow::anyhow!("error while running application: {}", err))?;

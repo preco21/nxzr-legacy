@@ -1,5 +1,5 @@
 use crate::config;
-use std::{io, path::Path};
+use std::{io, path::Path, sync::Arc};
 use tokio::{fs, sync::mpsc};
 use tracing_subscriber::fmt::MakeWriter;
 
@@ -25,11 +25,11 @@ pub async fn mkdir_p<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
 
 #[derive(Debug, Clone)]
 pub struct TracingChannelWriter<T: From<String> + Clone> {
-    writer_tx: mpsc::Sender<T>,
+    writer_tx: Arc<mpsc::Sender<T>>,
 }
 
 impl<T: From<String> + Clone> TracingChannelWriter<T> {
-    pub fn new(writer_tx: mpsc::Sender<T>) -> Self {
+    pub fn new(writer_tx: Arc<mpsc::Sender<T>>) -> Self {
         Self { writer_tx }
     }
 }
