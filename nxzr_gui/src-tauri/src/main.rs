@@ -49,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let module_filter =
         tracing_subscriber::filter::Targets::new().with_target("nxzr_gui", tracing::Level::TRACE);
+    // FIXME: cannot be reused after dispose
     let (log_out_tx, log_out_rx) = mpsc::channel(1024);
     let log_chan_writer = util::TracingChannelWriter::new(Arc::new(log_out_tx));
     let file_appender = tracing_appender::rolling::hourly(app_dirs.data_dir(), "output.log");

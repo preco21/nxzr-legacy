@@ -9,7 +9,7 @@ use tokio::{
 
 pub struct AppState {
     pub logging: Arc<LoggingState>,
-    pub task_handles: Mutex<HashMap<String, task::JoinHandle<Result<(), AppError>>>>,
+    pub task_handles: Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>,
 }
 
 impl AppState {
@@ -28,18 +28,28 @@ impl AppState {
         task_handles.contains_key(task_name)
     }
 
+    pub async fn reserve_task(&self, task_name: &str) -> Result<(), AppError> {
+        let mut task_handles = self.task_handles.lock().await;
+        if task_handles.contains_key(task_name) {
+            Err(AppError::TaskAlreadyRunning)
+        } else {
+            task_handles.insert(task_name.to_string(), None);
+            Ok(())
+        }
+    }
+
     pub async fn add_task(
         &self,
         task_name: &str,
         join_handle: task::JoinHandle<Result<(), AppError>>,
     ) {
         let mut task_handles = self.task_handles.lock().await;
-        task_handles.insert(task_name.to_string(), join_handle);
+        task_handles.insert(task_name.to_string(), Some(join_handle));
     }
 
     pub async fn cancel_task(&self, task_name: &str) -> Result<(), AppError> {
         let mut task_handles = self.task_handles.lock().await;
-        if let Some(join_handle) = task_handles.remove(task_name) {
+        if let Some(Some(join_handle)) = task_handles.remove(task_name) {
             join_handle.abort();
             Ok(())
         } else {

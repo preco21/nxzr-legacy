@@ -7,7 +7,6 @@ function LogPage(): React.ReactElement {
 
   useEffect(() => {
     const handle = setInterval(() => {
-      console.log(123);
       logger.info('foobar');
     }, 1000);
     return () => clearInterval(handle);

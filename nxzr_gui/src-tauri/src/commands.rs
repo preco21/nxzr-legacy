@@ -66,9 +66,7 @@ pub async fn subscribe_logging(
     state: tauri::State<'_, AppState>,
 ) -> Result<SubscribeLoggingResponse, AppError> {
     let task_name = "logging".to_string();
-    if state.is_task_running(&task_name).await {
-        return Err(AppError::TaskAlreadyRunning);
-    }
+    state.reserve_task(&task_name).await?;
     let logs = state.logging.logs().await;
     let mut log_rx = state.logging.events().await?;
     let task_handle = tokio::spawn({
