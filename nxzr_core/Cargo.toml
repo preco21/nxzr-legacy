@@ -13,6 +13,7 @@ publish = false
 async-trait = "0.1.68"
 bytes = "1.4.0"
 macaddr = "1.0.1"
+nxzr_shared = { version = "0.1.0", path = "../nxzr_shared" }
 strum = { version = "0.24.1", features = ["derive"] }
 thiserror = "1.0.40"
 tokio = { version = "1.28.2", features = ["rt", "sync", "time", "macros"] }

@@ -5,14 +5,21 @@ use std::{
     str::FromStr,
 };
 
+/// Bluetooth address.
+///
+/// The serialized representation is a string in colon-hexadecimal notation.
 #[derive(Clone, Copy, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Address(pub [u8; 6]);
 
 impl Address {
+    /// Creates a new Bluetooth address with the specified value.
     pub const fn new(addr: [u8; 6]) -> Self {
         Self(addr)
     }
 
+    /// Any Bluetooth address.
+    ///
+    /// Corresponds to `00:00:00:00:00:00`.
     pub const fn any() -> Self {
         Self([0; 6])
     }
@@ -72,6 +79,7 @@ impl From<Address> for MacAddr6 {
     }
 }
 
+/// Invalid Bluetooth address error.
 #[derive(Debug, Clone)]
 pub struct InvalidAddressError(pub String);
 

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "nxzr_shared",
     "nxzr_core",
     "nxzr_device",
     "nxzr_proto",

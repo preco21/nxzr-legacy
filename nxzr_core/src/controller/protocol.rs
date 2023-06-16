@@ -10,12 +10,12 @@ use super::{
     state::{ControllerState, StateError},
     ControllerType,
 };
-use crate::{
-    addr::Address,
-    event::{setup_event, EventError},
-};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
+use nxzr_shared::{
+    addr::Address,
+    event::{setup_event, EventError, SubscriptionReq},
+};
 use std::{future::Future, sync::Mutex};
 use strum::{Display, IntoStaticStr};
 use thiserror::Error;
@@ -57,18 +57,12 @@ pub enum ControllerProtocolError {
 
 #[derive(Clone, Error, Debug)]
 pub enum ControllerProtocolInternalError {
-    #[error("event: {0}")]
-    Event(EventError),
     #[error("report: {0}")]
     Report(ReportError),
     #[error("state: {0}")]
     State(StateError),
-}
-
-impl From<EventError> for ControllerProtocolError {
-    fn from(err: EventError) -> Self {
-        Self::Internal(ControllerProtocolInternalError::Event(err))
-    }
+    #[error("event: {0}")]
+    Event(EventError),
 }
 
 impl From<ReportError> for ControllerProtocolError {
@@ -80,6 +74,12 @@ impl From<ReportError> for ControllerProtocolError {
 impl From<StateError> for ControllerProtocolError {
     fn from(err: StateError) -> Self {
         Self::Internal(ControllerProtocolInternalError::State(err))
+    }
+}
+
+impl From<EventError> for ControllerProtocolError {
+    fn from(err: EventError) -> Self {
+        Self::Internal(ControllerProtocolInternalError::Event(err))
     }
 }
 
@@ -173,7 +173,7 @@ pub struct ControllerProtocol {
     notify_writer_wake: Notify,
     writer_ready_tx: watch::Sender<bool>,
     paused_tx: watch::Sender<bool>,
-    event_sub_tx: mpsc::Sender<SubscriptionReq>,
+    event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     msg_tx: mpsc::Sender<Event>,
 }
 
@@ -754,12 +754,6 @@ pub enum LogType {
     SubcommandReceived(Subcommand),
 }
 
-#[derive(Debug)]
-pub struct SubscriptionReq {
-    tx: mpsc::UnboundedSender<Event>,
-    ready_tx: oneshot::Sender<()>,
-}
-
 impl Event {
-    setup_event!();
+    setup_event!(Event);
 }

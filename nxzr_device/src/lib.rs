@@ -1,15 +1,9 @@
-pub mod semaphore;
-pub mod sock;
-
-mod addr;
-pub use addr::*;
-
+pub use nxzr_shared::uuid_ext::UuidExt;
 pub use uuid::Uuid;
-mod uuid_ext;
-pub use uuid_ext::UuidExt;
 
 pub mod connection;
 pub mod device;
+pub mod semaphore;
 pub mod session;
 pub mod system;
 pub mod transport;

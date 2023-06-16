@@ -80,6 +80,12 @@ impl From<Address> for bluer::Address {
     }
 }
 
+impl From<bluer::Address> for nxzr_shared::Address {
+    fn from(addr: bluer::Address) -> Self {
+        addr.0.into()
+    }
+}
+
 /// Interop [nxzr_core::Address] with [crate::Address].
 impl From<nxzr_core::Address> for Address {
     fn from(addr: nxzr_core::Address) -> Self {

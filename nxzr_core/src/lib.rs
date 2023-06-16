@@ -1,6 +1,5 @@
 pub mod controller;
-pub mod event;
 pub mod protocol;
 
-mod addr;
-pub use addr::*;
+// Re-export of address module.
+pub use nxzr_shared::addr::*;
