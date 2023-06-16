@@ -1,4 +1,4 @@
-use crate::AppError;
+use crate::{state::AppState, AppError};
 use tauri::Manager;
 
 #[tauri::command]
@@ -7,6 +7,15 @@ pub fn window_ready(window: tauri::Window, name: String) -> Result<(), AppError>
         .get_window(name.as_str())
         .ok_or(AppError::WindowReadyFailed)?
         .show()?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn cancel_task(
+    state: tauri::State<'_, AppState>,
+    task_name: String,
+) -> Result<(), AppError> {
+    state.cancel_task(&task_name).await?;
     Ok(())
 }
 
@@ -33,4 +42,36 @@ pub async fn open_logs_window(handle: tauri::AppHandle) -> Result<(), AppError> 
     logs_window.open_devtools();
 
     Ok(())
+}
+
+#[derive(serde::Serialize)]
+pub struct SubscribeLoggingResponse {
+    logs: Vec<String>,
+    task_name: String,
+}
+
+#[tauri::command]
+pub async fn subscribe_logging(
+    window: tauri::Window,
+    state: tauri::State<'_, AppState>,
+) -> Result<SubscribeLoggingResponse, AppError> {
+    let task_name = "log".to_string();
+    if state.is_task_running(&task_name).await {
+        return Err(AppError::TaskAlreadyRunning);
+    }
+    let mut log_rx = state.logging.events().await?;
+    let logs = state.logging.logs().await;
+    let task_handle = tokio::spawn({
+        let logging = state.logging.clone();
+        async move {
+            while let Some(event) = log_rx.recv().await {
+                let log_string = event.to_string();
+                logging.push_log(log_string.as_str()).await;
+                window.emit("log", log_string).unwrap();
+            }
+            Ok::<(), AppError>(())
+        }
+    });
+    state.add_task(&task_name, task_handle).await;
+    Ok(SubscribeLoggingResponse { logs, task_name })
 }

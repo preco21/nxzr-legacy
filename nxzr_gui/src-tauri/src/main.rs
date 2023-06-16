@@ -74,13 +74,10 @@ async fn main() -> anyhow::Result<()> {
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(app_state)
-        // FIXME: find good way to specify this
         .invoke_handler(tauri::generate_handler![
             commands::window_ready,
-            // js2rs,
-            // greet,
-            subscribe_logging,
-            cancel_task,
+            commands::cancel_task,
+            commands::subscribe_logging,
             commands::open_logs_window,
         ])
         .setup(|app| {
@@ -100,77 +97,6 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-#[derive(serde::Serialize)]
-struct SubscribeLoggingResponse {
-    logs: Vec<String>,
-    task_name: String,
-}
-
-#[tauri::command]
-async fn subscribe_logging(
-    window: tauri::Window,
-    state: tauri::State<'_, AppState>,
-) -> Result<SubscribeLoggingResponse, AppError> {
-    let task_name = "log".to_string();
-    if state.is_task_running(&task_name).await {
-        return Err(AppError::TaskAlreadyRunning);
-    }
-    let mut log_rx = state.logging.events().await?;
-    let logs = state.logging.logs().await;
-    let task_handle = tokio::spawn({
-        let logging = state.logging.clone();
-        async move {
-            while let Some(event) = log_rx.recv().await {
-                let log_string = event.to_string();
-                logging.push_log(log_string.as_str()).await;
-                window.emit("log", log_string).unwrap();
-            }
-            Ok::<(), AppError>(())
-        }
-    });
-    state.add_task(&task_name, task_handle).await;
-    Ok(SubscribeLoggingResponse { logs, task_name })
-}
-
-#[tauri::command]
-async fn cancel_task(task_name: String, state: tauri::State<'_, AppState>) -> Result<(), AppError> {
-    state.cancel_task(&task_name).await?;
-    Ok(())
-}
-
-// #[tauri::command]
-// fn greet(name: &str) -> String {
-//     format!("Hello, {}! You've been greeted from Rust!", name)
-// }
-
-// async fn async_process_model(
-//     mut input_rx: mpsc::Receiver<String>,
-//     handle: tauri::AppHandle,
-// ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-//     while let Some(input) = input_rx.recv().await {
-//         let output = input;
-//         rs2js(output, &handle);
-//     }
-//     Ok(())
-// }
-
-// fn rs2js<R: tauri::Runtime>(message: String, manager: &impl Manager<R>) {
-//     tracing::info!(?message, "rs2js");
-//     manager
-//         .emit_all("rs2js", format!("rs: {}", message))
-//         .unwrap();
-// }
-
-// #[tauri::command]
-// async fn js2rs(message: String, state: tauri::State<'_, AppState>) -> Result<(), String> {
-//     tracing::info!(?message, "js2rs");
-//     let async_proc_input_tx = state.inner.lock().await;
-//     async_proc_input_tx
-//         .send(message)
-//         .await
-//         .map_err(|e| e.to_string())
-// }
 
 /// Bootstraps the program.
 ///
