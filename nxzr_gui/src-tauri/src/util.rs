@@ -21,3 +21,34 @@ pub async fn mkdir_p<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     }
     Ok(())
 }
+
+#[derive(Debug, Clone)]
+pub struct TracingChannelWriter {
+    writer_tx: mpsc::UnboundedSender<String>,
+}
+
+impl TracingChannelWriter {
+    pub fn new(writer_tx: mpsc::UnboundedSender<String>) -> Self {
+        Self { writer_tx }
+    }
+}
+
+impl io::Write for TracingChannelWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let json = String::from_utf8_lossy(buf).into_owned();
+        let _ = self.writer_tx.send(json);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> MakeWriter<'a> for TracingChannelWriter {
+    type Writer = Self;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
