@@ -6,7 +6,10 @@ use crate::controller::{
     report::subcommand::Subcommand,
     state::ControllerState,
 };
-use crate::event::{setup_event, EventError};
+use nxzr_shared::{
+    event::{EventError, SubscriptionReq},
+    setup_event,
+};
 use std::future::Future;
 use std::sync::Arc;
 use strum::{Display, IntoStaticStr};
@@ -272,7 +275,7 @@ impl Protocol {
 pub(crate) struct ProtocolInner {
     pub protocol: Arc<ControllerProtocol>,
     state_send_tx: mpsc::Sender<StateSendReq>,
-    event_sub_tx: mpsc::Sender<SubscriptionReq>,
+    event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     closing_tx: mpsc::Sender<()>,
     closed_tx: mpsc::Sender<()>,
 }
@@ -286,7 +289,7 @@ impl ProtocolInner {
     pub fn new(
         config: ProtocolConfig,
         state_send_tx: mpsc::Sender<StateSendReq>,
-        event_sub_tx: mpsc::Sender<SubscriptionReq>,
+        event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
         closing_tx: mpsc::Sender<()>,
         closed_tx: mpsc::Sender<()>,
     ) -> Result<Self, ProtocolError> {
@@ -429,12 +432,6 @@ impl From<ProtocolLogType> for LogType {
     }
 }
 
-#[derive(Debug)]
-pub struct SubscriptionReq {
-    tx: mpsc::UnboundedSender<Event>,
-    ready_tx: oneshot::Sender<()>,
-}
-
 impl Event {
-    setup_event!();
+    setup_event!(Event);
 }

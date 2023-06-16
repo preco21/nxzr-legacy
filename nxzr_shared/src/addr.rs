@@ -79,6 +79,20 @@ impl From<Address> for MacAddr6 {
     }
 }
 
+/// Interop [bluer::Address] with [Address].
+#[cfg(feature = "bluer")]
+impl From<bluer::Address> for Address {
+    fn from(addr: bluer::Address) -> Self {
+        addr.0.into()
+    }
+}
+#[cfg(feature = "bluer")]
+impl From<Address> for bluer::Address {
+    fn from(addr: Address) -> Self {
+        addr.0.into()
+    }
+}
+
 /// Invalid Bluetooth address error.
 #[derive(Debug, Clone)]
 pub struct InvalidAddressError(pub String);

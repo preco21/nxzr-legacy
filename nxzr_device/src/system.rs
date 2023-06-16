@@ -1,9 +1,6 @@
 use crate::Address;
 use thiserror::Error;
-use tokio::{
-    process::Command,
-    time::{self, error::Elapsed},
-};
+use tokio::{process::Command, time::error::Elapsed};
 
 #[derive(Clone, Error, Debug)]
 pub enum SysCheckError {

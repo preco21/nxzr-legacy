@@ -27,7 +27,9 @@ macaddr = "1.0.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 nxzr_core = { path = "../nxzr_core" }
-nxzr_shared = { version = "0.1.0", path = "../nxzr_shared" }
+nxzr_shared = { version = "0.1.0", path = "../nxzr_shared", features = [
+    "bluer",
+] }
 
 [dev-dependencies]
 tokio = { version = "1.28.2", features = ["full"] }

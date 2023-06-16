@@ -8,8 +8,8 @@ pub enum EventError {
 }
 
 pub struct SubscriptionReq<T> {
-    tx: mpsc::UnboundedSender<T>,
-    ready_tx: oneshot::Sender<()>,
+    pub tx: mpsc::UnboundedSender<T>,
+    pub ready_tx: oneshot::Sender<()>,
 }
 
 #[async_trait::async_trait]
