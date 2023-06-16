@@ -1,7 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use state::LoggingEvent;
+use nxzr_shared::event::EventError;
+use state::{AppState, LoggingEvent};
 use tauri::Manager;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -16,10 +17,16 @@ mod util;
 pub enum AppError {
     #[error("failed to show window on ready")]
     WindowReadyFailed,
+    #[error("task already running")]
+    TaskAlreadyRunning,
+    #[error("no such task found")]
+    TaskNotFound,
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
+    #[error(transparent)]
+    EventError(#[from] EventError),
 }
 
 impl serde::Serialize for AppError {
@@ -72,6 +79,8 @@ async fn main() -> anyhow::Result<()> {
             commands::window_ready,
             // js2rs,
             // greet,
+            subscribe_logging,
+            cancel_task,
             commands::open_logs_window,
         ])
         .setup(|app| {
@@ -92,10 +101,43 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-// #[tauri::command]
-// fn subscribe_logging(window: tauri::Window, state: tauri::State<State>) {
-//     tokio::spawn()
-// }
+#[derive(serde::Serialize)]
+struct SubscribeLoggingResponse {
+    logs: Vec<String>,
+    task_name: String,
+}
+
+#[tauri::command]
+async fn subscribe_logging(
+    window: tauri::Window,
+    state: tauri::State<'_, AppState>,
+) -> Result<SubscribeLoggingResponse, AppError> {
+    let task_name = "log".to_string();
+    if state.is_task_running(&task_name).await {
+        return Err(AppError::TaskAlreadyRunning);
+    }
+    let mut log_rx = state.logging.events().await?;
+    let logs = state.logging.logs().await;
+    let task_handle = tokio::spawn({
+        let logging = state.logging.clone();
+        async move {
+            while let Some(event) = log_rx.recv().await {
+                let log_string = event.to_string();
+                logging.push_log(log_string.as_str()).await;
+                window.emit("log", log_string).unwrap();
+            }
+            Ok::<(), AppError>(())
+        }
+    });
+    state.add_task(&task_name, task_handle).await;
+    Ok(SubscribeLoggingResponse { logs, task_name })
+}
+
+#[tauri::command]
+async fn cancel_task(task_name: String, state: tauri::State<'_, AppState>) -> Result<(), AppError> {
+    state.cancel_task(&task_name).await?;
+    Ok(())
+}
 
 // #[tauri::command]
 // fn greet(name: &str) -> String {
