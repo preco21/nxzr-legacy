@@ -83,7 +83,7 @@ async fn main() -> anyhow::Result<()> {
             commands::window_ready,
             commands::cancel_task,
             commands::log,
-            commands::open_logs_window,
+            commands::open_log_window,
             commands::subscribe_logging,
         ])
         .setup(|app| {

@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/tauri';
 import React from 'react';
 import styled from 'styled-components';
 import { Button, Colors } from '@blueprintjs/core';
@@ -14,6 +15,7 @@ export function Header(props: HeaderProps): React.ReactElement {
     <Container className={className}>
       <ProfileSelector />
       <RightActions>
+        <Button icon="console" minimal onClick={() => invoke('open_log_window')} />
         <Button icon="cog" minimal />
       </RightActions>
     </Container>

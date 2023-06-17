@@ -30,11 +30,15 @@ pub fn log(kind: String, message: String) {
 }
 
 #[tauri::command]
-pub async fn open_logs_window(handle: tauri::AppHandle) -> Result<(), AppError> {
-    let logs_window = tauri::WindowBuilder::from_config(
+pub async fn open_log_window(handle: tauri::AppHandle) -> Result<(), AppError> {
+    if let Some(log_window) = handle.get_window("log") {
+        log_window.show()?;
+        return Ok(());
+    }
+    let log_window = tauri::WindowBuilder::from_config(
         &handle,
         tauri::utils::config::WindowConfig {
-            label: "logs".to_string(),
+            label: "log".to_string(),
             url: tauri::WindowUrl::App("index-log.html".into()),
             title: "NXZR - Logs".to_string(),
             visible: false,
@@ -49,7 +53,7 @@ pub async fn open_logs_window(handle: tauri::AppHandle) -> Result<(), AppError> 
     .build()?;
 
     #[cfg(debug_assertions)]
-    logs_window.open_devtools();
+    log_window.open_devtools();
 
     Ok(())
 }
