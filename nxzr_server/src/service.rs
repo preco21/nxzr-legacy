@@ -143,6 +143,14 @@ impl Nxzr for NxzrService {
                             let mut guard = conn_state.lock().unwrap();
                             *guard = ConnectionState::Connected(conn.clone());
                         }
+                        // Send Event: Connected
+                        let _ = stream_tx.send(create_res(create_event(
+                            connection_event::Kind::Log(connection_event::EventLog {
+                                kind: connection_event::EventLogKind::Connected.into(),
+                                message: "Connected to Switch.".to_string(),
+                                ..Default::default()
+                            }),
+                        )));
                         // FIXME: Handle/move Send Evnet: Connecting here
                         // Wait for either ends to be closed.
                         tokio::select! {
@@ -160,7 +168,7 @@ impl Nxzr for NxzrService {
                         let _ = stream_tx.send(create_res(create_event(
                             connection_event::Kind::Log(connection_event::EventLog {
                                 kind: connection_event::EventLogKind::Disconnecting.into(),
-                                message: "Disconnecting in progress...".to_string(),
+                                message: "Disconnection in progress...".to_string(),
                                 ..Default::default()
                             }),
                         )));
@@ -176,11 +184,19 @@ impl Nxzr for NxzrService {
                         let _ = stream_tx.send(Err(NxzrServiceError::StreamClosed.into()));
                     }
                 }
-                // Set closed.
+                // Set disconnected.
                 {
                     let mut guard = conn_state.lock().unwrap();
                     *guard = ConnectionState::NotConnected;
                 }
+                // Send Event: Disconnected
+                let _ = stream_tx.send(create_res(create_event(connection_event::Kind::Log(
+                    connection_event::EventLog {
+                        kind: connection_event::EventLogKind::Disconnected.into(),
+                        message: "Successfully disconnected from Switch.".to_string(),
+                        ..Default::default()
+                    },
+                ))));
                 drop(shutdown_complete_guard);
             }
         });
@@ -290,7 +306,7 @@ async fn handle_connect_switch(
     let _ = stream_tx.send(create_res(create_event(connection_event::Kind::Log(
         connection_event::EventLog {
             kind: connection_event::EventLogKind::Connecting.into(),
-            message: "Connecting to Switch as an initial connection.".to_string(),
+            message: "Connecting to Switch as initial connection.".to_string(),
             ..Default::default()
         },
     ))));
@@ -343,10 +359,6 @@ fn map_protocol_event_to_event_kind(
 ) -> Option<connection_event::Kind> {
     match protocol_event {
         protocol::Event::Log(log) => Some(connection_event::Kind::Log(match log {
-            protocol::LogType::Closing => connection_event::EventLog {
-                kind: connection_event::EventLogKind::Closing.into(),
-                message: "Closing protocol interfaces...".to_string(),
-            },
             protocol::LogType::PairingEnded => connection_event::EventLog {
                 kind: connection_event::EventLogKind::PairingEnded.into(),
                 message: "Protocol has been marked as paired.".to_string(),

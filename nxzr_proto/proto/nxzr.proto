@@ -52,8 +52,8 @@ message ConnectionEvent {
     UNSPECIFIED = 0;
     CONNECTING = 1;
     CONNECTED = 2;
-    CLOSING = 3;
-    CLOSED = 4;
+    DISCONNECTING = 3;
+    DISCONNECTED = 4;
     SUBCOMMAND_RECEIVED = 5;
     PAIRING_ENDED = 6;
   }
