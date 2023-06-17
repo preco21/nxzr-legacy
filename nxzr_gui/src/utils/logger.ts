@@ -16,12 +16,12 @@ export interface LogEntry {
 
 export interface SubscribeLoggingResponse {
   logs: string[];
-  task_name: string;
+  task_label: string;
 }
 
 export class LogListener {
   private state: 'init' | 'pending' | 'ready' = 'init';
-  private taskName: string | undefined = undefined;
+  private taskLabel: string | undefined = undefined;
   private listeners: Set<(entry: LogEntry) => void> = new Set();
   private internalLoggerHandle: UnlistenFn | undefined = undefined;
   private logId: number = 0;
@@ -45,7 +45,7 @@ export class LogListener {
       ...JSON.parse(logString) as LogEntry,
       id: this.logId++,
     }));
-    this.taskName = res.task_name;
+    this.taskLabel = res.task_label;
     this.state = 'ready';
   }
 
@@ -61,9 +61,9 @@ export class LogListener {
       return;
     }
     this.internalLoggerHandle?.();
-    await invoke('cancel_task', { taskName: this.taskName });
+    await invoke('cancel_task', { taskLabel: this.taskLabel });
     this.initialLogs = [];
-    this.taskName = undefined;
+    this.taskLabel = undefined;
     this.listeners.clear();
     this.state = 'init';
   }

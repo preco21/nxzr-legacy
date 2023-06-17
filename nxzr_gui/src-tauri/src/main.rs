@@ -75,9 +75,7 @@ async fn main() -> anyhow::Result<()> {
     let (log_sub_tx, log_sub_rx) = mpsc::channel(1);
     LoggingEvent::handle_events(log_out_rx, log_sub_rx)?;
 
-    // let (async_proc_input_tx, async_proc_input_rx) = mpsc::channel(1);
     let app_state = AppState::new(log_sub_tx);
-
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(app_state)

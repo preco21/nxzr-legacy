@@ -25,40 +25,44 @@ impl AppState {
 
     pub async fn register_task(
         &self,
-        task_name: &str,
+        task_label: &str,
         create_fut: impl Future<Output = Result<task::JoinHandle<Result<(), AppError>>, AppError>>,
     ) -> Result<(), AppError> {
-        self.reserve_task(task_name).await?;
+        self.reserve_task(task_label).await?;
         match create_fut.await {
             Ok(join_handle) => {
-                self.set_task(task_name, join_handle).await;
+                self.set_task(task_label, join_handle).await;
                 Ok(())
             }
             Err(err) => {
-                self.cancel_task(task_name).await?;
+                self.cancel_task(task_label).await?;
                 Err(err)
             }
         }
     }
 
-    async fn reserve_task(&self, task_name: &str) -> Result<(), AppError> {
+    async fn reserve_task(&self, task_label: &str) -> Result<(), AppError> {
         let mut task_handles = self.task_handles.lock().await;
-        if task_handles.contains_key(task_name) {
+        if task_handles.contains_key(task_label) {
             Err(AppError::TaskAlreadyRunning)
         } else {
-            task_handles.insert(task_name.to_string(), None);
+            task_handles.insert(task_label.to_string(), None);
             Ok(())
         }
     }
 
-    async fn set_task(&self, task_name: &str, join_handle: task::JoinHandle<Result<(), AppError>>) {
+    async fn set_task(
+        &self,
+        task_label: &str,
+        join_handle: task::JoinHandle<Result<(), AppError>>,
+    ) {
         let mut task_handles = self.task_handles.lock().await;
-        task_handles.insert(task_name.to_string(), Some(join_handle));
+        task_handles.insert(task_label.to_string(), Some(join_handle));
     }
 
-    pub async fn cancel_task(&self, task_name: &str) -> Result<(), AppError> {
+    pub async fn cancel_task(&self, task_label: &str) -> Result<(), AppError> {
         let mut task_handles = self.task_handles.lock().await;
-        if let Some(Some(join_handle)) = task_handles.remove(task_name) {
+        if let Some(Some(join_handle)) = task_handles.remove(task_label) {
             join_handle.abort();
             Ok(())
         } else {

@@ -13,9 +13,9 @@ pub fn window_ready(window: tauri::Window, name: String) -> Result<(), AppError>
 #[tauri::command]
 pub async fn cancel_task(
     state: tauri::State<'_, AppState>,
-    task_name: String,
+    task_label: String,
 ) -> Result<(), AppError> {
-    state.cancel_task(&task_name).await?;
+    state.cancel_task(&task_label).await?;
     Ok(())
 }
 
@@ -57,7 +57,7 @@ pub async fn open_logs_window(handle: tauri::AppHandle) -> Result<(), AppError> 
 #[derive(Clone, serde::Serialize)]
 pub struct SubscribeLoggingResponse {
     logs: Vec<String>,
-    task_name: String,
+    task_label: String,
 }
 
 #[tauri::command]
@@ -65,10 +65,10 @@ pub async fn subscribe_logging(
     window: tauri::Window,
     state: tauri::State<'_, AppState>,
 ) -> Result<SubscribeLoggingResponse, AppError> {
-    let task_name = "logging".to_string();
+    let task_label = "logging".to_string();
     let mut logs: Option<Vec<String>> = None;
     state
-        .register_task(&task_name, async {
+        .register_task(&task_label, async {
             logs = Some(state.logging.logs().await);
             let mut log_rx = state.logging.events().await?;
             let handle = tokio::spawn({
@@ -87,6 +87,6 @@ pub async fn subscribe_logging(
         .await?;
     Ok(SubscribeLoggingResponse {
         logs: logs.unwrap_or(Vec::new()),
-        task_name,
+        task_label,
     })
 }
