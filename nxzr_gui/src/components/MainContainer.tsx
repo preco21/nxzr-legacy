@@ -1,5 +1,6 @@
 import React from 'react';
 import classNames from 'classnames';
+import { styled } from 'styled-components';
 
 export interface MainContainerProps {
   className?: string;
@@ -9,8 +10,12 @@ export interface MainContainerProps {
 export function MainContainer(props: MainContainerProps): React.ReactElement {
   const { className, children } = props;
   return (
-    <main className={classNames('container', 'bp4-dark', className)}>
+    <Main className={classNames('container', 'bp4-dark', className)}>
       {children}
-    </main>
+    </Main>
   );
 }
+
+const Main = styled.main`
+  height: 100%;
+`;

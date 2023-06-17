@@ -2,9 +2,12 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
 
+export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
+
 export interface LogEntry {
+  id: number;
   timestamp: string;
-  level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
+  level: LogLevel;
   fields: {
     message: string;
   };
@@ -19,9 +22,10 @@ export interface SubscribeLoggingResponse {
 export class LogListener {
   private state: 'init' | 'pending' | 'ready' = 'init';
   private taskName: string | undefined = undefined;
-  private listeners: Set<(logs: string) => void> = new Set();
+  private listeners: Set<(entry: LogEntry) => void> = new Set();
   private internalLoggerHandle: UnlistenFn | undefined = undefined;
-  public initialLogs: string[] = [];
+  private logId: number = 0;
+  public initialLogs: LogEntry[] = [];
 
   public async init(): Promise<void> {
     if (this.state !== 'init') {
@@ -30,19 +34,22 @@ export class LogListener {
     this.state = 'pending';
     this.internalLoggerHandle = await listen<SubscribeLoggingResponse>('logging:log', (event) => {
       const logString = event.payload as unknown as string;
-      // FIXME: use concrete object
+      const parsed = { ...JSON.parse(logString) as LogEntry, id: this.logId++ };
       for (const listener of this.listeners) {
-        listener(logString);
+        listener(parsed);
       }
-      this.initialLogs.push(logString);
+      this.initialLogs.push(parsed);
     });
     const res = await invoke<SubscribeLoggingResponse>('subscribe_logging');
-    this.initialLogs = res.logs;
+    this.initialLogs = res.logs.map((logString) => ({
+      ...JSON.parse(logString) as LogEntry,
+      id: this.logId++,
+    }));
     this.taskName = res.task_name;
     this.state = 'ready';
   }
 
-  public onLog(listener: (logs: string) => void): (() => void) {
+  public onLog(listener: (entry: LogEntry) => void): (() => void) {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
