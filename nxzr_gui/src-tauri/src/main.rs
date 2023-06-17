@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use nxzr_shared::event::EventError;
 use state::{AppState, LoggingEvent};
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing_subscriber::prelude::*;
@@ -86,16 +86,26 @@ async fn main() -> anyhow::Result<()> {
             commands::open_log_window,
             commands::subscribe_logging,
         ])
+        .on_window_event(|event| match event.event() {
+            tauri::WindowEvent::Destroyed => {
+                // Closes all remaining windows when the main window is closed.
+                let window = event.window();
+                if window.label() == "main" {
+                    let windows = window.app_handle().windows();
+                    for (_, window) in windows.iter() {
+                        window.close().unwrap();
+                    }
+                }
+            }
+            _ => {}
+        })
         .setup(|app| {
-            // let app_handle = app.handle();
-            // tokio::spawn(async move { async_process_model(async_proc_input_rx, app_handle).await });
-
+            // Enable devtools.
             #[cfg(debug_assertions)]
             {
                 let window = app.get_window("main").unwrap();
                 window.open_devtools();
             }
-
             Ok(())
         })
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {

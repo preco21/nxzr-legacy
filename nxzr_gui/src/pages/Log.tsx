@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import styled from 'styled-components';
+import { Button, Checkbox, Colors, ControlGroup, HTMLSelect, InputGroup } from '@blueprintjs/core';
+import { Console } from 'console-feed';
 import * as logger from '../utils/logger';
 import { MainContainer } from '../components/MainContainer';
-import { Console } from 'console-feed';
-import styled from 'styled-components';
-import { Button, Checkbox, Colors, ControlGroup, HTMLSelect, InputGroup, OptionProps } from '@blueprintjs/core';
 
 type ConsoleProps = React.ComponentProps<typeof Console>;
 type ConsoleMessage = ConsoleProps['logs'][number];

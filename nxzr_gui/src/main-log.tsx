@@ -17,4 +17,4 @@ ReactDOM.createRoot(document.getElementById('__root__') as HTMLElement).render(
   </React.StrictMode>,
 );
 
-invoke('window_ready', { name: 'logs' });
+invoke('window_ready', { name: 'log' });

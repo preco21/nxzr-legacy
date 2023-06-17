@@ -32,7 +32,7 @@ pub fn log(kind: String, message: String) {
 #[tauri::command]
 pub async fn open_log_window(handle: tauri::AppHandle) -> Result<(), AppError> {
     if let Some(log_window) = handle.get_window("log") {
-        log_window.show()?;
+        log_window.set_focus()?;
         return Ok(());
     }
     let log_window = tauri::WindowBuilder::from_config(

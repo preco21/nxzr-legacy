@@ -6,16 +6,21 @@ import { ProfileSelector } from './ProfileSelector';
 
 export interface HeaderProps {
   className?: string;
-  children?: React.ReactNode;
 }
 
 export function Header(props: HeaderProps): React.ReactElement {
-  const { className, children } = props;
+  const { className } = props;
   return (
     <Container className={className}>
       <ProfileSelector />
       <RightActions>
-        <Button icon="console" minimal onClick={() => invoke('open_log_window')} />
+        <Button
+          icon="console"
+          minimal
+          onClick={async () => {
+            await invoke('open_log_window');
+          }}
+        />
         <Button icon="cog" minimal />
       </RightActions>
     </Container>
