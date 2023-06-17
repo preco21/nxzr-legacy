@@ -1,5 +1,6 @@
+import { listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
-import React from 'react';
+import React, { useEffect } from 'react';
 import styled from 'styled-components';
 import { Button, Colors } from '@blueprintjs/core';
 
@@ -9,6 +10,19 @@ export interface TitleBarProps {
 
 export function TitleBar(props: TitleBarProps): React.ReactElement {
   const { className } = props;
+  const [isMaximized, setMaximized] = React.useState(false);
+
+  useEffect(() => {
+    let unlisten: () => void;
+    (async () => {
+      unlisten = await listen('tauri://resize', async () => {
+        const maximized = await appWindow.isMaximized();
+        setMaximized(maximized);
+      });
+    })();
+    return () => unlisten?.();
+  }, []);
+
   return (
     <Container className={className} data-tauri-drag-region>
       <TitleArea>
@@ -17,6 +31,18 @@ export function TitleBar(props: TitleBarProps): React.ReactElement {
       </TitleArea>
       <WindowActions>
         <Button icon="minus" minimal onClick={() => appWindow.minimize()} />
+        <Button
+          icon={isMaximized ? 'duplicate' : 'small-square'}
+          minimal
+          onClick={async () => {
+            const maximized = await appWindow.isMaximized();
+            if (maximized) {
+              await appWindow.unmaximize();
+            } else {
+              await appWindow.maximize();
+            }
+          }}
+        />
         <Button icon="cross" minimal onClick={() => appWindow.close()} />
       </WindowActions>
     </Container>
