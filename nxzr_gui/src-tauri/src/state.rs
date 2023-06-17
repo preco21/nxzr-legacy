@@ -1,7 +1,7 @@
 use crate::AppError;
 use nxzr_shared::{event::SubscriptionReq, setup_event};
 use ringbuf::Rb;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, future::Future, sync::Arc};
 use tokio::{
     sync::{mpsc, oneshot, Mutex},
     task,
@@ -23,12 +23,25 @@ impl AppState {
         }
     }
 
-    pub async fn is_task_running(&self, task_name: &str) -> bool {
-        let task_handles = self.task_handles.lock().await;
-        task_handles.contains_key(task_name)
+    pub async fn register_task(
+        &self,
+        task_name: &str,
+        create_fut: impl Future<Output = Result<task::JoinHandle<Result<(), AppError>>, AppError>>,
+    ) -> Result<(), AppError> {
+        self.reserve_task(task_name).await?;
+        match create_fut.await {
+            Ok(join_handle) => {
+                self.set_task(task_name, join_handle).await;
+                Ok(())
+            }
+            Err(err) => {
+                self.cancel_task(task_name).await?;
+                Err(err)
+            }
+        }
     }
 
-    pub async fn reserve_task(&self, task_name: &str) -> Result<(), AppError> {
+    async fn reserve_task(&self, task_name: &str) -> Result<(), AppError> {
         let mut task_handles = self.task_handles.lock().await;
         if task_handles.contains_key(task_name) {
             Err(AppError::TaskAlreadyRunning)
@@ -38,11 +51,7 @@ impl AppState {
         }
     }
 
-    pub async fn add_task(
-        &self,
-        task_name: &str,
-        join_handle: task::JoinHandle<Result<(), AppError>>,
-    ) {
+    async fn set_task(&self, task_name: &str, join_handle: task::JoinHandle<Result<(), AppError>>) {
         let mut task_handles = self.task_handles.lock().await;
         task_handles.insert(task_name.to_string(), Some(join_handle));
     }

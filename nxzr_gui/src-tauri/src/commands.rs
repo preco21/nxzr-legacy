@@ -66,20 +66,27 @@ pub async fn subscribe_logging(
     state: tauri::State<'_, AppState>,
 ) -> Result<SubscribeLoggingResponse, AppError> {
     let task_name = "logging".to_string();
-    state.reserve_task(&task_name).await?;
-    let logs = state.logging.logs().await;
-    let mut log_rx = state.logging.events().await?;
-    let task_handle = tokio::spawn({
-        let logging = state.logging.clone();
-        async move {
-            while let Some(event) = log_rx.recv().await {
-                let log_string = event.to_string();
-                logging.push_log(log_string.as_str()).await;
-                window.emit("logging:log", log_string).unwrap();
-            }
-            Ok::<(), AppError>(())
-        }
-    });
-    state.add_task(&task_name, task_handle).await;
-    Ok(SubscribeLoggingResponse { logs, task_name })
+    let mut logs: Option<Vec<String>> = None;
+    state
+        .register_task(&task_name, async {
+            logs = Some(state.logging.logs().await);
+            let mut log_rx = state.logging.events().await?;
+            let handle = tokio::spawn({
+                let logging = state.logging.clone();
+                async move {
+                    while let Some(event) = log_rx.recv().await {
+                        let log_string = event.to_string();
+                        logging.push_log(log_string.as_str()).await;
+                        window.emit("logging:log", log_string).unwrap();
+                    }
+                    Ok::<(), AppError>(())
+                }
+            });
+            Ok(handle)
+        })
+        .await?;
+    Ok(SubscribeLoggingResponse {
+        logs: logs.unwrap_or(Vec::new()),
+        task_name,
+    })
 }
