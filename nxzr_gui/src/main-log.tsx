@@ -3,8 +3,11 @@ import { invoke } from '@tauri-apps/api';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { FocusStyleManager } from '@blueprintjs/core';
+import { setupListenerHook } from './utils/logger';
 import LogPage from './pages/Log';
 import './styles.css';
+
+await setupListenerHook();
 
 FocusStyleManager.onlyShowFocusOnTabs();
 

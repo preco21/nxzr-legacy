@@ -1,48 +1,45 @@
 import { invoke } from '@tauri-apps/api/tauri';
-import { listen } from '@tauri-apps/api/event';
+import { UnlistenFn, listen } from '@tauri-apps/api/event';
+import { appWindow } from '@tauri-apps/api/window';
+
+export interface LogEntry {
+  timestamp: string;
+  level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
+  fields: {
+    message: string;
+  };
+  target: string;
+}
 
 export interface SubscribeLoggingResponse {
   logs: string[];
   task_name: string;
 }
 
-export class Logger {
-  private initialized = false;
-  private handle: string | undefined = undefined;
+export class LogListener {
+  private state: 'init' | 'pending' | 'ready' = 'init';
+  private taskName: string | undefined = undefined;
   private listeners: Set<(logs: string) => void> = new Set();
-  public logs: string[] = [];
+  private internalLoggerHandle: UnlistenFn | undefined = undefined;
+  public initialLogs: string[] = [];
 
-  constructor() {
-    listen<SubscribeLoggingResponse>('logging:log', (event) => {
+  public async init(): Promise<void> {
+    if (this.state !== 'init') {
+      return;
+    }
+    this.state = 'pending';
+    this.internalLoggerHandle = await listen<SubscribeLoggingResponse>('logging:log', (event) => {
       const logString = event.payload as unknown as string;
       // FIXME: use concrete object
-      this.logs.push(logString);
       for (const listener of this.listeners) {
         listener(logString);
       }
+      this.initialLogs.push(logString);
     });
-  }
-
-  public async init(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
     const res = await invoke<SubscribeLoggingResponse>('subscribe_logging');
-    this.logs = res.logs;
-    this.handle = res.task_name;
-    this.initialized = true;
-  }
-
-  public async info(message: string): Promise<void> {
-    await invoke('log', { kind: 'info', message });
-  }
-
-  public async warn(message: string): Promise<void> {
-    await invoke('log', { kind: 'warn', message });
-  }
-
-  public async error(message: string): Promise<void> {
-    await invoke('log', { kind: 'error', message });
+    this.initialLogs = res.logs;
+    this.taskName = res.task_name;
+    this.state = 'ready';
   }
 
   public onLog(listener: (logs: string) => void): (() => void) {
@@ -53,14 +50,39 @@ export class Logger {
   }
 
   public async dispose(): Promise<void> {
-    if (!this.initialized) {
+    if (this.state !== 'ready') {
       return;
     }
-    await invoke('cancel_task', { task_name: this.handle });
-    this.logs = [];
-    this.handle = undefined;
-    this.initialized = false;
+    this.internalLoggerHandle?.();
+    await invoke('cancel_task', { taskName: this.taskName });
+    this.initialLogs = [];
+    this.taskName = undefined;
+    this.listeners.clear();
+    this.state = 'init';
   }
 }
 
-export const logger = new Logger();
+export const logListener = new LogListener();
+
+export async function info(message: string): Promise<void> {
+  await invoke('log', { kind: 'info', message });
+}
+
+export async function warn(message: string): Promise<void> {
+  await invoke('log', { kind: 'warn', message });
+}
+
+export async function error(message: string): Promise<void> {
+  await invoke('log', { kind: 'error', message });
+}
+
+export async function setupListenerHook(): Promise<void> {
+  await logListener.init();
+  appWindow.once('tauri://close-requested', async () => {
+    await logListener.dispose();
+    appWindow.close();
+  });
+  window.addEventListener('beforeunload', () => {
+    logListener.dispose();
+  });
+}

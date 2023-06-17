@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import * as logger from '../utils/logger';
 import { MainContainer } from '../components/MainContainer';
-import { logger } from '../utils/logger';
 
 function LogPage(): React.ReactElement {
   const [logs, setLogs] = useState<string[]>([]);
@@ -13,18 +13,11 @@ function LogPage(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    let handle: () => void;
-    (async () => {
-      await logger.init();
-      const initialLogs = logger.logs;
-      setLogs(initialLogs);
-      handle = logger.onLog((log) => setLogs((prev) => [...prev, log]));
-    })();
+    // Set initial logs by copying the currently stored logs.
+    setLogs(logger.logListener.initialLogs.slice());
+    const unsubscribe = logger.logListener.onLog((log) => setLogs((prev) => [...prev, log]));
     return () => {
-      if (handle != null) {
-        handle();
-      }
-      logger.dispose();
+      unsubscribe();
     };
   }, []);
   return (
