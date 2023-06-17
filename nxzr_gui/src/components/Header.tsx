@@ -31,7 +31,7 @@ const Container = styled.div`
   display: flex;
   justify-content: space-between;
   padding: 12px;
-  background-color: ${Colors.DARK_GRAY2};
+  background-color: ${Colors.BLACK};
 `;
 
 const RightActions = styled.div`

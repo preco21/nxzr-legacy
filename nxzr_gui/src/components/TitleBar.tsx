@@ -27,7 +27,7 @@ const Container = styled.header`
   user-select: none;
   display: grid;
   grid-template: 1fr / 12fr 4fr;
-  padding: 16px;
+  padding: 4px 8px;
   background-color: ${Colors.BLACK};
 `;
 
