@@ -30,7 +30,7 @@ export function Header(props: HeaderProps): React.ReactElement {
 const Container = styled.div`
   display: flex;
   justify-content: space-between;
-  padding: 12px;
+  padding: 12px 8px;
   background-color: ${Colors.BLACK};
 `;
 
