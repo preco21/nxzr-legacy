@@ -68,9 +68,6 @@ function LogPage(): React.ReactElement {
         });
       }
     });
-    logger.info('테스트 로그임');
-    logger.warn('테스트 로그임');
-    logger.error('테스트 로그임');
     return () => {
       unsubscribe();
     };
