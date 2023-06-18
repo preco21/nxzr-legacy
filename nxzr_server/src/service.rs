@@ -107,7 +107,7 @@ impl Nxzr for NxzrService {
     #[tracing::instrument(target = "service")]
     async fn connect_switch(
         &self,
-        req: Request<ConnectSwitchRequest>,
+        _req: Request<ConnectSwitchRequest>,
     ) -> ServiceResult<Self::ConnectSwitchStream> {
         // Start connection.
         {
@@ -144,13 +144,19 @@ impl Nxzr for NxzrService {
                             *guard = ConnectionState::Connected(conn.clone());
                         }
                         // Send Event: Connected
-                        let _ = stream_tx.send(create_res(create_event(
-                            connection_event::Kind::Log(connection_event::EventLog {
-                                kind: connection_event::EventLogKind::Connected.into(),
-                                message: "Connected to Switch.".to_string(),
+                        let _ = stream_tx.send(Ok(ConnectSwitchResponse {
+                            res: Some(connect_switch_response::Res::Event(ConnectionEvent {
+                                kind: Some(connection_event::Kind::Log(
+                                    connection_event::EventLog {
+                                        kind: connection_event::EventLogKind::Connected.into(),
+                                        message: "Connected to Switch.".to_string(),
+                                        ..Default::default()
+                                    },
+                                )),
                                 ..Default::default()
-                            }),
-                        )));
+                            })),
+                            ..Default::default()
+                        }));
                         // FIXME: Handle/move Send Evnet: Connecting here
                         // Wait for either ends to be closed.
                         tokio::select! {
@@ -164,14 +170,25 @@ impl Nxzr for NxzrService {
                                 tracing::warn!("terminating connection due to shutdown signal");
                             },
                         }
+                        // Set disconnecting.
+                        {
+                            let mut guard = conn_state.lock().unwrap();
+                            *guard = ConnectionState::Disconnecting;
+                        }
                         // Send Event: Disconnecting
-                        let _ = stream_tx.send(create_res(create_event(
-                            connection_event::Kind::Log(connection_event::EventLog {
-                                kind: connection_event::EventLogKind::Disconnecting.into(),
-                                message: "Disconnection in progress...".to_string(),
+                        let _ = stream_tx.send(Ok(ConnectSwitchResponse {
+                            res: Some(connect_switch_response::Res::Event(ConnectionEvent {
+                                kind: Some(connection_event::Kind::Log(
+                                    connection_event::EventLog {
+                                        kind: connection_event::EventLogKind::Disconnecting.into(),
+                                        message: "Disconnection in progress...".to_string(),
+                                        ..Default::default()
+                                    },
+                                )),
                                 ..Default::default()
-                            }),
-                        )));
+                            })),
+                            ..Default::default()
+                        }));
                         drop(conn_handle);
                         conn.closed().await;
                     }
@@ -190,13 +207,17 @@ impl Nxzr for NxzrService {
                     *guard = ConnectionState::NotConnected;
                 }
                 // Send Event: Disconnected
-                let _ = stream_tx.send(create_res(create_event(connection_event::Kind::Log(
-                    connection_event::EventLog {
-                        kind: connection_event::EventLogKind::Disconnected.into(),
-                        message: "Successfully disconnected from Switch.".to_string(),
+                let _ = stream_tx.send(Ok(ConnectSwitchResponse {
+                    res: Some(connect_switch_response::Res::Event(ConnectionEvent {
+                        kind: Some(connection_event::Kind::Log(connection_event::EventLog {
+                            kind: connection_event::EventLogKind::Disconnected.into(),
+                            message: "Successfully disconnected from Switch.".to_string(),
+                            ..Default::default()
+                        })),
                         ..Default::default()
-                    },
-                ))));
+                    })),
+                    ..Default::default()
+                }));
                 drop(shutdown_complete_guard);
             }
         });
@@ -289,27 +310,18 @@ async fn handle_connect_switch(
     device: Arc<device::Device>,
     stream_tx: mpsc::UnboundedSender<Result<ConnectSwitchResponse, Status>>,
 ) -> Result<(connection::Connection, connection::ConnectionHandle), NxzrServiceError> {
-    let create_res = |res: connect_switch_response::Res| {
-        Ok(ConnectSwitchResponse {
-            res: Some(res),
-            ..Default::default()
-        })
-    };
-    let create_event = |evt: connection_event::Kind| {
-        connect_switch_response::Res::Event(ConnectionEvent {
-            kind: Some(evt),
-            ..Default::default()
-        })
-    };
-
     // Send Event: Connecting
-    let _ = stream_tx.send(create_res(create_event(connection_event::Kind::Log(
-        connection_event::EventLog {
-            kind: connection_event::EventLogKind::Connecting.into(),
-            message: "Connecting to Switch as initial connection.".to_string(),
+    let _ = stream_tx.send(Ok(ConnectSwitchResponse {
+        res: Some(connect_switch_response::Res::Event(ConnectionEvent {
+            kind: Some(connection_event::Kind::Log(connection_event::EventLog {
+                kind: connection_event::EventLogKind::Connecting.into(),
+                message: "Connecting to Switch as initial connection.".to_string(),
+                ..Default::default()
+            })),
             ..Default::default()
-        },
-    ))));
+        })),
+        ..Default::default()
+    }));
 
     let controller_type = controller::ControllerType::ProController;
     let session_listener = connection::create_session_listener(&device).await?;
@@ -336,20 +348,27 @@ async fn handle_connect_switch(
                 // wire, for example, protocol's `Closed` event is
                 // ignored as we need to handle it after a cleanup.
                 if let Some(evt) = map_protocol_event_to_event_kind(evt) {
-                    let _ = stream_tx.send(create_res(create_event(evt)));
+                    let _ = stream_tx.send(Ok(ConnectSwitchResponse {
+                        res: Some(connect_switch_response::Res::Event(ConnectionEvent {
+                            kind: Some(evt),
+                            ..Default::default()
+                        })),
+                        ..Default::default()
+                    }));
                 }
             }
         }
     });
 
     // Metadata
-    let _ = stream_tx.send(create_res(connect_switch_response::Res::Metadata(
-        ConnectionMetadata {
+    let _ = stream_tx.send(Ok(ConnectSwitchResponse {
+        res: Some(connect_switch_response::Res::Metadata(ConnectionMetadata {
             adapter_address: adapter_address.to_string(),
             target_address: target_address.to_string(),
             ..Default::default()
-        },
-    )));
+        })),
+        ..Default::default()
+    }));
 
     Ok((conn, conn_handle))
 }
