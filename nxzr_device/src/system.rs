@@ -6,7 +6,7 @@ use tokio::{process::Command, time::error::Elapsed};
 pub enum SysCheckError {
     #[error("privilege error, this program is required to run as root user")]
     RootPrivilegeRequired,
-    #[error("failed to check Bluetooth service, possibly the driver for Bluetooth is not loaded")]
+    #[error("failed to check Bluetooth service, possibly the driver for Bluetooth is not loaded or the service is dead")]
     BluetoothNotAvailable,
     #[error("cli tool presence check failed: {0}")]
     CliToolFailed(String),
