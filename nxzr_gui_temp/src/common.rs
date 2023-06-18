@@ -24,7 +24,7 @@ pub async fn mkdir_p<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     Ok(())
 }
 
-pub fn trim_string_whitespace(input: String) -> String {
+pub fn trim_string_whitespace(input: &str) -> String {
     input
         .trim()
         .lines()
