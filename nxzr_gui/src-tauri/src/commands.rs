@@ -22,10 +22,10 @@ pub async fn cancel_task(
 #[tauri::command]
 pub fn log(kind: String, message: String) {
     match kind.as_str() {
-        "info" => tracing::info!("[console.log]: {}", message),
-        "warn" => tracing::warn!("[console.log]: {}", message),
-        "error" => tracing::error!("[console.log]: {}", message),
-        _ => tracing::debug!("[console.log]: {}", message),
+        "info" => tracing::info!("[renderer]: {}", message),
+        "warn" => tracing::warn!("[renderer]: {}", message),
+        "error" => tracing::error!("[renderer]: {}", message),
+        _ => tracing::debug!("[renderer]: {}", message),
     }
 }
 
