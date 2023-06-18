@@ -1,14 +1,14 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::Arc;
-
 use nxzr_shared::event::EventError;
 use state::{AppState, LoggingEvent};
-use tauri::{Manager, WindowEvent};
+use std::{path::Path, sync::Arc};
+use tauri::Manager;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing_subscriber::prelude::*;
+use util::SystemCommandError;
 
 mod commands;
 mod config;
@@ -29,6 +29,10 @@ pub enum AppError {
     Tauri(#[from] tauri::Error),
     #[error(transparent)]
     EventError(#[from] EventError),
+    #[error(transparent)]
+    SystemCommandError(#[from] SystemCommandError),
+    #[error(transparent)]
+    Anyhow(#[from] anyhow::Error),
 }
 
 impl serde::Serialize for AppError {
@@ -44,15 +48,16 @@ impl serde::Serialize for AppError {
 async fn main() -> anyhow::Result<()> {
     bootstrap().await?;
 
-    let Some(app_dirs) = util::get_app_dirs() else {
-        return Err(anyhow::anyhow!("failed to resolve app dirs"));
-    };
+    let app_dirs = util::get_app_dirs().ok_or(anyhow::anyhow!("failed to resolve app dirs"))?;
     let module_filter =
         tracing_subscriber::filter::Targets::new().with_target("nxzr_gui", tracing::Level::TRACE);
     // FIXME: cannot be reused after dispose
     let (log_out_tx, log_out_rx) = mpsc::channel(1024);
     let log_chan_writer = util::TracingChannelWriter::new(Arc::new(log_out_tx));
-    let file_appender = tracing_appender::rolling::hourly(app_dirs.data_dir(), "output.log");
+    let file_appender = tracing_appender::rolling::hourly(
+        app_dirs.data_dir().join(Path::new(config::LOG_FOLDER_NAME)),
+        "output.log",
+    );
     let (log_file_appender, _guard) = tracing_appender::non_blocking(file_appender);
     let subscriber = tracing_subscriber::registry()
         .with(module_filter)
@@ -85,6 +90,9 @@ async fn main() -> anyhow::Result<()> {
             commands::log,
             commands::open_log_window,
             commands::subscribe_logging,
+            commands::get_app_dirs,
+            commands::reveal_in_file_explorer,
+            commands::open_log_folder,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

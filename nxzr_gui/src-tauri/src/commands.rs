@@ -1,5 +1,7 @@
-use crate::{state::AppState, AppError};
+use crate::{config, state::AppState, util, AppError};
+use std::path::Path;
 use tauri::Manager;
+use tokio::process::Command;
 
 #[tauri::command]
 pub fn window_ready(window: tauri::Window, name: String) -> Result<(), AppError> {
@@ -93,4 +95,57 @@ pub async fn subscribe_logging(
         logs: logs.unwrap_or(Vec::new()),
         task_label,
     })
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct GetAppDirsResponse {
+    config_dir: String,
+    data_dir: String,
+}
+
+#[tauri::command]
+pub fn get_app_dirs() -> Result<GetAppDirsResponse, AppError> {
+    let app_dirs = util::get_app_dirs().ok_or(anyhow::anyhow!("failed to resolve app dirs"))?;
+    Ok(GetAppDirsResponse {
+        config_dir: app_dirs
+            .config_dir()
+            .to_str()
+            .ok_or(anyhow::anyhow!("failed to resolve app dirs"))?
+            .to_string(),
+        data_dir: app_dirs
+            .data_dir()
+            .to_str()
+            .ok_or(anyhow::anyhow!("failed to resolve app dirs"))?
+            .to_string(),
+    })
+}
+
+#[tauri::command]
+pub async fn reveal_in_file_explorer(path: String) -> Result<(), AppError> {
+    util::run_system_command({
+        let mut cmd = Command::new("explorer.exe");
+        cmd.args(&["/select", &path]);
+        cmd
+    })
+    .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_log_folder() -> Result<(), AppError> {
+    let app_dirs = util::get_app_dirs().ok_or(anyhow::anyhow!("failed to resolve app dirs"))?;
+    let dir = app_dirs
+        .data_dir()
+        .join(Path::new(config::LOG_FOLDER_NAME))
+        .to_str()
+        .ok_or(anyhow::anyhow!("failed to resolve app dirs"))?
+        .to_string();
+    tracing::info!("dir: {}", &dir);
+    util::run_system_command({
+        let mut cmd = Command::new("explorer.exe");
+        cmd.args(&[&dir]);
+        cmd
+    })
+    .await?;
+    Ok(())
 }

@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/tauri';
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Checkbox, Colors, ControlGroup, HTMLSelect, InputGroup } from '@blueprintjs/core';
@@ -67,6 +68,9 @@ function LogPage(): React.ReactElement {
         });
       }
     });
+    logger.info('테스트 로그임');
+    logger.warn('테스트 로그임');
+    logger.error('테스트 로그임');
     return () => {
       unsubscribe();
     };
@@ -75,7 +79,7 @@ function LogPage(): React.ReactElement {
   return (
     <Container>
       <ConsoleActions>
-        <Button icon="trash" minimal onClick={() => setLogs([])} />
+        <Button icon="disable" minimal small onClick={() => setLogs([])} />
         <InputGroup
           type="text"
           placeholder="Filter logs..."
@@ -87,6 +91,7 @@ function LogPage(): React.ReactElement {
               : undefined
           )}
           fill
+          small
           onChange={(e) => setLogFilterKeyword((e.target as HTMLInputElement).value)}
         />
         <LogLevelSelect
@@ -102,6 +107,15 @@ function LogPage(): React.ReactElement {
           checked={autoScroll}
           onChange={(e) => setAutoScroll((e.target as HTMLInputElement).checked)}
         />
+        <Button
+          icon="share"
+          intent="primary"
+          minimal
+          small
+          onClick={() => invoke('open_log_folder')}
+        >
+          Open log folder
+        </Button>
       </ConsoleActions>
       <ConsoleContainer ref={consoleRef}>
         <Console
@@ -129,7 +143,7 @@ const ConsoleContainer = styled.section`
 `;
 
 const ConsoleActions = styled(ControlGroup)`
-  padding: 3px;
+  padding: 0 2px;
   background-color: ${Colors.DARK_GRAY3};
   align-items: center;
 `;
@@ -145,7 +159,7 @@ function convertLogEntryToMessage(entry: logger.LogEntry): ConsoleMessage {
     id: String(entry.id),
     method: LOG_LEVEL_TO_METHOD_MAP[entry.level],
     timestamp: getTimestampString(entry.timestamp),
-    data: [`[${entry.target}]`, entry.fields.message + Math.random()],
+    data: [`[${entry.target}]`, entry.fields.message],
   };
 }
 
