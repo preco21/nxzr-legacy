@@ -8,6 +8,8 @@
 - [nxzr_device](./nxzr_device/): Device and transport modules for working with unix sockets
 - [nxzr_server](./nxzr_server/): Server daemon application that runs on the guest side
 - [nxzr_gui](./nxzr_gui/): Host GUI application that interacts with `nxzr_server`
+- [nxzr_shared](./nxzr_shared/): Shared utilities across the project
+- [nxzr_proto](./nxzr_proto/): The gRPC IDLs
 
 ## Troubleshooting
 
