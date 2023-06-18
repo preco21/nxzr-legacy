@@ -1,9 +1,13 @@
 [package]
 name = "nxzr_shared"
-version = "0.1.0"
+version = { workspace = true }
+description = "NXZR Project: Shared utilities across the project"
+readme = "README.md"
+authors = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+publish = false
 
 [dependencies]
 async-trait = "0.1.68"
