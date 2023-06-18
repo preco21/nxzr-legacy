@@ -12,7 +12,7 @@ pub enum SessionError {
     #[error("control/interrupt socket address must match with each other")]
     CtlItrSocketAddrMismatch,
     #[error(
-        "failed to bind the target address, make sure that no `input` plugin enabled for bluetooth: {0}"
+        "failed to bind the target address, make sure that no `input` plugin enabled for Bluetooth: {0}"
     )]
     BindFailed(std::io::Error),
     #[error("internal error: {0}")]

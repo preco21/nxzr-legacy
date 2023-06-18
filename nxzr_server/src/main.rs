@@ -44,15 +44,21 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::Layer::default().event_format(event_format));
     tracing::subscriber::set_global_default(subscriber)?;
 
-    // Check for system requirements.
-    system::check_privileges().await?;
-    system::check_system_requirements().await?;
-
     // Run CLI.
     let args = Cli::parse();
     match args.command {
-        Cmd::Run => run(signal::ctrl_c()).await?,
-        Cmd::Check => {}
+        Cmd::Run => {
+            // Checks for system requirements.
+            system::check_privileges().await?;
+            system::check_system_requirements().await?;
+            // Then, runs the actual service.
+            run(signal::ctrl_c()).await?
+        }
+        Cmd::Check => {
+            // Checks for system requirements only, then exits.
+            system::check_privileges().await?;
+            system::check_system_requirements().await?;
+        }
     }
 
     Ok(())

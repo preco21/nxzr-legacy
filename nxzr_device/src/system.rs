@@ -6,6 +6,8 @@ use tokio::{process::Command, time::error::Elapsed};
 pub enum SysCheckError {
     #[error("privilege error, this program is required to run as root user")]
     RootPrivilegeRequired,
+    #[error("failed to check Bluetooth service, possibly the driver for Bluetooth is not loaded")]
+    BluetoothNotAvailable,
     #[error("cli tool presence check failed: {0}")]
     CliToolFailed(String),
 }
@@ -19,6 +21,12 @@ pub async fn check_privileges() -> Result<(), SysCheckError> {
 }
 
 pub async fn check_system_requirements() -> Result<(), SysCheckError> {
+    // Check Bluetooth service is available.
+    //
+    // This will fail if there's no Kernel support for the Bluetooth drivers. Which essentially leads the Bluetooth service to crash.
+    check_bluetooth_service()
+        .await
+        .map_err(|_| SysCheckError::BluetoothNotAvailable)?;
     // Check if `hciconfig` exists.
     //
     // This will be used to manipulate HCI settings like MAC address, device classes, etc...
@@ -94,8 +102,20 @@ pub(crate) async fn set_device_class(
 }
 
 #[tracing::instrument(target = "system")]
+pub async fn check_bluetooth_service() -> Result<(), SystemCommandError> {
+    tracing::info!("checking if Bluetooth service available");
+    run_system_command({
+        let mut cmd = Command::new("service");
+        cmd.args(&["bluetooth", "status"]);
+        cmd
+    })
+    .await?;
+    Ok(())
+}
+
+#[tracing::instrument(target = "system")]
 pub async fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
-    tracing::info!("attempting to restart bluetooth service");
+    tracing::info!("attempting to restart Bluetooth service");
     run_system_command({
         let mut cmd = Command::new("service");
         cmd.args(&["bluetooth", "restart"]);

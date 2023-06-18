@@ -30,4 +30,4 @@ nxzr_device = { path = "../nxzr_device" }
 nxzr_proto = { path = "../nxzr_proto" }
 tokio-util = "0.7.8"
 prost-types = "0.11.9"
-clap = "4.3.4"
+clap = { version = "4.3.4", features = ["derive"] }
