@@ -78,7 +78,7 @@ pub(crate) async fn set_device_class(
     adapter_name: &str,
     class: u32,
 ) -> Result<u32, SystemCommandError> {
-    let class_str = format!("0x{:X}", class).as_str();
+    let class_str = format!("0x{:X}", class);
     tracing::info!(
         "setting device class of adapter {:?} to {:?}.",
         adapter_name,
@@ -86,7 +86,7 @@ pub(crate) async fn set_device_class(
     );
     run_system_command({
         let mut cmd = Command::new("hciconfig");
-        cmd.args(&[adapter_name, "class", class_str]);
+        cmd.args(&[adapter_name, "class", class_str.as_str()]);
         cmd
     })
     .await?;
