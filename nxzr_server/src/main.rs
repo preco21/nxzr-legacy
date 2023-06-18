@@ -1,4 +1,5 @@
 use anyhow::Ok;
+use clap::{Parser, Subcommand};
 use nxzr_device::{
     device::{self, DeviceConfig},
     system,
@@ -11,6 +12,21 @@ use tracing_subscriber::prelude::*;
 
 mod controller;
 mod service;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// Run server daemon
+    Run,
+    /// Run system integrity check
+    Check,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -32,7 +48,12 @@ async fn main() -> anyhow::Result<()> {
     system::check_privileges().await?;
     system::check_system_requirements().await?;
 
-    run(signal::ctrl_c()).await?;
+    // Run CLI.
+    let args = Cli::parse();
+    match args.command {
+        Cmd::Run => run(signal::ctrl_c()).await?,
+        Cmd::Check => {}
+    }
 
     Ok(())
 }
