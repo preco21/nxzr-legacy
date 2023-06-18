@@ -27,3 +27,6 @@ lerna-debug.log*
 # Build output
 dist
 dist-ssr
+
+# Resources
+resources/

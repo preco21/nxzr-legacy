@@ -12,6 +12,21 @@ Please take a look https://tauri.app/v1/guides/getting-started/prerequisites for
 yarn
 ```
 
+## Providing external resources
+
+The program requires external binaries of a ready-to-use WSL kernel, distribution and `nxzr_server` binary.
+
+You can find and download each WSL-related pre-built resource from GitHub Releases here: https://github.com/preco21/nxzr/releases/tag/nxzr-helper
+
+- `nxzr-bzImage`
+- `nxzr-agent.tar`
+
+And you will need to manually build the `nxzr_server` from this repository by cloning it. It's located at `nxzr_server` folder from the root.
+
+After building, the executable binary can be obtained from `target/` folder.
+
+- `nxzr_server`
+
 ## Building
 
 You can build this project by choosing either of following options:
