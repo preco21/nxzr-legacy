@@ -1,4 +1,8 @@
 use thiserror::Error;
+use tokio::{
+    fs::File,
+    io::{AsyncBufReadExt, BufReader},
+};
 
 use crate::{config, util};
 
@@ -28,15 +32,24 @@ pub async fn check_installed() -> Result<(), InstallerError> {
     .await
     .map_err(|_err| InstallerError::WslNotAvailable)?;
     // 2. Checks if `.wslconfig` is properly configured in the user folder.
-    let user_dir = directories::UserDirs::new()
+    let wslconfig_dir = directories::UserDirs::new()
         .ok_or(InstallerError::WslConfigResolveFailed)?
         .home_dir()
         .join("./.wslconfig");
-    if !util::file_exists(user_dir.as_path()).await {
+    if !util::file_exists(wslconfig_dir.as_path()).await {
         return Err(InstallerError::WslConfigResolveFailed);
     };
+    // FIXME: use ini parser?
+    // extract to function
+    let wslconfig_file = File::open(wslconfig_dir).await?;
+    let reader = BufReader::new(wslconfig_file);
+    let mut lines = reader.lines();
+    while let Some(line) = lines.next_line().await? {
+        if line.contains("usbipd") {}
+    }
     // FIXME: check if wslconfig has pattern
-    let wsl_config = util::read_file(user_dir.as_path()).await?;
+
+    let wsl_config = util::read_file(wslconfig_dir.as_path()).await?;
 
     // 3. Checks if `usbipd` is available.
     util::run_system_command({
