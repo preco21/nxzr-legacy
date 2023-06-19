@@ -28,6 +28,13 @@ pub async fn directory_exists<P: AsRef<Path> + ?Sized>(path: &P) -> bool {
     }
 }
 
+pub async fn file_exists<P: AsRef<Path> + ?Sized>(path: &P) -> bool {
+    match fs::metadata(path).await {
+        Ok(metadata) => metadata.is_file(),
+        Err(_) => false,
+    }
+}
+
 pub async fn mkdir_p<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     if let Err(e) = fs::create_dir_all(path).await {
         if e.kind() != io::ErrorKind::AlreadyExists {

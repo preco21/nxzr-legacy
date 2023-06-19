@@ -41,6 +41,7 @@ async-trait = "0.1.68"
 nxzr_shared = { version = "0.1.0", path = "../../nxzr_shared" }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tempfile = "3.6.0"
+wslapi = "0.1.3"
 
 [target.'cfg(windows)'.build-dependencies]
 tauri-build = { version = "1.3", features = [] }

@@ -12,6 +12,7 @@ use util::SystemCommandError;
 
 mod commands;
 mod config;
+mod installer;
 mod state;
 mod util;
 
