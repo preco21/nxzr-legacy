@@ -34,7 +34,9 @@
         "icons/icon.ico"
       ],
       "resources": [
-        "resources/*"
+        "resources/nxzr-bzImage",
+        "resources/nxzr-agent.tar",
+        "resources/nxzr_server"
       ]
     },
     "security": {
