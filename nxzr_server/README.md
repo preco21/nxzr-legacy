@@ -21,3 +21,26 @@ apt install libdbus-1-dev pkg-config
 ```shell
 cargo build
 ```
+
+## Topics
+
+### Pulling out a binary out of WSL
+
+When you are building a binary from WSL environment, you will want to pull the binary out in order to put it in the GUI application.
+
+You can use [wslu](https://wslutiliti.es/) to make things easy for working between Windows and WSL such as moving files, etc...
+
+Assuming you are on Ubuntu, to install `wslu`:
+
+```shell
+sudo add-apt-repository ppa:wslutilities/wslu
+sudo apt update
+sudo apt install wslu
+```
+
+After building, you can use this command to pull the binary out of the `target` folder, moves to the Windows.
+
+```shell
+mkdir -p "$(wslpath $(wslvar USERPROFILE))/.nxzr-out"
+cp ../target/release/nxzr_server "$(wslpath $(wslvar USERPROFILE))/.nxzr-out"
+```
