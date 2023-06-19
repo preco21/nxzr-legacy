@@ -103,6 +103,7 @@ pub struct GetAppDirsResponse {
     data_dir: String,
 }
 
+// FIXME: unused
 #[tauri::command]
 pub fn get_app_dirs() -> Result<GetAppDirsResponse, AppError> {
     let app_dirs = util::get_app_dirs().ok_or(anyhow::anyhow!("failed to resolve app dirs"))?;
@@ -120,6 +121,7 @@ pub fn get_app_dirs() -> Result<GetAppDirsResponse, AppError> {
     })
 }
 
+// FIXME: unused
 #[tauri::command]
 pub async fn reveal_in_file_explorer(path: String) -> Result<(), AppError> {
     util::run_system_command({
