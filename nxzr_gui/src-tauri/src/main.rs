@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use installer::InstallerError;
 use nxzr_shared::event::EventError;
 use state::{AppState, LoggingEvent};
 use std::{path::Path, sync::Arc};
@@ -32,6 +33,8 @@ pub enum AppError {
     EventError(#[from] EventError),
     #[error(transparent)]
     SystemCommandError(#[from] SystemCommandError),
+    #[error(transparent)]
+    InstallerError(#[from] InstallerError),
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 }
@@ -94,6 +97,9 @@ async fn main() -> anyhow::Result<()> {
             commands::get_app_dirs,
             commands::reveal_in_file_explorer,
             commands::open_log_folder,
+            commands::check_1_setup_installed,
+            commands::check_2_wslconfig,
+            commands::check_3_agent_registered,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

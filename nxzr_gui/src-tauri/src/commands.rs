@@ -1,4 +1,4 @@
-use crate::{config, state::AppState, util, AppError};
+use crate::{config, installer, state::AppState, util, AppError};
 use std::path::Path;
 use tauri::Manager;
 use tokio::process::Command;
@@ -149,5 +149,27 @@ pub async fn open_log_folder() -> Result<(), AppError> {
         cmd
     })
     .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn check_1_setup_installed() -> Result<(), AppError> {
+    installer::check_setup_installed().await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn check_2_wslconfig(handle: tauri::AppHandle) -> Result<(), AppError> {
+    let resource_path = handle
+        .path_resolver()
+        .resolve_resource(config::WSL_KERNEL_IMAGE_NAME)
+        .ok_or(anyhow::anyhow!("failed to resolve resource path"))?;
+    installer::check_wslconfig(resource_path.as_path()).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn check_3_agent_registered() -> Result<(), AppError> {
+    installer::check_agent_registered().await?;
     Ok(())
 }

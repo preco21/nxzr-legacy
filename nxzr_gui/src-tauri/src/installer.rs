@@ -23,7 +23,7 @@ pub enum InstallerError {
     Io(#[from] std::io::Error),
 }
 
-pub async fn check_setup() -> Result<(), InstallerError> {
+pub async fn check_setup_installed() -> Result<(), InstallerError> {
     // Checks if WSL is available.
     util::run_system_command({
         let mut cmd = tokio::process::Command::new("wsl.exe");
@@ -63,13 +63,14 @@ pub async fn check_wslconfig(resource_path: &Path) -> Result<(), InstallerError>
     let field_val = section
         .get("kernel")
         .ok_or(InstallerError::WslConfigMalformed)?;
-    let actual_path = resource_path.join(config::WSL_KERNEL_IMAGE_NAME);
-    println!("foobar");
-    let actual_path_val = actual_path
-        .as_path()
+    // The path to the binary must be provided by the caller itself, because it
+    // cannot be known before the program is built.
+    //
+    // So, it will be injected from Tauri's `build.rs` script.
+    let actual_path = resource_path
         .to_str()
         .ok_or(InstallerError::WslConfigMalformed)?;
-    if field_val != actual_path_val {
+    if field_val != actual_path {
         return Err(InstallerError::WslConfigFieldMismatch);
     }
     Ok(())

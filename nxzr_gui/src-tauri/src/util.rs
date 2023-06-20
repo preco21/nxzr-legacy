@@ -188,7 +188,7 @@ pub async fn run_powershell_script(
         });
         let ret = tokio::select! {
             res = handle => res.map_err(|err| err.into()).and_then(|x| x),
-            res = run_system_command({
+            _ = run_system_command({
                 let mut cmd = Command::new("powershell.exe");
                 cmd.args(&[
                     "-NonInteractive",
@@ -200,7 +200,7 @@ pub async fn run_powershell_script(
                     cmd_str.as_str(),
                 ]);
                 cmd
-            }) => res,
+            }) => Ok(()),
         };
         // Cleanup background tasks.
         drop(close_rx);
