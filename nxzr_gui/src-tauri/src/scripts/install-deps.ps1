@@ -68,26 +68,26 @@ if (!(Test-CommandAvailable -Command "winget")) {
     Exit 1
 }
 
-Write-Host "> This script will automatically install required dependencies..."
+Write-Host "[-/-] This script will automatically install required dependencies..."
 
-# Create temporary directory to work with.
+# 1. Create temporary directory to work with.
 $tempdir = New-TemporaryDirectory
-Write-Host "> Using temporary directory: $tempdir"
+Write-Host "[1/5] Using temporary directory: $tempdir"
 
-# Install WSL.
-Write-Host "> Installing the `"Windows Subsystem for Linux (WSL)`""
+# 2. Install WSL.
+Write-Host "[2/5] Installing the `"Windows Subsystem for Linux (WSL)`""
 Start-Process -FilePath "wsl.exe" -ArgumentList "--install --no-launch --web-download --no-distribution" -Wait -NoNewWindow
 # Start-Process -FilePath "winget.exe" -ArgumentList "install --source msstore --disable-interactivity --accept-source-agreements --accept-package-agreements `"Windows Subsystem for Linux`"" -Wait -NoNewWindow
 
-# Enable "Virtual Machine Platform" support.
-Write-Host "> Enabling `"Virtual Machine Platform`" component"
+# 3. Enable "Virtual Machine Platform" support.
+Write-Host "[3/5] Enabling `"Virtual Machine Platform`" component"
 Start-Process -FilePath "dism.exe" -ArgumentList "/online /enable-feature /featurename:VirtualMachinePlatform /all /norestart" -Wait -NoNewWindow
 
-# Check if there's any updates from WSL.
-Write-Host "> Checking for the `"Windows Subsystem for Linux (WSL)`" updates"
+# 4. Check if there's any updates from WSL.
+Write-Host "[4/5] Checking for the `"Windows Subsystem for Linux (WSL)`" updates"
 Start-Process -FilePath "wsl.exe" -ArgumentList "--update --web-download" -Wait -NoNewWindow
 
-# Install `usbipd-win`.
-Write-Host "> Installing `"usbipd-win`""
+# 5. Install `usbipd-win`.
+Write-Host "[5/5] Installing `"usbipd-win`""
 $usbipd_bin = Get-LatestGitHubReleaseBinary -Repo "dorssel/usbipd-win" -Dir $tempdir
 Install-Msi -FilePath $usbipd_bin

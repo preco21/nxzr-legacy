@@ -7,8 +7,6 @@ use crate::common;
 
 const INSTALL_NXZR_SCRIPT: &str = include_str!("scripts/install-nxzr.ps1");
 
-// FIXME: powershell 스크립트를 [1/5] 같이 스탭으로 받아서 PROGRESS 파싱 처리하기...
-
 #[derive(Error, Debug)]
 pub enum BootstrapError {
     #[error("setup failed")]
