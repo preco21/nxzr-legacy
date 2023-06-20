@@ -14,11 +14,13 @@ pub enum InstallerError {
     #[error("WSL configuration is malformed")]
     WslConfigMalformed,
     #[error(
-        "The field `kernel` in WSL configuration does not match with the program's resource path"
+        "the field `kernel` in WSL configuration does not match with the program's resource path"
     )]
     WslConfigFieldMismatch,
-    #[error("nxzr-agent is not registered as a WSL distro")]
+    #[error("the agent is not registered as a WSL distro")]
     AgentNotRegistered,
+    #[error("the agent is not properly configured to work with WSL 2")]
+    AgentWslVersionMismatch,
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -82,9 +84,22 @@ pub async fn check_agent_registered() -> Result<(), InstallerError> {
     if !wsl.is_distribution_registered(config::WSL_AGENT_NAME) {
         return Err(InstallerError::AgentNotRegistered);
     }
+    // Checks for the distro's WSL version.
+    let conf = wsl
+        .get_distribution_configuration(config::WSL_AGENT_NAME)
+        .map_err(|_err| InstallerError::AgentNotRegistered)?;
+    if conf.version != 2 {
+        return Err(InstallerError::AgentWslVersionMismatch);
+    }
     Ok(())
 }
 
-pub async fn install() {}
+/// These scripts are responsible for checking / installing infrastructures and
+/// system requirements that is required to run NXZR for the current system.
+pub async fn install_setup() {}
+
+pub async fn ensure_wslconfig() {}
+
+pub async fn register_agent() {}
 
 pub async fn restart_wsl() {}
