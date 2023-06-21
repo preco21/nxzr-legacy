@@ -587,6 +587,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "command-group"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5080df6b0f0ecb76cab30808f00d937ba725cebe266a3da8cd89dff92f2a9916"
+dependencies = [
+ "async-trait",
+ "nix 0.26.2",
+ "tokio",
+ "winapi",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2330,6 +2342,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "command-group",
  "directories",
  "nxzr_shared",
  "ringbuf",

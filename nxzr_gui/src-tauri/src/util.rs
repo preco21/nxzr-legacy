@@ -1,4 +1,5 @@
 use crate::config;
+use command_group::{AsyncCommandGroup, AsyncGroupChild};
 use std::{
     io::{self, SeekFrom},
     path::Path,
@@ -10,7 +11,7 @@ use thiserror::Error;
 use tokio::{
     fs::{self, File},
     io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader},
-    process::{Child, ChildStderr, ChildStdout, Command},
+    process::{ChildStderr, ChildStdout, Command},
     sync::mpsc,
     task::JoinError,
     time,
@@ -90,15 +91,24 @@ pub async fn run_system_command(mut command: Command) -> Result<String, SystemCo
 
 pub async fn spawn_system_command(
     mut command: Command,
-) -> Result<(Child, BufReader<ChildStdout>, BufReader<ChildStderr>), SystemCommandError> {
+) -> Result<
+    (
+        AsyncGroupChild,
+        BufReader<ChildStdout>,
+        BufReader<ChildStderr>,
+    ),
+    SystemCommandError,
+> {
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
-    let mut child = command.spawn()?;
+    let mut child = command.group_spawn()?;
     let stdout = child
+        .inner()
         .stdout
         .take()
         .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stdout".to_string()))?;
     let stderr = child
+        .inner()
         .stderr
         .take()
         .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stderr".to_string()))?;
