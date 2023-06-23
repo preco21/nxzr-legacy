@@ -134,7 +134,7 @@ pub async fn reveal_in_file_explorer(path: String) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub async fn open_log_folder() -> Result<(), AppError> {
+pub async fn reveal_log_folder() -> Result<(), AppError> {
     let app_dirs = util::get_app_dirs().ok_or(anyhow::anyhow!("failed to resolve app dirs"))?;
     let dir = app_dirs
         .data_dir()
@@ -142,13 +142,15 @@ pub async fn open_log_folder() -> Result<(), AppError> {
         .to_str()
         .ok_or(anyhow::anyhow!("failed to resolve app dirs"))?
         .to_string();
-    tracing::info!("dir: {}", &dir);
-    util::run_system_command({
+    tracing::info!("opening log dir: {}", &dir);
+    // Ignore errors when calling `explorer.exe` because it sometimes fails even
+    // when the actual operation is success.
+    let _ = util::run_system_command({
         let mut cmd = Command::new("explorer.exe");
         cmd.args(&[&dir]);
         cmd
     })
-    .await?;
+    .await;
     Ok(())
 }
 

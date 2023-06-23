@@ -10,7 +10,7 @@ export interface MainContainerProps {
 export function MainContainer(props: MainContainerProps): React.ReactElement {
   const { className, children } = props;
   return (
-    <Main className={classNames('container', 'bp4-dark', className)}>
+    <Main className={classNames('container', 'bp5-dark', className)}>
       {children}
     </Main>
   );

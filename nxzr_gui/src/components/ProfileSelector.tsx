@@ -4,25 +4,25 @@ import { Button, Divider, HTMLSelect, InputGroup } from '@blueprintjs/core';
 
 export interface ProfileSelectorProps {
   className?: string;
-  children?: React.ReactNode;
+  disabled?: boolean;
 }
 
 export function ProfileSelector(props: ProfileSelectorProps): React.ReactElement {
-  const { className, children } = props;
+  const { className, disabled } = props;
   return (
     <Container className={className}>
       <Row>
-        <HTMLSelect options={[{ value: 'foobar', label: '프로필1' }]} />
+        <HTMLSelect options={[{ value: 'foobar', label: '프로필1' }]} disabled={disabled} />
         <Divider />
         <ActionButtons>
-          <Button icon="plus" minimal small />
-          <Button icon="annotation" minimal small />
-          <Button icon="trash" minimal small />
-          <Button icon="duplicate" minimal small />
+          <Button icon="plus" disabled={disabled} minimal small />
+          <Button icon="annotation" disabled={disabled} minimal small />
+          <Button icon="trash" disabled={disabled} minimal small />
+          <Button icon="duplicate" disabled={disabled} minimal small />
         </ActionButtons>
       </Row>
       <Row>
-        <InputGroup placeholder="Ctrl + Shift + 1" />
+        <InputGroup placeholder="Ctrl + Shift + 1" disabled={disabled} />
       </Row>
     </Container>
   );

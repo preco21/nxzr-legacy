@@ -16,12 +16,12 @@ function AppPage(): React.ReactElement {
   return (
     <MainContainer>
       <TitleBar />
-      <Header />
+      <Header disabled={!setupGuard.ready} />
       {!setupGuard.ready && (
         <Setup
+          steps={setupGuard.steps}
           loading={setupGuard.pending}
-          title={setupGuard?.currentStep?.name}
-          description={setupGuard?.currentStep?.description}
+          ready={setupGuard.ready}
         />
       )}
       {setupGuard.ready && (

@@ -12,7 +12,7 @@ interface SetupStep {
 
 const SETUP_STEPS: SetupStep[] = [
   {
-    name: 'Program Setup',
+    name: 'WSL & Program Requirements',
     description: 'This step will install all the necessary components of the program on your computer.',
     rebootRequired: true,
     check: async () => invoke('check_1_setup_installed'),

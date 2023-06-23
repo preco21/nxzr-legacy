@@ -96,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
             commands::subscribe_logging,
             commands::get_app_dirs,
             commands::reveal_in_file_explorer,
-            commands::open_log_folder,
+            commands::reveal_log_folder,
             commands::check_1_setup_installed,
             commands::check_2_wslconfig,
             commands::check_3_agent_registered,

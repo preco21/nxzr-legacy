@@ -6,13 +6,14 @@ import { ProfileSelector } from './ProfileSelector';
 
 export interface HeaderProps {
   className?: string;
+  disabled?: boolean;
 }
 
 export function Header(props: HeaderProps): React.ReactElement {
-  const { className } = props;
+  const { className, disabled } = props;
   return (
     <Container className={className}>
-      <ProfileSelector />
+      <ProfileSelector disabled={disabled} />
       <RightActions>
         <Button
           icon="console"
@@ -21,7 +22,7 @@ export function Header(props: HeaderProps): React.ReactElement {
             await invoke('open_log_window');
           }}
         />
-        <Button icon="cog" minimal />
+        <Button icon="cog" disabled={disabled} minimal />
       </RightActions>
     </Container>
   );

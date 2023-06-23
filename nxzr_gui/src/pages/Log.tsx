@@ -109,7 +109,7 @@ function LogPage(): React.ReactElement {
           intent="primary"
           minimal
           small
-          onClick={() => invoke('open_log_folder')}
+          onClick={() => invoke('reveal_log_folder')}
         >
           Open log folder
         </Button>
