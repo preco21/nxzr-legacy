@@ -9,10 +9,11 @@ export interface SetupProps {
   steps: StepDisplay[];
   loading: boolean;
   ready: boolean;
+  onInstall: () => void;
 }
 
 export function Setup(props: SetupProps): React.ReactElement {
-  const { className, steps, loading, ready } = props;
+  const { className, steps, loading, ready, onInstall } = props;
   const [title, description] = buildStatusText(loading, ready);
   return (
     <Container className={className}>
@@ -22,18 +23,25 @@ export function Setup(props: SetupProps): React.ReactElement {
         description={(
           <>
             <span>{description}</span>
-            {!loading && (
-              <StatusDisplay title="Check status">
-                {steps.map((step, index) => (
-                  <StepStatus key={index} stepDisplay={step} />
-                ))}
-              </StatusDisplay>
-            )}
+            <StatusDisplay title="Check status">
+              {steps.map((step, index) => (
+                <StepStatus key={index} stepDisplay={step} />
+              ))}
+            </StatusDisplay>
           </>
         )}
         action={(
           <>
-            {!loading && !ready && <Button icon="archive" intent="success" large>Install</Button>}
+            {!loading && !ready && (
+              <Button
+                icon="archive"
+                intent="success"
+                large
+                onClick={onInstall}
+              >
+                Install
+              </Button>
+            )}
           </>
         )}
       />

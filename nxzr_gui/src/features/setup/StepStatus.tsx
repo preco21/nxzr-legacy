@@ -6,7 +6,7 @@ import { StepDisplay } from './useSetupGuard';
 const STEP_STATUS_VISUAL_MAP = {
   none: {
     intent: 'none',
-    icon: 'chevron-backward',
+    icon: 'ban-circle',
     text: '-',
   },
   wait: {
@@ -16,7 +16,7 @@ const STEP_STATUS_VISUAL_MAP = {
   },
   check: {
     intent: 'warning',
-    icon: 'chevron-backward',
+    icon: 'history',
     text: 'Checking...',
   },
   checkFailed: {
@@ -26,7 +26,7 @@ const STEP_STATUS_VISUAL_MAP = {
   },
   install: {
     intent: 'warning',
-    icon: 'add',
+    icon: 'download',
     text: 'Installing...',
   },
   installFailed: {
@@ -38,6 +38,11 @@ const STEP_STATUS_VISUAL_MAP = {
     intent: 'success',
     icon: 'tick-circle',
     text: 'Ready',
+  },
+  rebootRequired: {
+    intent: 'warning',
+    icon: 'refresh',
+    text: 'Reboot required',
   },
   skipped: {
     intent: 'none',
@@ -67,7 +72,7 @@ export function StepStatus(props: StepStatusProps): React.ReactElement {
         fill
       >
         <InnerTagContainer>
-          {desiredStatus.text}:
+          {desiredStatus.text}
         </InnerTagContainer>
         {' '}
         {stepDisplay.name}
@@ -87,6 +92,6 @@ const StatusTag = styled(Tag)`
 const InnerTagContainer = styled.div`
   display: inline-flex;
   flex: 1;
-  min-width: 100px;
+  min-width: 105px;
   margin: 0 2px;
 `;
