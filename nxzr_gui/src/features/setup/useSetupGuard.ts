@@ -39,7 +39,7 @@ export interface UseSetupGuardOptions {
   onCheckError?: (error: Error) => void;
   onInstallComplete?: () => void;
   onInstallError?: (error: Error) => void;
-  onRebootRequest: () => void;
+  onRebootRequest?: () => void;
 }
 
 export interface UseSetupGuardState {
@@ -57,16 +57,14 @@ export interface UseSetupGuard {
   currentStep?: StepDisplay;
   outputSink: string[];
   performCheck: () => void;
-  // performInstall: () => void;
+  performInstall: () => void;
 }
 
 export interface StepDisplay {
   name: string;
   description: string;
   rebootRequired: boolean;
-  checkStatus: 'none' | 'wait' | 'check' | 'ready' | 'error' | 'aborted';
-  installRequested: boolean;
-  installStatus?: 'wait' | 'install' | 'ready' | 'error' | 'aborted';
+  status: 'none' | 'wait' | 'check' | 'checkFailed' | 'install' | 'installFailed' | 'ready' | 'skipped';
   error?: Error;
 }
 
@@ -78,9 +76,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
       name: step.name,
       description: step.description,
       rebootRequired: step.rebootRequired ?? false,
-      checkStatus: 'none',
-      installRequested: false,
-      installStatus: undefined,
+      status: 'none',
       error: undefined,
     })),
     currentStepIndex: undefined,
@@ -93,7 +89,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = true;
       for (const step of draft.steps) {
-        step.checkStatus = 'wait';
+        step.status = 'wait';
         step.error = undefined;
       }
       draft.currentStepIndex = undefined;
@@ -104,84 +100,89 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
       try {
         if (aborted) {
           setState((prevState) => produce(prevState, (draft) => {
-            draft.steps[index]!.checkStatus = 'aborted';
+            draft.steps[index]!.status = 'skipped';
           }));
           continue;
         }
         setState((prevState) => produce(prevState, (draft) => {
           draft.currentStepIndex = index;
-          draft.steps[index]!.checkStatus = 'check';
+          draft.steps[index]!.status = 'check';
         }));
         await step.check();
         setState((prevState) => produce(prevState, (draft) => {
-          draft.steps[index]!.checkStatus = 'ready';
+          draft.steps[index]!.status = 'ready';
         }));
       } catch (err) {
         aborted = true;
         setState((prevState) => produce(prevState, (draft) => {
-          draft.steps[index]!.checkStatus = 'error';
+          draft.steps[index]!.status = 'checkFailed';
           draft.steps[index]!.error = err as Error;
         }));
       }
     }
     setState((prevState) => ({ ...prevState, pending: false, ready: !aborted }));
   }, [state.pending]);
-  // const process = useCallback(async () => {
-  //   if (state.pending) {
-  //     return;
-  //   }
-  //   setState((prevState) => produce(prevState, (draft) => {
-  //     draft.pending = true;
-  //     for (const step of draft.steps) {
-  //       step.checkStatus = 'wait';
-  //       step.error = undefined;
-  //     }
-  //     draft.currentStepIndex = undefined;
-  //     draft.outputSink = [];
-  //   }));
-  //   let aborted = false;
-  //   for (const [index, step] of SETUP_STEPS.entries()) {
-  //     try {
-  //       if (aborted) {
-  //         setState((prevState) => produce(prevState, (draft) => {
-  //           draft.steps[index]!.checkStatus = 'aborted';
-  //         }));
-  //         continue;
-  //       }
-  //       setState((prevState) => produce(prevState, (draft) => {
-  //         draft.currentStepIndex = index;
-  //         draft.steps[index]!.checkStatus = 'check';
-  //       }));
-  //       await step.check();
-  //       setState((prevState) => produce(prevState, (draft) => {
-  //         draft.steps[index]!.checkStatus = 'ready';
-  //       }));
-  //     } catch (err) {
-  //       try {
-  //         setState((prevState) => produce(prevState, (draft) => {
-  //           draft.steps[index]!.checkStatus = 'install';
-  //         }));
-  //         await step.install();
-  //       } catch (err2) {
-  //         aborted = true;
-  //         setState((prevState) => produce(prevState, (draft) => {
-  //           draft.steps[index]!.checkStatus = 'installFailed';
-  //           draft.steps[index]!.error = err2 as Error;
-  //         }));
-  //       }
-  //       // FIXME: if check failed, try install and set status?
-  //       // if install success, and if it requires restart, set current step restarted required, set other steps "aborted"
-  //     }
-  //   }
-  //   setState((prevState) => ({ ...prevState, pending: false, ready: !aborted }));
-  // }, [state.pending]);
+  const performInstall = useCallback(async () => {
+    if (state.pending) {
+      return;
+    }
+    setState((prevState) => produce(prevState, (draft) => {
+      draft.pending = true;
+      for (const step of draft.steps) {
+        step.status = 'wait';
+        step.error = undefined;
+      }
+      draft.currentStepIndex = undefined;
+      draft.outputSink = [];
+    }));
+    let aborted = false;
+    for (const [index, step] of SETUP_STEPS.entries()) {
+      try {
+        if (aborted) {
+          setState((prevState) => produce(prevState, (draft) => {
+            draft.steps[index]!.status = 'skipped';
+          }));
+          continue;
+        }
+        setState((prevState) => produce(prevState, (draft) => {
+          draft.currentStepIndex = index;
+          draft.steps[index]!.status = 'check';
+        }));
+        await step.check();
+        setState((prevState) => produce(prevState, (draft) => {
+          draft.steps[index]!.status = 'ready';
+        }));
+      } catch {
+        try {
+          setState((prevState) => produce(prevState, (draft) => {
+            draft.steps[index]!.status = 'install';
+          }));
+          await step.install();
+          if (step.rebootRequired) {
+            aborted = true;
+            setState((prevState) => produce(prevState, (draft) => {
+              draft.steps[index]!.status = 'ready';
+            }));
+            options?.onRebootRequest?.();
+          }
+        } catch (err) {
+          aborted = true;
+          setState((prevState) => produce(prevState, (draft) => {
+            draft.steps[index]!.status = 'installFailed';
+            draft.steps[index]!.error = err as Error;
+          }));
+        }
+      }
+    }
+    setState((prevState) => ({ ...prevState, pending: false, ready: !aborted }));
+  }, [state.pending]);
   const value = useMemo(() => ({
     ...state,
     currentStep: state.currentStepIndex != null
       ? state.steps[state.currentStepIndex]
       : undefined,
     performCheck,
-    // performInstall: process,
+    performInstall,
   }), [state, performCheck]);
   useEffect(() => {
     // FIXME: subscribe event for output sink

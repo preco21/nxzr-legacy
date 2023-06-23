@@ -10,6 +10,7 @@ function AppPage(): React.ReactElement {
   const setupGuard = useSetupGuard();
   console.log(setupGuard);
   useEffect(() => {
+    // Run a program check at initial render.
     setupGuard.performCheck();
   }, []);
   return (
@@ -22,6 +23,9 @@ function AppPage(): React.ReactElement {
           title={setupGuard?.currentStep?.name}
           description={setupGuard?.currentStep?.description}
         />
+      )}
+      {setupGuard.ready && (
+        <div>hooray!</div>
       )}
     </MainContainer>
   );
