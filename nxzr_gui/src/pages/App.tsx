@@ -4,8 +4,10 @@ import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
 import { Setup } from '../features/setup/Setup';
-import { useSetupGuard } from '../features/setup/useSetupGuard';
+import { StepDisplay, useSetupGuard } from '../features/setup/useSetupGuard';
 import { RebootAlert } from '../features/setup/RebootAlert';
+
+const FAILURE_STATUS: StepDisplay['status'][] = ['checkFailed', 'installFailed'];
 
 function AppPage(): React.ReactElement {
   const [rebootRequested, setRebootRequested] = useState(false);
@@ -14,6 +16,7 @@ function AppPage(): React.ReactElement {
       setRebootRequested(true);
     }, []),
   });
+  const firstError = setupGuard.steps.find((step) => FAILURE_STATUS.includes(step.status));
   useEffect(() => {
     // Run a program check at initial render.
     setupGuard.performCheck();
@@ -27,6 +30,8 @@ function AppPage(): React.ReactElement {
           steps={setupGuard.steps}
           loading={setupGuard.pending}
           ready={setupGuard.ready}
+          error={firstError?.error?.message}
+          outputSink={[]}
           onInstall={() => setupGuard.performInstall()}
         />
       )}
