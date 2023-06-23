@@ -13,7 +13,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader},
     process::{ChildStderr, ChildStdout, Command},
     sync::mpsc,
-    task::JoinError,
+    task::{JoinError, JoinSet},
     time,
 };
 use tracing_subscriber::fmt::MakeWriter;
@@ -106,22 +106,33 @@ pub async fn spawn_system_command(
         .inner()
         .stdout
         .take()
-        .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stdout".to_string()))?;
+        .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stdout".into()))?;
     let stderr = child
         .inner()
         .stderr
         .take()
-        .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stderr".to_string()))?;
+        .ok_or_else(|| SystemCommandError::CommandFailed("failed to get stderr".into()))?;
     let stdout_reader = BufReader::new(stdout);
     let stderr_reader = BufReader::new(stderr);
     Ok((child, stdout_reader, stderr_reader))
+}
+
+pub struct RunPowershellScriptHandle {
+    _close_rx: mpsc::Receiver<()>,
+    _temp_dir_handle: TempDir,
 }
 
 pub async fn run_powershell_script(
     script: &str,
     args: Option<Vec<String>>,
     privileged: bool,
-) -> Result<(), SystemCommandError> {
+) -> Result<
+    (
+        mpsc::UnboundedReceiver<Result<String, SystemCommandError>>,
+        RunPowershellScriptHandle,
+    ),
+    SystemCommandError,
+> {
     // Create a file from embedded install script to temp directory.
     let dir = TempDir::new()?;
     if privileged {
@@ -133,7 +144,7 @@ pub async fn run_powershell_script(
         // then the program continuously reads it until the script finishes.
         let log_path = dir.path().join("output.txt");
         let log_path_str = log_path.to_str().ok_or_else(|| {
-            SystemCommandError::CommandFailed("failed to convert log file path".to_string())
+            SystemCommandError::CommandFailed("failed to convert log file path".into())
         })?;
         #[rustfmt::skip]
         let wrapped_script = trim_string_whitespace(format!(r#"
@@ -144,9 +155,7 @@ pub async fn run_powershell_script(
         let wrapper_script_path = dir.path().join("script-runas.ps1");
         create_file_from_raw_bytes(&wrapper_script_path, wrapped_script.as_bytes()).await?;
         let wrapped_path_str = wrapper_script_path.to_str().ok_or_else(|| {
-            SystemCommandError::CommandFailed(
-                "failed to convert wrapper script file path".to_string(),
-            )
+            SystemCommandError::CommandFailed("failed to convert wrapper script file path".into())
         })?;
         tracing::info!(
             "running PowerShell script temporarily created at: {}",
@@ -154,51 +163,38 @@ pub async fn run_powershell_script(
         );
         let joined_args = match args {
             Some(args) => format!(" {}", args.join(" ")),
-            None => "".to_string(),
+            None => "".into(),
         };
+        tracing::info!("joined args: {}", joined_args);
         let cmd_str = format!(
             "$p = Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{wrapped_path_str}\"{joined_args}' -Wait -Verb RunAs -WindowStyle Hidden -PassThru; if ($p.ExitCode -ne 0) {{ throw \"process exited with non-zero status code\" }}"
         );
         // Touch the log file.
         File::create(&log_path).await?;
         // Spawn a task to observe logs.
+        let (out_tx, out_rx) = mpsc::unbounded_channel();
         let (close_tx, close_rx) = mpsc::channel::<()>(1);
-        let handle = tokio::spawn(async move {
-            let mut bytes: Vec<u8> = vec![];
-            let mut position: usize = 0;
-            loop {
-                tokio::select! {
-                    res = async {
-                        // HACK: In Windows, it seems a file does not read from
-                        // the most latest changes when reusing the file handle
-                        // that is already open.
-                        //
-                        // So, here we are just re-opening a file every loop
-                        // round as a hack.
-                        //
-                        // For performance and resource implications, this
-                        // function will only be called for the setup, so it
-                        // will be just fine for the case.
-                        let mut log_file = File::open(&log_path).await?;
-                        log_file.seek(SeekFrom::Start(position as u64)).await?;
-                        bytes.truncate(0);
-                        position += log_file.read_to_end(&mut bytes).await?;
-                        let content = String::from_utf8_lossy(&bytes[..]);
-                        // FIXME: to return stream + handle instead
-                        if !content.is_empty() {
-                            print!("{}", content);
-                        }
-                        time::sleep(time::Duration::from_millis(400)).await;
-                        Ok::<(), SystemCommandError>(())
-                    } => res?,
-                    _ = close_tx.closed() => break,
+        let mut set: JoinSet<Result<(), SystemCommandError>> = JoinSet::new();
+        set.spawn({
+            let out_tx = out_tx.clone();
+            async move {
+                let mut bytes: Vec<u8> = vec![];
+                let mut position: usize = 0;
+                loop {
+                    let mut log_file = File::open(&log_path).await?;
+                    log_file.seek(SeekFrom::Start(position as u64)).await?;
+                    bytes.truncate(0);
+                    position += log_file.read_to_end(&mut bytes).await?;
+                    let content = String::from_utf8_lossy(&bytes[..]);
+                    if !content.is_empty() {
+                        let _ = out_tx.send(Ok(content.into()));
+                    }
+                    time::sleep(time::Duration::from_millis(400)).await;
                 }
             }
-            Ok::<(), SystemCommandError>(())
         });
-        let ret = tokio::select! {
-            res = handle => res.map_err(|err| err.into()).and_then(|x| x),
-            _ = run_system_command({
+        set.spawn(async move {
+            run_system_command({
                 let mut cmd = Command::new("powershell.exe");
                 cmd.args(&[
                     "-NonInteractive",
@@ -210,34 +206,70 @@ pub async fn run_powershell_script(
                     cmd_str.as_str(),
                 ]);
                 cmd
-            }) => Ok(()),
-        };
-        // Cleanup background tasks.
-        drop(close_rx);
-        ret
+            })
+            .await?;
+            Ok(())
+        });
+        tokio::spawn(async move {
+            tokio::select! {
+                Some(res) = set.join_next() => {
+                    match res {
+                        Ok(Err(err)) => { let _ = out_tx.send(Err(err)); }
+                        Err(err) => { let _ = out_tx.send(Err(err.into())); }
+                        _ => {}
+                    }
+                },
+                _ = close_tx.closed() => {},
+            }
+            tracing::info!("terminating the powershell script process.");
+            set.shutdown().await;
+        });
+        Ok((
+            out_rx,
+            RunPowershellScriptHandle {
+                _close_rx: close_rx,
+                _temp_dir_handle: dir,
+            },
+        ))
     } else {
         let script_path = dir.path().join("script.ps1");
         let script_path_str = script_path.to_str().ok_or_else(|| {
-            SystemCommandError::CommandFailed("failed to convert script file path".to_string())
+            SystemCommandError::CommandFailed("failed to convert script file path".into())
         })?;
         create_file_from_raw_bytes(&script_path, script.as_bytes()).await?;
         tracing::info!(
             "running PowerShell script temporarily created at: {}",
             script_path_str
         );
+        let mut cmd_args: Vec<String> = vec![
+            "-NonInteractive".into(),
+            "-NoLogo".into(),
+            "-NoProfile".into(),
+            "-ExecutionPolicy".into(),
+            "Bypass".into(),
+            "-File".into(),
+            script_path_str.into(),
+        ];
+        if let Some(args) = args {
+            cmd_args.extend(args);
+        }
         let mut cmd = Command::new("powershell.exe");
-        cmd.args(&[
-            "-NonInteractive",
-            "-NoLogo",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            script_path_str,
-        ]);
+        cmd.args(cmd_args);
         let (mut child, stdout_reader, stderr_reader) = spawn_system_command(cmd).await?;
         let mut combined_lines = stdout_reader.chain(stderr_reader).lines();
-        let handle = tokio::spawn(async move {
+        let (close_tx, close_rx) = mpsc::channel(1);
+        let (out_tx, out_rx) = mpsc::unbounded_channel();
+        let mut set: JoinSet<Result<(), SystemCommandError>> = JoinSet::new();
+        set.spawn({
+            let out_tx = out_tx.clone();
+            async move {
+                while let Some(line) = combined_lines.next_line().await? {
+                    let _ = out_tx.send(Ok(line));
+                }
+                Ok::<(), SystemCommandError>(())
+            }
+        });
+        set.spawn(async move {
             let status = child.wait().await?;
             if !status.success() {
                 return Err(SystemCommandError::CommandFailed(format!(
@@ -245,17 +277,32 @@ pub async fn run_powershell_script(
                     status
                         .code()
                         .map(|code| code.to_string())
-                        .unwrap_or("n/a".to_string())
+                        .unwrap_or("n/a".to_owned())
                 )));
             }
             Ok::<(), SystemCommandError>(())
         });
-        while let Some(line) = combined_lines.next_line().await? {
-            // FIXME: to return stream + handle instead of println.
-            println!("{}", line);
-        }
-        handle.await??;
-        Ok(())
+        tokio::spawn(async move {
+            tokio::select! {
+                Some(res) = set.join_next() => {
+                    match res {
+                        Ok(Err(err)) => { let _ = out_tx.send(Err(err)); }
+                        Err(err) => { let _ = out_tx.send(Err(err.into())); }
+                        _ => {}
+                    }
+                },
+                _ = close_tx.closed() => {},
+            }
+            tracing::info!("terminating the powershell script process.");
+            set.shutdown().await;
+        });
+        Ok((
+            out_rx,
+            RunPowershellScriptHandle {
+                _close_rx: close_rx,
+                _temp_dir_handle: dir,
+            },
+        ))
     }
 }
 

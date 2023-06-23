@@ -100,6 +100,9 @@ async fn main() -> anyhow::Result<()> {
             commands::check_1_setup_installed,
             commands::check_2_wslconfig,
             commands::check_3_agent_registered,
+            commands::install_1_program_setup,
+            commands::install_2_ensure_wslconfig,
+            commands::install_3_register_agent,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

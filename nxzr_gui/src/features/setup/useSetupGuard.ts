@@ -1,5 +1,6 @@
 import { produce } from 'immer';
 import { invoke } from '@tauri-apps/api/tauri';
+import { UnlistenFn, listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface SetupStep {
@@ -16,21 +17,21 @@ const SETUP_STEPS: SetupStep[] = [
     description: 'This step will install all the necessary components of the program on your computer.',
     rebootRequired: true,
     check: async () => invoke('check_1_setup_installed'),
-    install: async () => invoke('check_1_setup_installed'),
+    install: async () => invoke('install_1_program_setup'),
   },
   {
     name: 'WSL Global Configuration',
     description: 'This step will ensure that WSL is configured correctly on your computer.',
     rebootRequired: false,
     check: async () => invoke('check_2_wslconfig'),
-    install: async () => invoke('check_1_setup_installed'),
+    install: async () => invoke('install_2_ensure_wslconfig'),
   },
   {
     name: 'Agent Registration',
     description: 'This step will register the server daemon with the WSL instance.',
     rebootRequired: false,
     check: async () => invoke('check_3_agent_registered'),
-    install: async () => invoke('check_1_setup_installed'),
+    install: async () => invoke('install_3_register_agent'),
   },
 ];
 
@@ -208,7 +209,14 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     performInstall,
   }), [state, performCheck]);
   useEffect(() => {
-    // FIXME: subscribe event for output sink
+    let handle: UnlistenFn;
+    (async () => {
+      handle = await listen('install:log', (event) => {
+        // FIXME: save to output sink and display in UI
+        console.log(event);
+      });
+    })();
+    return () => handle();
   }, []);
   return value;
 }

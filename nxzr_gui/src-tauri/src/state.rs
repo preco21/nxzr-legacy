@@ -46,7 +46,7 @@ impl AppState {
         if task_handles.contains_key(task_label) {
             Err(AppError::TaskAlreadyRunning)
         } else {
-            task_handles.insert(task_label.to_string(), None);
+            task_handles.insert(task_label.into(), None);
             Ok(())
         }
     }
@@ -57,7 +57,7 @@ impl AppState {
         join_handle: task::JoinHandle<Result<(), AppError>>,
     ) {
         let mut task_handles = self.task_handles.lock().await;
-        task_handles.insert(task_label.to_string(), Some(join_handle));
+        task_handles.insert(task_label.into(), Some(join_handle));
     }
 
     pub async fn cancel_task(&self, task_label: &str) -> Result<(), AppError> {
