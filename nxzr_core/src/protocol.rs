@@ -74,7 +74,7 @@ impl Protocol {
     ) -> Result<(Self, ProtocolHandle), ProtocolError> {
         let (closing_tx, closing_rx) = mpsc::channel(1);
         let (closed_tx, closed_rx) = mpsc::channel(1);
-        let (close_signal_tx, mut close_signal_rx) = broadcast::channel(1);
+        let (sig_close_tx, mut sig_close_rx) = broadcast::channel(1);
 
         let (state_send_tx, state_send_rx) = mpsc::channel(1);
 
@@ -123,23 +123,23 @@ impl Protocol {
         let mut set = JoinSet::<Result<(), ProtocolError>>::new();
         // Setup protocol reader task
         let reader_fut = {
-            let mut close_signal_rx = close_signal_tx.subscribe();
+            let mut sig_close_rx = sig_close_tx.subscribe();
             let fut = setup_reader(inner.protocol.clone(), transport.clone());
             async move {
                 tokio::select! {
                     res = fut => res,
-                    _ = close_signal_rx.recv() => return Ok::<(), ProtocolError>(()),
+                    _ = sig_close_rx.recv() => return Ok::<(), ProtocolError>(()),
                 }
             }
         };
         // Setup protocol writer task
         let writer_fut = {
-            let mut close_signal_rx = close_signal_tx.subscribe();
+            let mut sig_close_rx = sig_close_tx.subscribe();
             let fut = setup_writer(inner.protocol.clone(), transport.clone(), state_send_rx);
             async move {
                 tokio::select! {
                     res = fut => res,
-                    _ = close_signal_rx.recv() => return Ok::<(), ProtocolError>(()),
+                    _ = sig_close_rx.recv() => return Ok::<(), ProtocolError>(()),
                 }
             }
         };
@@ -164,7 +164,7 @@ impl Protocol {
                         // Allow the task to send one last command.
                         time::sleep(time::Duration::from_millis(1000)).await;
                     },
-                    _ = close_signal_rx.recv() => {},
+                    _ = sig_close_rx.recv() => {},
                 }
                 // Notifies the sender task to close then wait for it until closed.
                 drop(connected_rx);
@@ -191,7 +191,7 @@ impl Protocol {
                         match inner {
                             Ok(Err(err)) => {
                                 let _ = msg_tx.try_send(Event::Error(err));
-                                let _ = close_signal_tx.send(());
+                                let _ = sig_close_tx.send(());
                                 break;
                             }
                             Err(err) => {
@@ -200,14 +200,14 @@ impl Protocol {
                                 let _ = msg_tx.try_send(Event::Error(ProtocolError::Internal(
                                     ProtocolInternalError::JoinError(err.to_string()),
                                 )));
-                                let _ = close_signal_tx.send(());
+                                let _ = sig_close_tx.send(());
                                 break;
                             }
                             _ => {}
                         }
                     },
                     _ = close_tx.closed() => {
-                        let _ = close_signal_tx.send(());
+                        let _ = sig_close_tx.send(());
                         break;
                     },
                 }

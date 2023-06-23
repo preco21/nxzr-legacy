@@ -149,7 +149,7 @@ impl Nxzr for NxzrService {
                                 kind: Some(connection_event::Kind::Log(
                                     connection_event::EventLog {
                                         kind: connection_event::EventLogKind::Connected.into(),
-                                        message: "Connected to Switch.".to_string(),
+                                        message: "Connected to Switch.".into(),
                                         ..Default::default()
                                     },
                                 )),
@@ -181,7 +181,7 @@ impl Nxzr for NxzrService {
                                 kind: Some(connection_event::Kind::Log(
                                     connection_event::EventLog {
                                         kind: connection_event::EventLogKind::Disconnecting.into(),
-                                        message: "Disconnection in progress...".to_string(),
+                                        message: "Disconnection in progress...".into(),
                                         ..Default::default()
                                     },
                                 )),
@@ -211,7 +211,7 @@ impl Nxzr for NxzrService {
                     res: Some(connect_switch_response::Res::Event(ConnectionEvent {
                         kind: Some(connection_event::Kind::Log(connection_event::EventLog {
                             kind: connection_event::EventLogKind::Disconnected.into(),
-                            message: "Successfully disconnected from Switch.".to_string(),
+                            message: "Successfully disconnected from Switch.".into(),
                             ..Default::default()
                         })),
                         ..Default::default()
@@ -315,7 +315,7 @@ async fn handle_connect_switch(
         res: Some(connect_switch_response::Res::Event(ConnectionEvent {
             kind: Some(connection_event::Kind::Log(connection_event::EventLog {
                 kind: connection_event::EventLogKind::Connecting.into(),
-                message: "Connecting to Switch as initial connection.".to_string(),
+                message: "Connecting to Switch as initial connection.".into(),
                 ..Default::default()
             })),
             ..Default::default()
@@ -380,7 +380,7 @@ fn map_protocol_event_to_event_kind(
         protocol::Event::Log(log) => Some(connection_event::Kind::Log(match log {
             protocol::LogType::PairingEnded => connection_event::EventLog {
                 kind: connection_event::EventLogKind::PairingEnded.into(),
-                message: "Protocol has been marked as paired.".to_string(),
+                message: "Protocol has been marked as paired.".into(),
             },
             protocol::LogType::SubcommandReceived(subcommand) => connection_event::EventLog {
                 kind: connection_event::EventLogKind::SubcommandReceived.into(),

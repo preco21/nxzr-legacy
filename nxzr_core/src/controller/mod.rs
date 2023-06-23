@@ -37,9 +37,9 @@ impl ControllerType {
 
     pub fn name(&self) -> String {
         match self {
-            Self::JoyConL => "Joy-Con (L)".to_owned(),
-            Self::JoyConR => "Joy-Con (R)".to_owned(),
-            Self::ProController => "Pro Controller".to_owned(),
+            Self::JoyConL => "Joy-Con (L)".into(),
+            Self::JoyConR => "Joy-Con (R)".into(),
+            Self::ProController => "Pro Controller".into(),
         }
     }
 

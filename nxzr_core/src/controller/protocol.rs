@@ -268,7 +268,7 @@ impl ControllerProtocol {
             }
             OutputReportId::RequestIrNfcMcu => {
                 self.emit_event(Event::Warning(
-                    ControllerProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring.".to_owned()
+                    ControllerProtocolError::NotImplemented("attempting to request subcommand: RequestIrNfcMcu, which is not implemented, ignoring.".into()
                 )));
             }
         }
@@ -314,7 +314,7 @@ impl ControllerProtocol {
         match mode {
             Some(0x21) => {
                 self.emit_event(Event::Warning(ControllerProtocolError::Invariant(
-                    "unexpectedly setting report mode for standard input reports.".to_owned(),
+                    "unexpectedly setting report mode for standard input reports.".into(),
                 )));
             }
             _ => {}
@@ -417,7 +417,7 @@ impl ControllerProtocol {
         };
         if self.controller_type != state.controller_state.controller() {
             return Err(
-                ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one that's passed on `Protocol` init.".to_owned())
+                ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one that's passed on `Protocol` init.".into())
             );
         }
         let Some(mode) = mode else {

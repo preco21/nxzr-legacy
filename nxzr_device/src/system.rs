@@ -36,7 +36,7 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
         cmd
     })
     .await
-    .map_err(|_| SysCheckError::CliToolFailed("hciconfig".to_owned()))?;
+    .map_err(|_| SysCheckError::CliToolFailed("hciconfig".into()))?;
     // FIXME: Maybe we do not need to change bdaddr
     // Revisit for revise: https://github.com/thxomas/bdaddr
     // Check if `bdaddr` exists
@@ -46,7 +46,7 @@ pub async fn check_system_requirements() -> Result<(), SysCheckError> {
     //     cmd
     // })
     // .await
-    // .map_err(|_| SysCheckError::CliToolFailed("bdaddr".to_owned()))?;
+    // .map_err(|_| SysCheckError::CliToolFailed("bdaddr".into()))?;
     Ok(())
 }
 
