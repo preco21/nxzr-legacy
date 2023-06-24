@@ -14,40 +14,36 @@ export interface AdapterSelectModalProps {
 export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactElement {
   const { className, isOpen, adapterManager, onClose } = props;
   const [error, setError] = useState<string | undefined>(undefined);
-  const [selectedAdapter, setSelectedAdapter] = useState<string | undefined>(undefined);
+  const [selectedAdapterId, setSelectedAdapterId] = useState<string | undefined>(undefined);
   const handleClose = (): void => {
     if (adapterManager.pending) {
       return;
     }
     setError(undefined);
-    setSelectedAdapter(undefined);
+    setSelectedAdapterId(undefined);
     onClose();
   };
   const handleAttach = async (): Promise<void> => {
-    if (selectedAdapter == null) {
+    if (selectedAdapterId == null) {
       return;
     }
     try {
-      const currentAdapter = adapterManager.selectedAdapter;
-      if (currentAdapter != null) {
-        await adapterManager.detachAdapter(currentAdapter.id);
-      }
-      await adapterManager.attachAdapter(selectedAdapter);
+      await adapterManager.attachAdapter(selectedAdapterId);
       onClose();
-      setSelectedAdapter(undefined);
+      setSelectedAdapterId(undefined);
     } catch (err) {
       setError((err as Error).message);
     }
   };
   const handleRefresh = async (): Promise<void> => {
     setError(undefined);
-    setSelectedAdapter(undefined);
     await adapterManager.refreshAdapterList();
+    setSelectedAdapterId(undefined);
   };
   useEffect(() => {
     const currentAdapter = adapterManager.selectedAdapter;
     if (currentAdapter != null) {
-      setSelectedAdapter(currentAdapter.id);
+      setSelectedAdapterId(currentAdapter.id);
     }
   }, [adapterManager.selectedAdapter]);
   const pending = adapterManager.pending;
@@ -68,9 +64,9 @@ export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactE
           <Description>Please select the appropriate Bluetooth adapter.</Description>
           <AdapterSelect
             adapters={adapterManager.adapters}
-            value={selectedAdapter}
+            value={selectedAdapterId}
             disabled={pending}
-            onSelect={(id) => setSelectedAdapter(id)}
+            onSelect={(id) => setSelectedAdapterId(id)}
             onRefresh={handleRefresh}
           />
           {error && (
@@ -93,8 +89,8 @@ export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactE
                 loading={pending}
                 disabled={(
                   pending ||
-                  selectedAdapter == null ||
-                  selectedAdapter === adapterManager.selectedAdapter?.id
+                  selectedAdapterId == null ||
+                  selectedAdapterId === adapterManager.selectedAdapter?.id
                 )}
                 onClick={handleAttach}
               />

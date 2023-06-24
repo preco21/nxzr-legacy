@@ -84,6 +84,7 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
 pub async fn attach_hid_adapter(hardware_id: &str) -> Result<(), UsbipdError> {
     tracing::info!("attaching hid adapter to WSL: {}", hardware_id);
     wsl::ensure_agent_distro_running().await?;
+    detach_hid_adapter(hardware_id).await?;
     util::run_system_command({
         let mut cmd = tokio::process::Command::new("usbipd.exe");
         cmd.args(&[
