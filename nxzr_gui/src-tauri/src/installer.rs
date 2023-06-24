@@ -1,4 +1,4 @@
-use crate::{config, util};
+use crate::{config, util, wsl};
 use std::path::Path;
 use thiserror::Error;
 use tokio::{fs, sync::mpsc, time};
@@ -34,6 +34,8 @@ pub enum InstallerError {
     PathConvertFailed,
     #[error(transparent)]
     SystemCommandError(#[from] util::SystemCommandError),
+    #[error(transparent)]
+    WslError(#[from] wsl::WslError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -139,6 +141,8 @@ pub async fn ensure_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> 
         Some(output_tx),
     )
     .await?;
+    // Ensure WSL to pick up the changed config by restarting it.
+    wsl::shutdown_wsl().await?;
     Ok(())
 }
 
