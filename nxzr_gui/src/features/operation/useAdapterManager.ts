@@ -1,36 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { attachHidAdapter, detachHidAdapter, listHidAdapters } from '../../common/commands';
-
-export interface HidAdapter {
-  id: string;
-  name: string;
-  busId: string;
-  hardwareId: string;
-  isAttached?: boolean;
-}
+import { useCallback, useMemo, useState } from 'react';
+import { AdapterInfo, attachHidAdapter, detachHidAdapter, listHidAdapters } from '../../common/commands';
 
 export interface UseAdapterManagerOptions {
-  enabled?: boolean;
-  onAdapterLost?: (adapter: HidAdapter) => void;
-  onAttached?: (adapter: HidAdapter) => void;
-  onDetached?: (adapter: HidAdapter) => void;
+  onAdapterLost?: (adapter: AdapterInfo) => void;
+  onAdapterAutoSelected?: (adapter: AdapterInfo) => void;
+  onAttached?: (adapter: AdapterInfo) => void;
+  onDetached?: (adapter: AdapterInfo) => void;
 }
 
 export interface UseAdapterManager {
   pending: boolean;
-  error?: Error;
-  adapters: HidAdapter[];
-  selectedAdapter?: HidAdapter;
-  refreshAdapterList: () => void;
-  attachAdapter: (id: string) => void;
-  detachAdapter: (id: string) => void;
+  adapters: AdapterInfo[];
+  selectedAdapter?: AdapterInfo;
+  refreshAdapterList: () => Promise<void>;
+  attachAdapter: (id: string) => Promise<void>;
+  detachAdapter: (id: string) => Promise<void>;
 }
 
 export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapterManager {
   const [pending, setPending] = useState<boolean>(false);
-  const [error, setError] = useState<Error | undefined>(undefined);
   const [currentAdapterId, setCurrentAdapterId] = useState<string | undefined>(undefined);
-  const [adapters, setAdapters] = useState<HidAdapter[]>([]);
+  const [adapters, setAdapters] = useState<AdapterInfo[]>([]);
   const selectedAdapter = useMemo(() => {
     return adapters.find((adapter) => adapter.id === currentAdapterId);
   }, [adapters, currentAdapterId]);
@@ -38,29 +28,25 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     try {
       setPending(true);
       setAdapters([]);
-      const adapterInfoList = await listHidAdapters();
-      const formattedAdapters = adapterInfoList.map((adapter) => ({
-        id: adapter.id,
-        name: adapter.name,
-        busId: adapter.bus_id,
-        hardwareId: adapter.hardware_id,
-        isAttached: adapter.is_attached,
-      }));
+      const newAdapters = await listHidAdapters();
       // Check if the current adapter is still available.
       if (selectedAdapter != null) {
-        const targetAdapter = adapters.find((adapter) => adapter.id === selectedAdapter.id);
+        const targetAdapter = newAdapters.find((adapter) => {
+          return adapter.id === selectedAdapter.id;
+        });
         if (targetAdapter == null) {
           setCurrentAdapterId(undefined);
           options?.onAdapterLost?.(selectedAdapter);
         }
-      }
-      setAdapters(formattedAdapters);
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err);
       } else {
-        setError(new Error(err as string));
+        // Infer the current adapter from the list.
+        const currentlyAttached = newAdapters.find((adapter) => adapter.isAttached);
+        if (currentlyAttached != null) {
+          setCurrentAdapterId(currentlyAttached.id);
+          options?.onAdapterAutoSelected?.(currentlyAttached);
+        }
       }
+      setAdapters(newAdapters);
     } finally {
       setPending(false);
     }
@@ -73,13 +59,13 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     try {
       setPending(true);
       await attachHidAdapter(targetAdapter.hardwareId);
+      const newAdapters = await listHidAdapters();
+      setAdapters(newAdapters);
+      setCurrentAdapterId(targetAdapter.id);
       options?.onAttached?.(targetAdapter);
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err);
-      } else {
-        setError(new Error(err as string));
-      }
+      setCurrentAdapterId(undefined);
+      throw err;
     } finally {
       setPending(false);
     }
@@ -92,19 +78,15 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     try {
       setPending(true);
       await detachHidAdapter(targetAdapter.hardwareId);
+      const newAdapters = await listHidAdapters();
+      setAdapters(newAdapters);
       options?.onDetached?.(targetAdapter);
     } finally {
       setPending(false);
     }
   }, []);
-  useEffect(() => {
-    if (options?.enabled) {
-      refreshAdapterList();
-    }
-  }, [options?.enabled, refreshAdapterList]);
   return {
     pending,
-    error,
     adapters,
     selectedAdapter,
     refreshAdapterList,

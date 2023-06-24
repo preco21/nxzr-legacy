@@ -256,7 +256,6 @@ mod tests {
             calibration: Some(l_cal),
             ..Default::default()
         });
-
         println!("{:?}", &stick_cal);
     }
 }

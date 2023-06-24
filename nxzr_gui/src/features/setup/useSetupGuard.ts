@@ -123,7 +123,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
         aborted = true;
         setState((prevState) => produce(prevState, (draft) => {
           draft.steps[index]!.status = 'checkFailed';
-          draft.steps[index]!.error = new Error(err as string);
+          draft.steps[index]!.error = err as Error;
         }));
       }
     }
@@ -197,7 +197,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
           aborted = true;
           setState((prevState) => produce(prevState, (draft) => {
             draft.steps[index]!.status = 'installFailed';
-            draft.steps[index]!.error = new Error(err as string);
+            draft.steps[index]!.error = err as Error;
           }));
         }
       }

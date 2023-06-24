@@ -1,4 +1,4 @@
-use crate::util;
+use crate::{config, util};
 use thiserror::Error;
 use tokio::time;
 
@@ -6,6 +6,8 @@ use tokio::time;
 pub enum WslError {
     #[error("WSL shutdown failed")]
     WslShutdownFailed,
+    #[error("WSL distribution warm up failed")]
+    WslDistroWarmUpFailed,
     #[error(transparent)]
     SystemCommandError(#[from] util::SystemCommandError),
     #[error(transparent)]
@@ -23,5 +25,19 @@ pub async fn shutdown_wsl() -> Result<(), WslError> {
     // We must wait for 8 seconds to make sure that the WSL is shutdown completely.
     // Please refer the document for more details: https://learn.microsoft.com/en-us/windows/wsl/wsl-config#the-8-second-rule
     time::sleep(time::Duration::from_secs(8)).await;
+    Ok(())
+}
+
+pub async fn ensure_agent_distro_running() -> Result<(), WslError> {
+    let output = util::run_system_command({
+        let mut cmd = tokio::process::Command::new("wsl.exe");
+        cmd.args(&["-d", config::WSL_AGENT_NAME, "--", "echo", "ok"]);
+        cmd
+    })
+    .await
+    .map_err(|err| WslError::SystemCommandError(err))?;
+    if output.is_empty() {
+        return Err(WslError::WslDistroWarmUpFailed);
+    }
     Ok(())
 }

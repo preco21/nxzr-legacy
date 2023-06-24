@@ -40,7 +40,7 @@ export class LogListener {
       ...JSON.parse(logString) as LogEntry,
       id: this.logId++,
     }));
-    this.taskLabel = res.task_label;
+    this.taskLabel = res.taskLabel;
     this.state = 'ready';
   }
 

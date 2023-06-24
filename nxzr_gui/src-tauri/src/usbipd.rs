@@ -1,17 +1,24 @@
-use crate::{config, util};
+use crate::{config, util, wsl};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum UsbipdError {
-    #[error("failed to retrieve usbipd state")]
-    UsbipdStateLookupFailed,
+    #[error("failed to retrieve usbipd state: {0}")]
+    UsbipdStateLookupFailed(String),
+    #[error("failed to attach hid adapter: {0}")]
+    UsbipdAttachFailed(String),
+    #[error("failed to detach hid adapter: {0}")]
+    UsbipdDetachFailed(String),
     #[error(transparent)]
     SystemCommandError(#[from] util::SystemCommandError),
+    #[error(transparent)]
+    WslError(#[from] wsl::WslError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
 #[derive(Debug, serde::Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct AdapterInfo {
     pub id: String,
     pub serial: String,
@@ -48,15 +55,18 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
         cmd
     })
     .await
-    .map_err(|_err| UsbipdError::UsbipdStateLookupFailed)?;
+    .map_err(|err| UsbipdError::UsbipdStateLookupFailed(err.to_string()))?;
     let parsed: UsbipdState = serde_json::from_str(&output).unwrap();
     let adapter_info_vec = parsed
         .devices
         .iter()
         .filter_map(|device| {
-            println!("{}", device.instance_id);
             let Some((vid_pid, serial)) = parse_hardware_id(&device.instance_id) else {
                 return None;
+            };
+            let is_attached = match &device.client_wsl_instance {
+                Some(wsl_instance) => wsl_instance == config::WSL_AGENT_NAME,
+                None => false,
             };
             Some(AdapterInfo {
                 id: vid_pid.clone(),
@@ -64,7 +74,7 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
                 bus_id: device.bus_id.clone(),
                 hardware_id: vid_pid,
                 name: device.description.clone(),
-                is_attached: device.client_wsl_instance.is_some(),
+                is_attached,
             })
         })
         .collect();
@@ -73,6 +83,7 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
 
 pub async fn attach_hid_adapter(hardware_id: &str) -> Result<(), UsbipdError> {
     tracing::info!("attaching hid adapter to WSL: {}", hardware_id);
+    wsl::ensure_agent_distro_running().await?;
     util::run_system_command({
         let mut cmd = tokio::process::Command::new("usbipd.exe");
         cmd.args(&[
@@ -86,7 +97,7 @@ pub async fn attach_hid_adapter(hardware_id: &str) -> Result<(), UsbipdError> {
         cmd
     })
     .await
-    .map_err(|_err| UsbipdError::UsbipdStateLookupFailed)?;
+    .map_err(|err| UsbipdError::UsbipdAttachFailed(err.to_string()))?;
     Ok(())
 }
 
@@ -98,7 +109,7 @@ pub async fn detach_hid_adapter(hardware_id: &str) -> Result<(), UsbipdError> {
         cmd
     })
     .await
-    .map_err(|_err| UsbipdError::UsbipdStateLookupFailed)?;
+    .map_err(|err| UsbipdError::UsbipdDetachFailed(err.to_string()))?;
     Ok(())
 }
 

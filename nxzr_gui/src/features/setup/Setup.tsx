@@ -9,7 +9,6 @@ export interface SetupProps {
   steps: StepDisplay[];
   loading: boolean;
   ready: boolean;
-  outputSink: string[];
   error?: React.ReactNode;
   onInstall: () => void;
 }
@@ -20,7 +19,6 @@ export function Setup(props: SetupProps): React.ReactElement {
     steps,
     loading,
     ready,
-    outputSink,
     error,
     onInstall,
   } = props;
@@ -28,7 +26,11 @@ export function Setup(props: SetupProps): React.ReactElement {
   return (
     <Container className={className}>
       <NonIdealState
-        icon={loading ? <Spinner size={50} /> : <StatusIcon icon="warning-sign" intent="warning" size={48} />}
+        icon={(
+          loading
+            ? <Spinner size={50} />
+            : <StatusIcon icon="warning-sign" intent="warning" size={48} />
+        )}
         title={title}
         description={(
           <>

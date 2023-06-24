@@ -7,7 +7,7 @@ const STEP_STATUS_VISUAL_MAP = {
   none: {
     intent: 'none',
     icon: 'ban-circle',
-    text: '-',
+    text: 'N/A',
   },
   wait: {
     intent: 'primary',

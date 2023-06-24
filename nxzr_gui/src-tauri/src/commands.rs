@@ -64,6 +64,7 @@ pub async fn open_log_window(handle: tauri::AppHandle) -> Result<(), AppError> {
 }
 
 #[derive(Clone, serde::Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct SubscribeLoggingResponse {
     logs: Vec<String>,
     task_label: String,
@@ -98,12 +99,6 @@ pub async fn subscribe_logging(
         logs: logs.unwrap_or(Vec::new()),
         task_label,
     })
-}
-
-#[derive(Clone, serde::Serialize)]
-pub struct GetAppDirsResponse {
-    config_dir: String,
-    data_dir: String,
 }
 
 #[tauri::command]

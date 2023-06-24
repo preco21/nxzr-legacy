@@ -7,36 +7,42 @@ import { Setup } from '../features/setup/Setup';
 import { StepDisplay, useSetupGuard } from '../features/setup/useSetupGuard';
 import { RebootAlert } from '../features/setup/RebootAlert';
 import { useAdapterManager } from '../features/operation/useAdapterManager';
+import { AdapterSelectModal } from '../features/operation/AdapterSelectModal';
 
 const FAILURE_STATUS: StepDisplay['status'][] = ['checkFailed', 'installFailed'];
 
 function AppPage(): React.ReactElement {
   const [rebootRequested, setRebootRequested] = useState(false);
+  const adapterManager = useAdapterManager({
+  });
   const setupGuard = useSetupGuard({
+    onCheckComplete: useCallback(() => adapterManager.refreshAdapterList(), []),
     onRebootRequest: useCallback(() => {
       setRebootRequested(true);
     }, []),
   });
   const firstSetupError = setupGuard.steps.find((step) => FAILURE_STATUS.includes(step.status));
-  const adapterManager = useAdapterManager({
-    enabled: setupGuard.ready,
-  });
+
+  const [adapterModalOpen, setAdapterModalOpen] = useState<boolean>(false);
   useEffect(() => {
     // Run a program check at initial render.
     setupGuard.performCheck();
   }, []);
-  console.log(adapterManager);
   return (
     <MainContainer>
       <TitleBar />
-      <Header disabled={!setupGuard.ready} />
+      <Header
+        disabled={!setupGuard.ready}
+        adapterInfo={adapterManager.selectedAdapter}
+        adapterPending={adapterManager.pending}
+        onAdapterDisplayClick={() => setAdapterModalOpen(true)}
+      />
       {!setupGuard.ready && (
         <Setup
           steps={setupGuard.steps}
           loading={setupGuard.pending}
           ready={setupGuard.ready}
           error={firstSetupError?.error?.message}
-          outputSink={[]}
           onInstall={() => setupGuard.performInstall()}
         />
       )}
@@ -44,6 +50,11 @@ function AppPage(): React.ReactElement {
         <div>hooray!</div>
       )}
       <RebootAlert isOpen={rebootRequested} onConfirm={() => setRebootRequested(false)} />
+      <AdapterSelectModal
+        isOpen={adapterModalOpen}
+        adapterManager={adapterManager}
+        onClose={() => setAdapterModalOpen(false)}
+      />
     </MainContainer>
   );
 }
