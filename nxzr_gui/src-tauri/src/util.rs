@@ -2,7 +2,7 @@ use crate::config;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
 use std::{
     io::{self, SeekFrom},
-    path::Path,
+    path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
 };
@@ -17,6 +17,12 @@ use tokio::{
     time,
 };
 use tracing_subscriber::fmt::MakeWriter;
+
+pub fn get_resource(handle: &tauri::AppHandle, name: &str) -> Option<PathBuf> {
+    handle
+        .path_resolver()
+        .resolve_resource(format!("resources/{}", name))
+}
 
 pub fn get_app_dirs() -> Option<directories::ProjectDirs> {
     directories::ProjectDirs::from(config::QUALIFIER, config::ORGANIZATION, config::APP_NAME)

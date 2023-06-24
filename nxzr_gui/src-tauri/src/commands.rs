@@ -130,9 +130,7 @@ pub async fn check_1_setup_installed() -> Result<(), AppError> {
 
 #[tauri::command]
 pub async fn check_2_wslconfig(handle: tauri::AppHandle) -> Result<(), AppError> {
-    let kernel_path = handle
-        .path_resolver()
-        .resolve_resource(config::WSL_KERNEL_IMAGE_NAME)
+    let kernel_path = util::get_resource(&handle, config::WSL_KERNEL_IMAGE_NAME)
         .ok_or(anyhow::anyhow!("failed to resolve kernel image path"))?;
     installer::check_wslconfig(kernel_path.as_path()).await?;
     Ok(())
@@ -152,9 +150,7 @@ pub async fn install_1_program_setup() -> Result<(), AppError> {
 
 #[tauri::command]
 pub async fn install_2_ensure_wslconfig(handle: tauri::AppHandle) -> Result<(), AppError> {
-    let kernel_path = handle
-        .path_resolver()
-        .resolve_resource(config::WSL_KERNEL_IMAGE_NAME)
+    let kernel_path = util::get_resource(&handle, config::WSL_KERNEL_IMAGE_NAME)
         .ok_or(anyhow::anyhow!("failed to resolve kernel image path"))?;
     installer::ensure_wslconfig(kernel_path.as_path()).await?;
     Ok(())
@@ -162,9 +158,7 @@ pub async fn install_2_ensure_wslconfig(handle: tauri::AppHandle) -> Result<(), 
 
 #[tauri::command]
 pub async fn install_3_register_agent(handle: tauri::AppHandle) -> Result<(), AppError> {
-    let agent_archive_path = handle
-        .path_resolver()
-        .resolve_resource(config::WSL_AGENT_ARCHIVE_NAME)
+    let agent_archive_path = util::get_resource(&handle, config::WSL_AGENT_ARCHIVE_NAME)
         .ok_or(anyhow::anyhow!("failed to resolve agent archive path"))?;
     installer::register_agent(&agent_archive_path).await?;
     Ok(())

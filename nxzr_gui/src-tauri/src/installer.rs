@@ -82,10 +82,10 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
     // cannot be known before the program is built.
     //
     // So, it will be injected from Tauri's `build.rs` script.
-    // FIXME: This does not handles the escape characters properly. e.g. \ -> \\ need to revise.
     let actual_path = kernel_path
         .to_str()
-        .ok_or(InstallerError::PathConvertFailed)?;
+        .ok_or(InstallerError::PathConvertFailed)?
+        .replace("\\", "\\\\");
     if field_val != actual_path {
         return Err(InstallerError::WslConfigFieldMismatch);
     }
@@ -125,6 +125,7 @@ pub async fn ensure_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> 
     let actual_path = kernel_path
         .to_str()
         .ok_or(InstallerError::WslConfigMalformed)?
+        .replace("\\", "\\\\")
         .to_owned();
     let (output_tx, mut output_rx) = mpsc::unbounded_channel();
     tokio::spawn(async move {
@@ -194,5 +195,6 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
     })
     .await
     .map_err(|_err| InstallerError::AgentWslRegistrationFailed)?;
+    time::sleep(time::Duration::from_secs(1)).await;
     Ok(())
 }

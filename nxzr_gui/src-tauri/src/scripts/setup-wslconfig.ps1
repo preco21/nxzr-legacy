@@ -20,7 +20,7 @@ if (Test-Path $wsl_conf_path) {
     # Replace existing config only when actual content mismatches.
     $current_conf_content = Get-Content $wsl_conf_path -Raw
     if ($current_conf_content.Trim() -ne $wsl_conf_content.Trim()) {
-        Write-Host "> Existing `".wslconfig`" does not match to the desired config, replacing it with new content, and a backup will be created..."
+        Write-Host "> The existing `".wslconfig`" file does not match the desired configuration. It will be replaced with new content, and a backup will be created."
         # Create a backup copy of `.wslconfig` as `wslconfig.back[.N]` if there's existing one
         $backup_path = Join-Path $home_dir "wslconfig.back"
         $index = 0
