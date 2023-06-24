@@ -8,6 +8,7 @@ import {
   install2EnsureWslconfig,
   install3RegisterAgent,
 } from '../../common/commands';
+import { sleep } from '../../utils/promise';
 
 interface SetupStep {
   name: string;
@@ -126,6 +127,8 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
         }));
       }
     }
+    // Wait for a moment to allow the UI to update.
+    await sleep(100);
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = false;
       draft.ready = !aborted;
@@ -197,6 +200,8 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
         }
       }
     }
+    // Wait for a moment to allow the UI to update.
+    await sleep(100);
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = false;
       draft.inInstall = false;
