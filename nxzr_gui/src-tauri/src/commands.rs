@@ -1,7 +1,7 @@
-use crate::{config, installer, state::AppState, util, AppError};
+use crate::{config, installer, state::AppState, util, wsl, AppError};
 use std::path::Path;
 use tauri::Manager;
-use tokio::{process::Command, sync::mpsc};
+use tokio::process::Command;
 
 #[tauri::command]
 pub fn window_ready(window: tauri::Window, name: String) -> Result<(), AppError> {
@@ -53,10 +53,8 @@ pub async fn open_log_window(handle: tauri::AppHandle) -> Result<(), AppError> {
         },
     )
     .build()?;
-
     #[cfg(debug_assertions)]
     log_window.open_devtools();
-
     Ok(())
 }
 
@@ -148,13 +146,7 @@ pub async fn check_3_agent_registered() -> Result<(), AppError> {
 
 #[tauri::command]
 pub async fn install_1_program_setup() -> Result<(), AppError> {
-    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
-    tokio::spawn(async move {
-        while let Some(line) = output_rx.recv().await {
-            tracing::trace!("[installer] install_1_program_setup: {}", line);
-        }
-    });
-    installer::install_program_setup(Some(output_tx)).await?;
+    installer::install_program_setup().await?;
     Ok(())
 }
 
@@ -164,18 +156,23 @@ pub async fn install_2_ensure_wslconfig(handle: tauri::AppHandle) -> Result<(), 
         .path_resolver()
         .resolve_resource(config::WSL_KERNEL_IMAGE_NAME)
         .ok_or(anyhow::anyhow!("failed to resolve kernel image path"))?;
-    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
-    tokio::spawn(async move {
-        while let Some(line) = output_rx.recv().await {
-            tracing::trace!("[installer] install_2_ensure_wslconfig: {}", line);
-        }
-    });
-    installer::ensure_wslconfig(kernel_path.as_path(), Some(output_tx)).await?;
+    installer::ensure_wslconfig(kernel_path.as_path()).await?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn install_3_register_agent(handle: tauri::AppHandle) -> Result<(), AppError> {
-    // FIXME: implement me
-    Err(AppError::TaskNotFound)
+    let agent_archive_path = handle
+        .path_resolver()
+        .resolve_resource(config::WSL_AGENT_ARCHIVE_NAME)
+        .ok_or(anyhow::anyhow!("failed to resolve agent archive path"))?;
+    installer::register_agent(&agent_archive_path).await?;
+    Ok(())
+}
+
+// Operation
+#[tauri::command]
+pub async fn shutdown_wsl() -> Result<(), AppError> {
+    wsl::shutdown_wsl().await?;
+    Ok(())
 }

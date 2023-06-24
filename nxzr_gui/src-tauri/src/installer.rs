@@ -1,7 +1,7 @@
 use crate::{config, util};
 use std::path::Path;
 use thiserror::Error;
-use tokio::{fs, sync::mpsc};
+use tokio::{fs, sync::mpsc, time};
 
 const INSTALL_DEPS_SCRIPT: &str = include_str!("scripts/install-deps.ps1");
 const SETUP_WSLCONFIG_SCRIPT: &str = include_str!("scripts/setup-wslconfig.ps1");
@@ -20,10 +20,18 @@ pub enum InstallerError {
         "the field `kernel` in WSL configuration does not match with the program's resource path"
     )]
     WslConfigFieldMismatch,
+    #[error("failed to unregister requested distro from WSL")]
+    WslDistroUnregisterFailed,
     #[error("the agent is not registered as a WSL distro")]
     AgentNotRegistered,
     #[error("the agent is not properly configured to work with WSL 2")]
     AgentWslVersionMismatch,
+    #[error("failed to register agent as a WSL distro")]
+    AgentWslRegistrationFailed,
+    #[error("failed to resolve app dirs")]
+    AppDirResolveFailed,
+    #[error("failed to convert path")]
+    PathConvertFailed,
     #[error(transparent)]
     SystemCommandError(#[from] util::SystemCommandError),
     #[error(transparent)]
@@ -77,7 +85,7 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
     // FIXME: This does not handles the escape characters properly. e.g. \ -> \\ need to revise.
     let actual_path = kernel_path
         .to_str()
-        .ok_or(InstallerError::WslConfigMalformed)?;
+        .ok_or(InstallerError::PathConvertFailed)?;
     if field_val != actual_path {
         return Err(InstallerError::WslConfigFieldMismatch);
     }
@@ -102,30 +110,89 @@ pub async fn check_agent_registered() -> Result<(), InstallerError> {
 
 /// These scripts are responsible for checking / installing infrastructures and
 /// system requirements that is required to run NXZR for the current system.
-pub async fn install_program_setup(
-    output_tx: Option<mpsc::UnboundedSender<String>>,
-) -> Result<(), InstallerError> {
-    util::run_powershell_script_privileged(INSTALL_DEPS_SCRIPT, None, output_tx).await?;
+pub async fn install_program_setup() -> Result<(), InstallerError> {
+    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        while let Some(line) = output_rx.recv().await {
+            tracing::trace!("[installer] install_1_program_setup: {}", line);
+        }
+    });
+    util::run_powershell_script_privileged(INSTALL_DEPS_SCRIPT, None, Some(output_tx)).await?;
     Ok(())
 }
 
-pub async fn ensure_wslconfig(
-    kernel_path: &Path,
-    output_tx: Option<mpsc::UnboundedSender<String>>,
-) -> Result<(), InstallerError> {
+pub async fn ensure_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
     let actual_path = kernel_path
         .to_str()
         .ok_or(InstallerError::WslConfigMalformed)?
         .to_owned();
+    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        while let Some(line) = output_rx.recv().await {
+            tracing::trace!("[installer] install_2_ensure_wslconfig: {}", line);
+        }
+    });
     util::run_powershell_script(
         SETUP_WSLCONFIG_SCRIPT,
         Some(vec!["-KernelPath".to_owned(), actual_path]),
-        output_tx,
+        Some(output_tx),
     )
     .await?;
     Ok(())
 }
 
-pub async fn register_agent() {}
-
-pub async fn restart_wsl() {}
+pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerError> {
+    let wsl = wslapi::Library::new()?;
+    // This routine is generally unreachable because the checker will ensure
+    // that the agent is not registered yet.
+    //
+    // However, to make sure there's no clutter around agent registration, we
+    // just blindly check and unregister it here as if there was no check held
+    // in advance.
+    if wsl.is_distribution_registered(config::WSL_AGENT_NAME) {
+        tracing::info!("agent distro found, unregistering...");
+        // TODO: unregister
+        util::run_system_command({
+            let mut cmd = tokio::process::Command::new("wsl.exe");
+            cmd.args(&["--terminate", config::WSL_AGENT_NAME]);
+            cmd
+        })
+        .await
+        .map_err(|_err| InstallerError::WslDistroUnregisterFailed)?;
+        util::run_system_command({
+            let mut cmd = tokio::process::Command::new("wsl.exe");
+            cmd.args(&["--unregister", config::WSL_AGENT_NAME]);
+            cmd
+        })
+        .await
+        .map_err(|_err| InstallerError::WslDistroUnregisterFailed)?;
+        // Wait for a few seconds to make sure the distro is properly unregistered.
+        time::sleep(time::Duration::from_secs(8)).await;
+    }
+    let app_dirs = util::get_app_dirs().ok_or(InstallerError::AppDirResolveFailed)?;
+    let install_dir = app_dirs
+        .data_dir()
+        .join(Path::new(config::WSL_AGENT_INSTALL_DIR_NAME))
+        .to_str()
+        .ok_or(InstallerError::PathConvertFailed)?
+        .to_owned();
+    tracing::info!("installing agent distro in: {}", &install_dir);
+    let agent_archive_path = agent_archive_path
+        .to_str()
+        .ok_or(InstallerError::PathConvertFailed)?
+        .to_owned();
+    tracing::info!("agent archive path: {}", &agent_archive_path);
+    util::run_system_command({
+        let mut cmd = tokio::process::Command::new("wsl.exe");
+        cmd.args(&[
+            "--import",
+            config::WSL_AGENT_NAME,
+            &install_dir,
+            &agent_archive_path,
+        ]);
+        cmd
+    })
+    .await
+    .map_err(|_err| InstallerError::AgentWslRegistrationFailed)?;
+    Ok(())
+}

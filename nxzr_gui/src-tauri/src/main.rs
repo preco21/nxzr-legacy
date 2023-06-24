@@ -10,12 +10,14 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing_subscriber::prelude::*;
 use util::SystemCommandError;
+use wsl::WslError;
 
 mod commands;
 mod config;
 mod installer;
 mod state;
 mod util;
+mod wsl;
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -35,6 +37,8 @@ pub enum AppError {
     SystemCommandError(#[from] SystemCommandError),
     #[error(transparent)]
     InstallerError(#[from] InstallerError),
+    #[error(transparent)]
+    WslError(#[from] WslError),
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 }
@@ -101,6 +105,7 @@ async fn main() -> anyhow::Result<()> {
             commands::install_1_program_setup,
             commands::install_2_ensure_wslconfig,
             commands::install_3_register_agent,
+            commands::shutdown_wsl,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

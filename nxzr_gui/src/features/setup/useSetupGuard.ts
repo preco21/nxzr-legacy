@@ -14,6 +14,7 @@ interface SetupStep {
   name: string;
   description: string;
   rebootRequired: boolean;
+  canRefresh: boolean;
   check: () => Promise<void>;
   install: () => Promise<void>;
 }
@@ -23,6 +24,7 @@ const SETUP_STEPS: SetupStep[] = [
     name: 'WSL & Program Requirements',
     description: 'This step will install all the necessary components of the program on your computer.',
     rebootRequired: true,
+    canRefresh: false,
     check: () => check1SetupInstalled(),
     install: () => install1ProgramSetup(),
   },
@@ -30,6 +32,7 @@ const SETUP_STEPS: SetupStep[] = [
     name: 'WSL Global Configuration',
     description: 'This step will ensure that WSL is configured correctly on your computer.',
     rebootRequired: false,
+    canRefresh: true,
     check: () => check2Wslconfig(),
     install: () => install2EnsureWslconfig(),
   },
@@ -37,6 +40,7 @@ const SETUP_STEPS: SetupStep[] = [
     name: 'Agent Registration',
     description: 'This step will register the server daemon with the WSL instance.',
     rebootRequired: false,
+    canRefresh: true,
     check: () => check3AgentRegistered(),
     install: () => install3RegisterAgent(),
   },
@@ -63,7 +67,7 @@ export interface UseSetupGuard {
   currentStep?: StepDisplay;
   outputSink: string[];
   performCheck: () => void;
-  performInstall: () => void;
+  performInstall: (forceReinstall?: boolean) => void;
 }
 
 export interface StepDisplay {
@@ -137,7 +141,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
       options?.onCheckComplete?.();
     }
   }, [state.pending]);
-  const performInstall = useCallback(async () => {
+  const performInstall = useCallback(async (forceReinstall?: boolean) => {
     if (state.pending) {
       return;
     }
@@ -164,7 +168,11 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
           draft.currentStepIndex = index;
           draft.steps[index]!.status = 'check';
         }));
-        await step.check();
+        if (forceReinstall && !step.rebootRequired && step.canRefresh) {
+          throw new Error('Performing force reinstall.');
+        } else {
+          await step.check();
+        }
         setState((prevState) => produce(prevState, (draft) => {
           draft.steps[index]!.status = 'ready';
         }));
@@ -174,7 +182,6 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
             draft.steps[index]!.status = 'install';
           }));
           await step.install();
-          await new Promise((r) => setTimeout(r, 1000));
           if (step.rebootRequired) {
             aborted = true;
             setState((prevState) => produce(prevState, (draft) => {
