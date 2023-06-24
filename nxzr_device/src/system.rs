@@ -156,6 +156,7 @@ impl From<std::io::Error> for SystemCommandError {
 }
 
 async fn run_system_command(mut command: Command) -> Result<(), SystemCommandError> {
+    command.kill_on_drop(true);
     let output = command.output().await?;
     if !output.status.success() {
         return Err(SystemCommandError::CommandFailed(
