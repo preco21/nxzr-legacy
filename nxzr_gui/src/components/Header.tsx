@@ -1,7 +1,7 @@
-import { invoke } from '@tauri-apps/api/tauri';
 import React from 'react';
 import styled from 'styled-components';
 import { Button, Colors } from '@blueprintjs/core';
+import { openLogWindow } from '../common/commands';
 import { ProfileSelector } from './ProfileSelector';
 
 export interface HeaderProps {
@@ -18,9 +18,7 @@ export function Header(props: HeaderProps): React.ReactElement {
         <Button
           icon="console"
           minimal
-          onClick={async () => {
-            await invoke('open_log_window');
-          }}
+          onClick={() => openLogWindow()}
         />
         <Button icon="cog" disabled={disabled} minimal />
       </RightActions>

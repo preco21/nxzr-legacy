@@ -1,8 +1,8 @@
-import { invoke } from '@tauri-apps/api/tauri';
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Checkbox, Colors, ControlGroup, HTMLSelect, InputGroup } from '@blueprintjs/core';
 import { Console } from 'console-feed';
+import { revealLogFolder } from '../common/commands';
 import * as logger from '../utils/logger';
 import { MainContainer } from '../components/MainContainer';
 
@@ -109,7 +109,7 @@ function LogPage(): React.ReactElement {
           intent="primary"
           minimal
           small
-          onClick={() => invoke('reveal_log_folder')}
+          onClick={() => revealLogFolder()}
         >
           Open log folder
         </Button>

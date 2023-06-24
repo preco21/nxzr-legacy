@@ -1,7 +1,7 @@
 import './bootstrap';
-import { invoke } from '@tauri-apps/api';
 import ReactDOM from 'react-dom/client';
 import { FocusStyleManager } from '@blueprintjs/core';
+import { windowReady } from './common/commands';
 import AppPage from './pages/App';
 import './styles.css';
 
@@ -11,4 +11,4 @@ ReactDOM.createRoot(document.getElementById('__root__') as HTMLElement).render(
   <AppPage />,
 );
 
-invoke('window_ready', { name: 'main' });
+windowReady('main');

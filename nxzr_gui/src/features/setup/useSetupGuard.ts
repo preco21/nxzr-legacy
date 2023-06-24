@@ -1,7 +1,13 @@
 import { produce } from 'immer';
-import { invoke } from '@tauri-apps/api/tauri';
-import { UnlistenFn, listen } from '@tauri-apps/api/event';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  check1SetupInstalled,
+  check2Wslconfig,
+  check3AgentRegistered,
+  install1ProgramSetup,
+  install2EnsureWslconfig,
+  install3RegisterAgent,
+} from '../../common/commands';
 
 interface SetupStep {
   name: string;
@@ -16,22 +22,22 @@ const SETUP_STEPS: SetupStep[] = [
     name: 'WSL & Program Requirements',
     description: 'This step will install all the necessary components of the program on your computer.',
     rebootRequired: true,
-    check: async () => invoke('check_1_setup_installed'),
-    install: async () => invoke('install_1_program_setup'),
+    check: () => check1SetupInstalled(),
+    install: () => install1ProgramSetup(),
   },
   {
     name: 'WSL Global Configuration',
     description: 'This step will ensure that WSL is configured correctly on your computer.',
     rebootRequired: false,
-    check: async () => invoke('check_2_wslconfig'),
-    install: async () => invoke('install_2_ensure_wslconfig'),
+    check: () => check2Wslconfig(),
+    install: () => install2EnsureWslconfig(),
   },
   {
     name: 'Agent Registration',
     description: 'This step will register the server daemon with the WSL instance.',
     rebootRequired: false,
-    check: async () => invoke('check_3_agent_registered'),
-    install: async () => invoke('install_3_register_agent'),
+    check: () => check3AgentRegistered(),
+    install: () => install3RegisterAgent(),
   },
 ];
 
@@ -208,15 +214,5 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     performCheck,
     performInstall,
   }), [state, performCheck]);
-  useEffect(() => {
-    let handle: UnlistenFn;
-    (async () => {
-      handle = await listen('install:log', (event) => {
-        // FIXME: save to output sink and display in UI
-        console.log(event);
-      });
-    })();
-    return () => handle();
-  }, []);
   return value;
 }

@@ -1,6 +1,6 @@
-import { invoke } from '@tauri-apps/api/tauri';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
+import { SubscribeLoggingResponse, cancelTask, sendLog, subscribeLogging } from '../common/commands';
 
 export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
 
@@ -12,11 +12,6 @@ export interface LogEntry {
     message: string;
   };
   target: string;
-}
-
-export interface SubscribeLoggingResponse {
-  logs: string[];
-  task_label: string;
 }
 
 export class LogListener {
@@ -40,7 +35,7 @@ export class LogListener {
       }
       this.initialLogs.push(parsed);
     });
-    const res = await invoke<SubscribeLoggingResponse>('subscribe_logging');
+    const res = await subscribeLogging();
     this.initialLogs = res.logs.map((logString) => ({
       ...JSON.parse(logString) as LogEntry,
       id: this.logId++,
@@ -61,7 +56,7 @@ export class LogListener {
       return;
     }
     this.internalLoggerHandle?.();
-    await invoke('cancel_task', { taskLabel: this.taskLabel });
+    await cancelTask(this.taskLabel!);
     this.initialLogs = [];
     this.taskLabel = undefined;
     this.listeners.clear();
@@ -72,15 +67,15 @@ export class LogListener {
 export const logListener = new LogListener();
 
 export async function info(message: string): Promise<void> {
-  await invoke('log', { kind: 'info', message });
+  await sendLog('info', message);
 }
 
 export async function warn(message: string): Promise<void> {
-  await invoke('log', { kind: 'warn', message });
+  await sendLog('warn', message);
 }
 
 export async function error(message: string): Promise<void> {
-  await invoke('log', { kind: 'error', message });
+  await sendLog('error', message);
 }
 
 export async function setupListenerHook(): Promise<void> {
