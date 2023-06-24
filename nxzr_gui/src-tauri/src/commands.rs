@@ -1,7 +1,7 @@
 use crate::{config, installer, state::AppState, util, AppError};
 use std::path::Path;
 use tauri::Manager;
-use tokio::process::Command;
+use tokio::{process::Command, sync::mpsc};
 
 #[tauri::command]
 pub fn window_ready(window: tauri::Window, name: String) -> Result<(), AppError> {
@@ -148,17 +148,13 @@ pub async fn check_3_agent_registered() -> Result<(), AppError> {
 
 #[tauri::command]
 pub async fn install_1_program_setup(handle: tauri::AppHandle) -> Result<(), AppError> {
-    let (mut out_stream, _script_handle) = installer::install_program_setup().await?;
-    while let Some(res) = out_stream.next().await {
-        match res {
-            Ok(line) => {
-                handle
-                    .emit_all("install:log", line)
-                    .expect("failed to emit install:log");
-            }
-            Err(err) => return Err(err.into()),
+    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        while let Some(line) = output_rx.recv().await {
+            tracing::trace!("[installer] install_1_program_setup: {}", line);
         }
-    }
+    });
+    installer::install_program_setup(Some(output_tx)).await?;
     Ok(())
 }
 
@@ -168,18 +164,13 @@ pub async fn install_2_ensure_wslconfig(handle: tauri::AppHandle) -> Result<(), 
         .path_resolver()
         .resolve_resource(config::WSL_KERNEL_IMAGE_NAME)
         .ok_or(anyhow::anyhow!("failed to resolve kernel image path"))?;
-    let (mut out_stream, _script_handle) =
-        installer::ensure_wslconfig(kernel_path.as_path()).await?;
-    while let Some(res) = out_stream.next().await {
-        match res {
-            Ok(line) => {
-                handle
-                    .emit_all("install:log", line)
-                    .expect("failed to emit install:log");
-            }
-            Err(err) => return Err(err.into()),
+    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        while let Some(line) = output_rx.recv().await {
+            tracing::trace!("[installer] install_2_ensure_wslconfig: {}", line);
         }
-    }
+    });
+    installer::ensure_wslconfig(kernel_path.as_path(), Some(output_tx)).await?;
     Ok(())
 }
 

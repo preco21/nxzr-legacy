@@ -195,7 +195,7 @@ pub async fn run_powershell_script_privileged(
         })
         .await;
         stream_read_handle.abort();
-        stream_read_handle.await;
+        let _ = stream_read_handle.await;
         res?;
     } else {
         run_system_command({
@@ -257,7 +257,7 @@ pub async fn run_powershell_script(
         });
         let output = child.wait_with_output().await?;
         stream_read_handle.abort();
-        stream_read_handle.await;
+        let _ = stream_read_handle.await;
         if !output.status.success() {
             return Err(SystemCommandError::CommandFailed(
                 std::str::from_utf8(&output.stderr)?.to_owned(),

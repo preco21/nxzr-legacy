@@ -1,11 +1,7 @@
-use crate::{
-    config,
-    util::{self, RunPowershellScriptHandle},
-};
-use std::{path::Path, pin::Pin};
+use crate::{config, util};
+use std::path::Path;
 use thiserror::Error;
-use tokio::fs;
-use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
+use tokio::{fs, sync::mpsc};
 
 const INSTALL_DEPS_SCRIPT: &str = include_str!("scripts/install-deps.ps1");
 const SETUP_WSLCONFIG_SCRIPT: &str = include_str!("scripts/setup-wslconfig.ps1");
@@ -78,6 +74,7 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
     // cannot be known before the program is built.
     //
     // So, it will be injected from Tauri's `build.rs` script.
+    // FIXME: This does not handles the escape characters properly. e.g. \ -> \\ need to revise.
     let actual_path = kernel_path
         .to_str()
         .ok_or(InstallerError::WslConfigMalformed)?;
@@ -103,35 +100,30 @@ pub async fn check_agent_registered() -> Result<(), InstallerError> {
     Ok(())
 }
 
-pub type InstallOutputPair = (
-    Pin<Box<dyn Stream<Item = Result<String, InstallerError>> + Send + 'static>>,
-    RunPowershellScriptHandle,
-);
-
 /// These scripts are responsible for checking / installing infrastructures and
 /// system requirements that is required to run NXZR for the current system.
-pub async fn install_program_setup() -> Result<InstallOutputPair, InstallerError> {
-    let (out_rx, script_handle) =
-        util::run_powershell_script(INSTALL_DEPS_SCRIPT, None, true).await?;
-    let stream = UnboundedReceiverStream::new(out_rx);
-    let stream = stream.map(|res| res.map_err(|err| err.into()));
-    Ok((Box::pin(stream), script_handle))
+pub async fn install_program_setup(
+    output_tx: Option<mpsc::UnboundedSender<String>>,
+) -> Result<(), InstallerError> {
+    util::run_powershell_script_privileged(INSTALL_DEPS_SCRIPT, None, output_tx).await?;
+    Ok(())
 }
 
-pub async fn ensure_wslconfig(kernel_path: &Path) -> Result<InstallOutputPair, InstallerError> {
+pub async fn ensure_wslconfig(
+    kernel_path: &Path,
+    output_tx: Option<mpsc::UnboundedSender<String>>,
+) -> Result<(), InstallerError> {
     let actual_path = kernel_path
         .to_str()
         .ok_or(InstallerError::WslConfigMalformed)?
         .to_owned();
-    let (out_rx, script_handle) = util::run_powershell_script(
+    util::run_powershell_script(
         SETUP_WSLCONFIG_SCRIPT,
         Some(vec!["-KernelPath".to_owned(), actual_path]),
-        false,
+        output_tx,
     )
     .await?;
-    let stream = UnboundedReceiverStream::new(out_rx);
-    let stream = stream.map(|res| res.map_err(|err| err.into()));
-    Ok((Box::pin(stream), script_handle))
+    Ok(())
 }
 
 pub async fn register_agent() {}
