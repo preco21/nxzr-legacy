@@ -173,7 +173,7 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
     let app_dirs = util::get_app_dirs().ok_or(InstallerError::AppDirResolveFailed)?;
     let install_dir = app_dirs
         .data_dir()
-        .join(Path::new(config::WSL_AGENT_INSTALL_DIR_NAME))
+        .join(Path::new(config::WSL_AGENT_INSTALL_FOLDER_NAME))
         .to_str()
         .ok_or(InstallerError::PathConvertFailed)?
         .to_owned();
