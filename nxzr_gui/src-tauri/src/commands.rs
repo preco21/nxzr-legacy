@@ -147,7 +147,7 @@ pub async fn check_3_agent_registered() -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub async fn install_1_program_setup(handle: tauri::AppHandle) -> Result<(), AppError> {
+pub async fn install_1_program_setup() -> Result<(), AppError> {
     let (output_tx, mut output_rx) = mpsc::unbounded_channel();
     tokio::spawn(async move {
         while let Some(line) = output_rx.recv().await {
