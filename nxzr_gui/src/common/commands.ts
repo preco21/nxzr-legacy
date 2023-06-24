@@ -55,3 +55,26 @@ export async function install2EnsureWslconfig(): Promise<void> {
 export async function install3RegisterAgent(): Promise<void> {
   await invoke('install_3_register_agent');
 }
+
+// Operation
+export interface AdapterInfo {
+  id: string;
+  serial: string;
+  name: string;
+  bus_id: string;
+  hardware_id: string;
+  is_attached: boolean;
+}
+
+export async function listHidAdapters(): Promise<AdapterInfo[]> {
+  console.log('hid adapters');
+  return invoke<AdapterInfo[]>('list_hid_adapters');
+}
+
+export async function attachHidAdapter(hardwareId: string): Promise<void> {
+  await invoke('attach_hid_adapter', { hardwareId });
+}
+
+export async function detachHidAdapter(hardwareId: string): Promise<void> {
+  await invoke('detach_hid_adapter', { hardwareId });
+}

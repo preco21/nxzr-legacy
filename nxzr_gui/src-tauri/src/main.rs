@@ -9,6 +9,7 @@ use tauri::Manager;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing_subscriber::prelude::*;
+use usbipd::UsbipdError;
 use util::SystemCommandError;
 use wsl::WslError;
 
@@ -16,6 +17,7 @@ mod commands;
 mod config;
 mod installer;
 mod state;
+mod usbipd;
 mod util;
 mod wsl;
 
@@ -39,6 +41,8 @@ pub enum AppError {
     InstallerError(#[from] InstallerError),
     #[error(transparent)]
     WslError(#[from] WslError),
+    #[error(transparent)]
+    UsbipdError(#[from] UsbipdError),
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 }
@@ -105,6 +109,9 @@ async fn main() -> anyhow::Result<()> {
             commands::install_2_ensure_wslconfig,
             commands::install_3_register_agent,
             commands::shutdown_wsl,
+            commands::list_hid_adapters,
+            commands::attach_hid_adapter,
+            commands::detach_hid_adapter,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

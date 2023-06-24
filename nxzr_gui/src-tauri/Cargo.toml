@@ -20,7 +20,7 @@ tauri = { version = "1.3", features = [
     "window-unmaximize",
 ] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = "1.0.99"
 tokio = { version = "1.28.2", features = [
     "sync",
     "time",

@@ -1,4 +1,9 @@
-use crate::{config, installer, state::AppState, util, wsl, AppError};
+use crate::{
+    config, installer,
+    state::AppState,
+    usbipd::{self, AdapterInfo},
+    util, wsl, AppError,
+};
 use std::path::Path;
 use tauri::Manager;
 use tokio::process::Command;
@@ -168,5 +173,24 @@ pub async fn install_3_register_agent(handle: tauri::AppHandle) -> Result<(), Ap
 #[tauri::command]
 pub async fn shutdown_wsl() -> Result<(), AppError> {
     wsl::shutdown_wsl().await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, AppError> {
+    let adapters = usbipd::list_hid_adapters().await?;
+    tracing::info!("hid adapters: {:?}", adapters);
+    Ok(adapters)
+}
+
+#[tauri::command]
+pub async fn attach_hid_adapter(hardware_id: String) -> Result<(), AppError> {
+    usbipd::attach_hid_adapter(&hardware_id).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn detach_hid_adapter(hardware_id: String) -> Result<(), AppError> {
+    usbipd::detach_hid_adapter(&hardware_id).await?;
     Ok(())
 }

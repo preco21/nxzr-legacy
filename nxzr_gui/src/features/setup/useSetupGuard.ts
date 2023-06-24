@@ -1,5 +1,5 @@
 import { produce } from 'immer';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   check1SetupInstalled,
   check2Wslconfig,
@@ -57,7 +57,6 @@ export interface UseSetupGuardState {
   ready: boolean;
   steps: StepDisplay[];
   currentStepIndex?: number;
-  outputSink: string[];
 }
 
 export interface UseSetupGuard {
@@ -65,7 +64,6 @@ export interface UseSetupGuard {
   ready: boolean;
   steps: StepDisplay[];
   currentStep?: StepDisplay;
-  outputSink: string[];
   performCheck: () => void;
   performInstall: (forceReinstall?: boolean) => void;
 }
@@ -91,7 +89,6 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
       error: undefined,
     })),
     currentStepIndex: undefined,
-    outputSink: [],
   }));
   const performCheck = useCallback(async () => {
     if (state.pending) {
@@ -104,7 +101,6 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
         step.error = undefined;
       }
       draft.currentStepIndex = undefined;
-      draft.outputSink = [];
     }));
     let aborted = false;
     for (const [index, step] of SETUP_STEPS.entries()) {
@@ -153,7 +149,6 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
         step.error = undefined;
       }
       draft.currentStepIndex = undefined;
-      draft.outputSink = [];
     }));
     let aborted = false;
     for (const [index, step] of SETUP_STEPS.entries()) {
@@ -218,13 +213,12 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
       options?.onCheckComplete?.();
     }
   }, [state.pending]);
-  const value = useMemo(() => ({
+  return {
     ...state,
     currentStep: state.currentStepIndex != null
       ? state.steps[state.currentStepIndex]
       : undefined,
     performCheck,
     performInstall,
-  }), [state, performCheck]);
-  return value;
+  };
 }
