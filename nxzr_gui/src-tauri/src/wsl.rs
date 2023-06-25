@@ -36,8 +36,7 @@ pub async fn ensure_agent_distro_running() -> Result<(), WslError> {
         cmd.args(&["-d", config::WSL_AGENT_NAME, "--", "echo", "ok"]);
         cmd
     })
-    .await
-    .map_err(|err| WslError::SystemCommandError(err))?;
+    .await?;
     if output.is_empty() {
         return Err(WslError::WslDistroWarmUpFailed);
     }
