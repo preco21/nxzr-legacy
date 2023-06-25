@@ -136,7 +136,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     if (!aborted) {
       options?.onCheckComplete?.();
     }
-  }, [state.pending]);
+  }, [state.pending, options?.onCheckComplete]);
   const performInstall = useCallback(async (forceReinstall?: boolean) => {
     if (state.pending) {
       return;
@@ -212,7 +212,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     if (!aborted) {
       options?.onCheckComplete?.();
     }
-  }, [state.pending]);
+  }, [state.pending, options?.onCheckComplete]);
   return {
     ...state,
     currentStep: state.currentStepIndex != null

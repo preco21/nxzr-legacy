@@ -78,7 +78,7 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     } finally {
       setPending(false);
     }
-  }, [adapters, handleAdapterUpdate]);
+  }, [adapters, handleAdapterUpdate, options?.onAttached]);
   const detachAdapter = useCallback(async (id: string) => {
     const targetAdapter = adapters.find((adapter) => adapter.id === id);
     if (targetAdapter == null) {
@@ -95,7 +95,7 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     } finally {
       setPending(false);
     }
-  }, []);
+  }, [options?.onDetached]);
   return {
     pending,
     adapters,
