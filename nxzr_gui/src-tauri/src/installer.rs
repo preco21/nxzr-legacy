@@ -1,7 +1,12 @@
 use crate::{config, util, wsl};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use tokio::{fs, sync::mpsc, time};
+use tokio::io::AsyncWriteExt;
+use tokio::{
+    fs::{self, File},
+    sync::mpsc,
+    time,
+};
 
 const INSTALL_DEPS_SCRIPT: &str = include_str!("scripts/install-deps.ps1");
 
@@ -144,8 +149,10 @@ pub async fn ensure_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> 
         .replace("\\", "\\\\");
     let mut conf = ini::Ini::new();
     conf.with_section(Some("wsl2")).set("kernel", actual_path);
-    // This is a sync operation, but its overhead is very small so it is negligible.
-    conf.write_to_file(&wslconfig_dir)?;
+    let mut buf: Vec<u8> = Vec::new();
+    conf.write_to(&mut buf)?;
+    let mut config_file = File::create(&wslconfig_dir).await?;
+    config_file.write_all(&buf).await?;
     // Ensure WSL to pick up the changed config by restarting it.
     wsl::shutdown_wsl().await?;
     Ok(())
