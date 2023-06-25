@@ -80,7 +80,7 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     let (device, device_handle) = device::Device::create(DeviceConfig::default()).await?;
     let device = Arc::new(device);
 
-    let addr = "[::1]:50051"
+    let addr = "[::1]:50052"
         .to_socket_addrs()?
         .next()
         .ok_or(anyhow::anyhow!("failed to select an address to bind"))?;
