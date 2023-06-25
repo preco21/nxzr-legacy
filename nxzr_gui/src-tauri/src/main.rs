@@ -13,6 +13,7 @@ use usbipd::UsbipdError;
 use util::SystemCommandError;
 use wsl::WslError;
 
+mod agent;
 mod commands;
 mod config;
 mod installer;

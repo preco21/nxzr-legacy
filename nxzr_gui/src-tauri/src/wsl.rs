@@ -53,3 +53,16 @@ pub async fn full_refresh_wsl() -> Result<(), WslError> {
     util::run_powershell_script_privileged(WSL_FULL_REFRESH_SCRIPT, None, Some(output_tx)).await?;
     Ok(())
 }
+
+pub async fn spawn_wsl_shell_process() -> Result<(), WslError> {
+    let output = util::run_system_command({
+        let mut cmd = tokio::process::Command::new("wsl.exe");
+        cmd.args(&["-d", config::WSL_AGENT_NAME]);
+        cmd
+    })
+    .await?;
+    if output.is_empty() {
+        return Err(WslError::WslDistroWarmUpFailed);
+    }
+    Ok(())
+}
