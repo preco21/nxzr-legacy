@@ -61,7 +61,6 @@ export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactE
         onClose={handleClose}
       >
         <DialogBody>
-          <Description>Please choose a Bluetooth adapter.</Description>
           <AdapterSelect
             adapters={adapterManager.adapters}
             value={selectedAdapterId}
@@ -103,10 +102,6 @@ export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactE
 }
 
 const Container = styled.div`
-`;
-
-const Description = styled.div`
-  margin-bottom: 8px;
 `;
 
 const ErrorCallout = styled(Callout)`
