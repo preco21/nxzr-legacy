@@ -64,15 +64,15 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
         .devices
         .iter()
         .filter_map(|device| {
-            let Some((vid_pid, serial)) = parse_hardware_id(&device.instance_id) else {
+            // If the device is disconnected, it should be treated as a nonexistent device.
+            let Some(bus_id) = device.bus_id.clone() else {
                 return None;
             };
             let is_attached = match &device.client_wsl_instance {
                 Some(wsl_instance) => wsl_instance == config::WSL_AGENT_NAME,
                 None => false,
             };
-            // If the device is disconnected, it should be treated as a nonexistent device.
-            let Some(bus_id) = device.bus_id.clone() else {
+            let Some((vid_pid, serial)) = parse_hardware_id(&device.instance_id) else {
                 return None;
             };
             Some(AdapterInfo {
