@@ -24,33 +24,39 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
   const selectedAdapter = useMemo(() => {
     return adapters.find((adapter) => adapter.id === currentAdapterId);
   }, [adapters, currentAdapterId]);
+  const handleAdapterUpdate = useCallback((
+    newAdapters: AdapterInfo[],
+    currentAdapter: AdapterInfo | undefined,
+  ) => {
+    // Check if the current adapter is still available.
+    if (currentAdapter != null) {
+      const targetAdapter = newAdapters.find((adapter) => {
+        return adapter.id === currentAdapter.id;
+      });
+      if (targetAdapter == null || !targetAdapter.isAttached) {
+        setCurrentAdapterId(undefined);
+        options?.onAdapterLost?.(currentAdapter);
+      }
+    } else {
+      // Infer the current adapter from the list.
+      const currentlyAttached = newAdapters.find((adapter) => adapter.isAttached);
+      if (currentlyAttached != null) {
+        setCurrentAdapterId(currentlyAttached.id);
+        options?.onAdapterAutoSelected?.(currentlyAttached);
+      }
+    }
+  }, [options?.onAdapterLost, options?.onAdapterAutoSelected]);
   const refreshAdapterList = useCallback(async () => {
     try {
       setPending(true);
       setAdapters([]);
       const newAdapters = await listHidAdapters();
-      // Check if the current adapter is still available.
-      if (selectedAdapter != null) {
-        const targetAdapter = newAdapters.find((adapter) => {
-          return adapter.id === selectedAdapter.id;
-        });
-        if (targetAdapter == null) {
-          setCurrentAdapterId(undefined);
-          options?.onAdapterLost?.(selectedAdapter);
-        }
-      } else {
-        // Infer the current adapter from the list.
-        const currentlyAttached = newAdapters.find((adapter) => adapter.isAttached);
-        if (currentlyAttached != null) {
-          setCurrentAdapterId(currentlyAttached.id);
-          options?.onAdapterAutoSelected?.(currentlyAttached);
-        }
-      }
+      handleAdapterUpdate(newAdapters, selectedAdapter);
       setAdapters(newAdapters);
     } finally {
       setPending(false);
     }
-  }, [selectedAdapter]);
+  }, [selectedAdapter, handleAdapterUpdate]);
   const attachAdapter = useCallback(async (id: string) => {
     const targetAdapter = adapters.find((adapter) => adapter.id === id);
     if (targetAdapter == null) {
@@ -59,9 +65,12 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     try {
       setPending(true);
       await attachHidAdapter(targetAdapter.hardwareId);
+      // Fetch new adapter state.
       const newAdapters = await listHidAdapters();
       setAdapters(newAdapters);
       setCurrentAdapterId(targetAdapter.id);
+      // Check if the `targetAdapter` is still available.
+      handleAdapterUpdate(newAdapters, targetAdapter);
       options?.onAttached?.(targetAdapter);
     } catch (err) {
       setCurrentAdapterId(undefined);
@@ -69,7 +78,7 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     } finally {
       setPending(false);
     }
-  }, [adapters]);
+  }, [adapters, handleAdapterUpdate]);
   const detachAdapter = useCallback(async (id: string) => {
     const targetAdapter = adapters.find((adapter) => adapter.id === id);
     if (targetAdapter == null) {
@@ -78,8 +87,10 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     try {
       setPending(true);
       await detachHidAdapter(targetAdapter.hardwareId);
+      // Fetch new adapter state.
       const newAdapters = await listHidAdapters();
       setAdapters(newAdapters);
+      setCurrentAdapterId(undefined);
       options?.onDetached?.(targetAdapter);
     } finally {
       setPending(false);
