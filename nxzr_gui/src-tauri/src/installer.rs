@@ -76,7 +76,7 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
     // Checks if the `.wslconfig` is properly configured with specific fields.
     let wslconfig_raw = fs::read(wslconfig_dir.as_path()).await?;
     let wslconfig_content = String::from_utf8_lossy(&wslconfig_raw);
-    let ini_conf = ini::Ini::load_from_str_noescape(&wslconfig_content)
+    let ini_conf = ini::Ini::load_from_str(&wslconfig_content)
         .map_err(|_err| InstallerError::WslConfigMalformed)?;
     let section = ini_conf
         .section(Some("wsl2"))
@@ -90,8 +90,7 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
     // So, it will be injected from Tauri's `build.rs` script.
     let actual_path = kernel_path
         .to_str()
-        .ok_or(InstallerError::PathConversionFailed)?
-        .replace("\\", "\\\\");
+        .ok_or(InstallerError::PathConversionFailed)?;
     if field_val != actual_path {
         return Err(InstallerError::WslConfigFieldMismatch);
     }
@@ -145,8 +144,7 @@ pub async fn ensure_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> 
     // So, it will be injected from Tauri's `build.rs` script.
     let actual_path = kernel_path
         .to_str()
-        .ok_or(InstallerError::PathConversionFailed)?
-        .replace("\\", "\\\\");
+        .ok_or(InstallerError::PathConversionFailed)?;
     let mut conf = ini::Ini::new();
     conf.with_section(Some("wsl2")).set("kernel", actual_path);
     let mut buf: Vec<u8> = Vec::new();

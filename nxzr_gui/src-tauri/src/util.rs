@@ -222,6 +222,7 @@ pub async fn run_powershell_script_privileged(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn run_powershell_script(
     script: &str,
     args: Option<Vec<String>>,
