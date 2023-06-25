@@ -51,7 +51,7 @@ export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactE
     <Container className={className}>
       <Dialog
         className="bp5-dark"
-        title="Bluetooth Adapter Select"
+        title="Choose a Bluetooth Adapter"
         icon="signal-search"
         isOpen={isOpen}
         canEscapeKeyClose={!pending}
@@ -61,7 +61,7 @@ export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactE
         onClose={handleClose}
       >
         <DialogBody>
-          <Description>Please select the appropriate Bluetooth adapter.</Description>
+          <Description>Please choose a Bluetooth adapter.</Description>
           <AdapterSelect
             adapters={adapterManager.adapters}
             value={selectedAdapterId}
