@@ -33,7 +33,6 @@ export function AdapterSelect(props: AdapterSelectProps): React.ReactElement {
           iconName="caret-down"
           disabled={disabled}
           placeholder="Select an adapter..."
-          fill
           onChange={(e) => onSelect?.(e.target.value)}
         />
         <Button icon="refresh" disabled={disabled} onClick={onRefresh} />
