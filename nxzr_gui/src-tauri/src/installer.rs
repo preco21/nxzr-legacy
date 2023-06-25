@@ -1,10 +1,9 @@
 use crate::{config, util, wsl};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio::{fs, sync::mpsc, time};
 
 const INSTALL_DEPS_SCRIPT: &str = include_str!("scripts/install-deps.ps1");
-const SETUP_WSLCONFIG_SCRIPT: &str = include_str!("scripts/setup-wslconfig.ps1");
 
 #[derive(Debug, Error)]
 pub enum InstallerError {
@@ -31,7 +30,7 @@ pub enum InstallerError {
     #[error("failed to resolve app dirs")]
     AppDirResolveFailed,
     #[error("failed to convert path")]
-    PathConvertFailed,
+    PathConversionFailed,
     #[error(transparent)]
     SystemCommandError(#[from] util::SystemCommandError),
     #[error(transparent)]
@@ -68,7 +67,7 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
         .join(".wslconfig");
     if !util::file_exists(wslconfig_dir.as_path()).await {
         return Err(InstallerError::WslConfigResolveFailed);
-    };
+    }
     // Checks if the `.wslconfig` is properly configured with specific fields.
     let wslconfig_raw = fs::read(wslconfig_dir.as_path()).await?;
     let wslconfig_content = String::from_utf8_lossy(&wslconfig_raw);
@@ -86,7 +85,7 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
     // So, it will be injected from Tauri's `build.rs` script.
     let actual_path = kernel_path
         .to_str()
-        .ok_or(InstallerError::PathConvertFailed)?
+        .ok_or(InstallerError::PathConversionFailed)?
         .replace("\\", "\\\\");
     if field_val != actual_path {
         return Err(InstallerError::WslConfigFieldMismatch);
@@ -124,26 +123,42 @@ pub async fn install_program_setup() -> Result<(), InstallerError> {
 }
 
 pub async fn ensure_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
+    // Checks if the `.wslconfig` exists in the user folder.
+    let home_dir = directories::UserDirs::new()
+        .ok_or(InstallerError::WslConfigResolveFailed)?
+        .home_dir()
+        .to_owned();
+    let wslconfig_dir = home_dir.join(".wslconfig");
+    // If the file already exists, creates a backup.
+    if util::file_exists(wslconfig_dir.as_path()).await {
+        let backup_path = find_available_wslconfig_backup(&home_dir).await;
+        fs::copy(&wslconfig_dir, &backup_path).await?;
+    }
+    // The path to the binary must be provided by the caller itself, because it
+    // cannot be known before the program is built.
+    //
+    // So, it will be injected from Tauri's `build.rs` script.
     let actual_path = kernel_path
         .to_str()
-        .ok_or(InstallerError::WslConfigMalformed)?
-        .replace("\\", "\\\\")
-        .to_owned();
-    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
-    tokio::spawn(async move {
-        while let Some(line) = output_rx.recv().await {
-            tracing::trace!("[installer] install_2_ensure_wslconfig: {}", line);
-        }
-    });
-    util::run_powershell_script(
-        SETUP_WSLCONFIG_SCRIPT,
-        Some(vec!["-KernelPath".to_owned(), actual_path]),
-        Some(output_tx),
-    )
-    .await?;
+        .ok_or(InstallerError::PathConversionFailed)?
+        .replace("\\", "\\\\");
+    let mut conf = ini::Ini::new();
+    conf.with_section(Some("wsl2")).set("kernel", actual_path);
+    // This is a sync operation, but its overhead is very small so it is negligible.
+    conf.write_to_file(&wslconfig_dir)?;
     // Ensure WSL to pick up the changed config by restarting it.
     wsl::shutdown_wsl().await?;
     Ok(())
+}
+
+async fn find_available_wslconfig_backup(home_dir: &Path) -> PathBuf {
+    let mut idx = 0;
+    let mut backup_path = home_dir.join("wslconfig.back");
+    while util::file_exists(&backup_path).await {
+        idx += 1;
+        backup_path = home_dir.join(format!("wslconfig.back.{}", idx));
+    }
+    backup_path
 }
 
 pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerError> {
@@ -179,12 +194,12 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
         .data_dir()
         .join(Path::new(config::WSL_AGENT_INSTALL_FOLDER_NAME))
         .to_str()
-        .ok_or(InstallerError::PathConvertFailed)?
+        .ok_or(InstallerError::PathConversionFailed)?
         .to_owned();
     tracing::info!("installing agent distro in: {}", &install_dir);
     let agent_archive_path = agent_archive_path
         .to_str()
-        .ok_or(InstallerError::PathConvertFailed)?
+        .ok_or(InstallerError::PathConversionFailed)?
         .to_owned();
     tracing::info!("agent archive path: {}", &agent_archive_path);
     util::run_system_command({
