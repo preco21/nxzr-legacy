@@ -112,6 +112,7 @@ async fn main() -> anyhow::Result<()> {
             commands::list_hid_adapters,
             commands::attach_hid_adapter,
             commands::detach_hid_adapter,
+            commands::full_refresh_wsl,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

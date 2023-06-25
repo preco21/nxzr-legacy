@@ -1,6 +1,8 @@
 use crate::{config, util};
 use thiserror::Error;
-use tokio::time;
+use tokio::{sync::mpsc, time};
+
+const WSL_FULL_REFRESH_SCRIPT: &str = include_str!("scripts/full-refresh-wsl.ps1");
 
 #[derive(Debug, Error)]
 pub enum WslError {
@@ -39,5 +41,16 @@ pub async fn ensure_agent_distro_running() -> Result<(), WslError> {
     if output.is_empty() {
         return Err(WslError::WslDistroWarmUpFailed);
     }
+    Ok(())
+}
+
+pub async fn full_refresh_wsl() -> Result<(), WslError> {
+    let (output_tx, mut output_rx) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        while let Some(line) = output_rx.recv().await {
+            tracing::trace!("[wsl] full WSL refresh: {}", line);
+        }
+    });
+    util::run_powershell_script_privileged(WSL_FULL_REFRESH_SCRIPT, None, Some(output_tx)).await?;
     Ok(())
 }

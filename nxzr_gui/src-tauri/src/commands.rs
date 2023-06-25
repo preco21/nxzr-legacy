@@ -189,3 +189,10 @@ pub async fn detach_hid_adapter(hardware_id: String) -> Result<(), AppError> {
     usbipd::detach_hid_adapter(&hardware_id).await?;
     Ok(())
 }
+
+// Misc
+#[tauri::command]
+pub async fn full_refresh_wsl() -> Result<(), AppError> {
+    wsl::full_refresh_wsl().await?;
+    Ok(())
+}
