@@ -15,6 +15,8 @@ pub enum UsbipdError {
     #[error(transparent)]
     WslError(#[from] wsl::WslError),
     #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
@@ -38,7 +40,7 @@ pub struct UsbipdState {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all(deserialize = "PascalCase"))]
 pub struct UsbipdStateDevice {
-    pub bus_id: String,
+    pub bus_id: Option<String>,
     pub client_ip_address: Option<String>,
     pub client_wsl_instance: Option<String>,
     pub description: String,
@@ -57,7 +59,7 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
     })
     .await
     .map_err(|err| UsbipdError::UsbipdStateLookupFailed(err.to_string()))?;
-    let parsed: UsbipdState = serde_json::from_str(&output).unwrap();
+    let parsed: UsbipdState = serde_json::from_str(&output)?;
     let adapter_info_vec = parsed
         .devices
         .iter()
@@ -69,10 +71,14 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
                 Some(wsl_instance) => wsl_instance == config::WSL_AGENT_NAME,
                 None => false,
             };
+            // If the device is disconnected, it should be treated as a nonexistent device.
+            let Some(bus_id) = device.bus_id.clone() else {
+                return None;
+            };
             Some(AdapterInfo {
                 id: vid_pid.clone(),
                 serial,
-                bus_id: device.bus_id.clone(),
+                bus_id,
                 hardware_id: vid_pid,
                 name: device.description.clone(),
                 is_attached,
