@@ -56,7 +56,7 @@ export async function install3RegisterAgent(): Promise<void> {
   await wrapError(invoke('install_3_register_agent'));
 }
 
-// Operation
+// Usbipd
 export interface AdapterInfo {
   id: string;
   serial: string;
@@ -76,6 +76,11 @@ export async function attachHidAdapter(hardwareId: string): Promise<void> {
 
 export async function detachHidAdapter(hardwareId: string): Promise<void> {
   await wrapError(invoke('detach_hid_adapter', { hardwareId }));
+}
+
+// WSL
+export async function launchWslInstance(): Promise<void> {
+  await wrapError(invoke('launch_wsl'));
 }
 
 async function wrapError<T>(promise: Promise<T>): Promise<T> {

@@ -7,16 +7,21 @@ use std::{future::Future, sync::Arc};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex};
 
+use crate::wsl;
+
 #[derive(Debug, Error)]
 pub enum AgentManagerError {
+    #[error("wsl instance already launched")]
+    WslInstanceAlreadyLaunched,
+    #[error(transparent)]
+    WslError(#[from] wsl::WslError),
     #[error(transparent)]
     Event(#[from] event::EventError),
 }
 
 #[derive(Debug)]
 pub struct AgentManager {
-    wsl_instance: Arc<Mutex<Option<AsyncGroupChild>>>,
-    wsl_ready_tx: watch::Sender<bool>,
+    wsl_instance_tx: watch::Sender<Option<AsyncGroupChild>>,
     msg_tx: mpsc::Sender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     sig_close_tx: broadcast::Sender<()>,
@@ -34,6 +39,7 @@ impl AgentManager {
 
         // Inner를 따로 만들어야 할 수도 있다 async task 때문에...
         Ok(Self {
+            wsl_instance_tx: watch::channel(None).0,
             msg_tx,
             event_sub_tx,
             sig_close_tx,
@@ -41,18 +47,19 @@ impl AgentManager {
         })
     }
 
-    // FIXME: 페이즈1
-    pub async fn launch_wsl_instance() -> Result<(), AgentManagerError> {
-        // 0. spawn a task that
-        // 1. launch wsl instance
-        // 2. set wsl_ready when ready
-        // 3.
-        unimplemented!()
+    pub async fn launch_wsl_instance(&self) -> Result<(), AgentManagerError> {
+        let rx = self.wsl_instance_tx.subscribe();
+        if rx.borrow().is_some() {
+            return Err(AgentManagerError::WslInstanceAlreadyLaunched);
+        }
+        let child = wsl::spawn_wsl_shell_process().await?;
+        self.wsl_instance_tx.send_replace(Some(child));
+        Ok(())
     }
 
     pub async fn wsl_ready(&self) {
-        let mut rx = self.wsl_ready_tx.subscribe();
-        while !*rx.borrow() {
+        let mut rx = self.wsl_instance_tx.subscribe();
+        while rx.borrow().is_some() {
             rx.changed().await.unwrap();
         }
     }

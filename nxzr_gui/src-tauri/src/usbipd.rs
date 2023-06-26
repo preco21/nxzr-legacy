@@ -89,7 +89,6 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
 }
 
 pub async fn attach_hid_adapter(hardware_id: &str) -> Result<(), UsbipdError> {
-    wsl::ensure_agent_distro_running().await?;
     // Always detach already attached adapter before attaching new one.
     detach_hid_adapter(&hardware_id).await?;
     // Wait for a second to make sure the detach is complete.

@@ -1,4 +1,4 @@
-use crate::AppError;
+use crate::{agent::AgentManager, AppError};
 use nxzr_shared::{event::SubscriptionReq, setup_event};
 use ringbuf::Rb;
 use std::{collections::HashMap, future::Future, sync::Arc};
@@ -8,13 +8,18 @@ use tokio::{
 };
 
 pub struct AppState {
+    pub agent_manager: Arc<AgentManager>,
     pub logging: Arc<LoggingState>,
     pub task_handles: Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>,
 }
 
 impl AppState {
-    pub fn new(log_sub_tx: mpsc::Sender<SubscriptionReq<LoggingEvent>>) -> Self {
+    pub fn new(
+        log_sub_tx: mpsc::Sender<SubscriptionReq<LoggingEvent>>,
+        agent_manager: Arc<AgentManager>,
+    ) -> Self {
         Self {
+            agent_manager,
             logging: Arc::new(LoggingState {
                 seen_buf: Mutex::new(ringbuf::HeapRb::new(1024)),
                 log_sub_tx,

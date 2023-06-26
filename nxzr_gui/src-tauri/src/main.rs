@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use agent::AgentManagerError;
 use installer::InstallerError;
 use nxzr_shared::event::EventError;
 use state::{AppState, LoggingEvent};
@@ -40,6 +41,8 @@ pub enum AppError {
     SystemCommandError(#[from] SystemCommandError),
     #[error(transparent)]
     InstallerError(#[from] InstallerError),
+    #[error(transparent)]
+    AgentManagerError(#[from] AgentManagerError),
     #[error(transparent)]
     WslError(#[from] WslError),
     #[error(transparent)]
@@ -92,7 +95,8 @@ async fn main() -> anyhow::Result<()> {
     let (log_sub_tx, log_sub_rx) = mpsc::channel(1);
     LoggingEvent::handle_events(log_out_rx, log_sub_rx)?;
 
-    let app_state = AppState::new(log_sub_tx);
+    let agent_manager = Arc::new(agent::AgentManager::new().await?);
+    let app_state = AppState::new(log_sub_tx, agent_manager);
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(app_state)
@@ -109,10 +113,11 @@ async fn main() -> anyhow::Result<()> {
             commands::install_1_program_setup,
             commands::install_2_ensure_wslconfig,
             commands::install_3_register_agent,
-            commands::shutdown_wsl,
             commands::list_hid_adapters,
             commands::attach_hid_adapter,
             commands::detach_hid_adapter,
+            commands::launch_wsl_instance,
+            commands::shutdown_wsl,
             commands::full_refresh_wsl,
         ])
         .on_window_event(|event| match event.event() {

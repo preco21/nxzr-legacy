@@ -164,15 +164,12 @@ pub async fn install_3_register_agent(handle: tauri::AppHandle) -> Result<(), Ap
     Ok(())
 }
 
-// Operation
+// Usbipd
 #[tauri::command]
-pub async fn shutdown_wsl() -> Result<(), AppError> {
-    wsl::shutdown_wsl().await?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, AppError> {
+pub async fn list_hid_adapters(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<AdapterInfo>, AppError> {
+    state.agent_manager.wsl_ready().await;
     let adapters = usbipd::list_hid_adapters().await?;
     tracing::info!("hid adapters: {:?}", adapters);
     Ok(adapters)
@@ -190,7 +187,19 @@ pub async fn detach_hid_adapter(hardware_id: String) -> Result<(), AppError> {
     Ok(())
 }
 
-// Misc
+// Wsl
+#[tauri::command]
+pub async fn launch_wsl_instance(state: tauri::State<'_, AppState>) -> Result<(), AppError> {
+    state.agent_manager.launch_wsl_instance().await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn shutdown_wsl() -> Result<(), AppError> {
+    wsl::shutdown_wsl().await?;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn full_refresh_wsl() -> Result<(), AppError> {
     wsl::full_refresh_wsl().await?;

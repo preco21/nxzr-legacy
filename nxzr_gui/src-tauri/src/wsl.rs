@@ -1,4 +1,5 @@
 use crate::{config, util};
+use command_group::AsyncGroupChild;
 use thiserror::Error;
 use tokio::{sync::mpsc, time};
 
@@ -30,18 +31,19 @@ pub async fn shutdown_wsl() -> Result<(), WslError> {
     Ok(())
 }
 
-pub async fn ensure_agent_distro_running() -> Result<(), WslError> {
-    let output = util::run_system_command({
-        let mut cmd = tokio::process::Command::new("wsl.exe");
-        cmd.args(&["-d", config::WSL_AGENT_NAME, "--", "echo", "ok"]);
-        cmd
-    })
-    .await?;
-    if output.is_empty() {
-        return Err(WslError::WslDistroWarmUpFailed);
-    }
-    Ok(())
-}
+// FIXME: unused
+// pub async fn ensure_agent_distro_running() -> Result<(), WslError> {
+//     let output = util::run_system_command({
+//         let mut cmd = tokio::process::Command::new("wsl.exe");
+//         cmd.args(&["-d", config::WSL_AGENT_NAME, "--", "echo", "ok"]);
+//         cmd
+//     })
+//     .await?;
+//     if output.is_empty() {
+//         return Err(WslError::WslDistroWarmUpFailed);
+//     }
+//     Ok(())
+// }
 
 pub async fn full_refresh_wsl() -> Result<(), WslError> {
     let (output_tx, mut output_rx) = mpsc::unbounded_channel();
@@ -54,15 +56,12 @@ pub async fn full_refresh_wsl() -> Result<(), WslError> {
     Ok(())
 }
 
-pub async fn spawn_wsl_shell_process() -> Result<(), WslError> {
-    let output = util::run_system_command({
+pub async fn spawn_wsl_shell_process() -> Result<AsyncGroupChild, WslError> {
+    let (child, _stdout, _stderr) = util::spawn_system_command({
         let mut cmd = tokio::process::Command::new("wsl.exe");
         cmd.args(&["-d", config::WSL_AGENT_NAME]);
         cmd
     })
     .await?;
-    if output.is_empty() {
-        return Err(WslError::WslDistroWarmUpFailed);
-    }
-    Ok(())
+    Ok(child)
 }

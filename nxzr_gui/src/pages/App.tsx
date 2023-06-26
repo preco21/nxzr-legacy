@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { css } from 'styled-components';
+import { launchWslInstance } from '../common/commands';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
@@ -16,7 +17,10 @@ function AppPage(): React.ReactElement {
   const adapterManager = useAdapterManager({
   });
   const setupGuard = useSetupGuard({
-    onCheckComplete: useCallback(() => adapterManager.refreshAdapterList(), []),
+    onCheckComplete: useCallback(async () => {
+      await launchWslInstance();
+      await adapterManager.refreshAdapterList();
+    }, []),
     onRebootRequest: useCallback(() => {
       setRebootRequested(true);
     }, []),
