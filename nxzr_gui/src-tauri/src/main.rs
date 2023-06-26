@@ -8,7 +8,7 @@ use state::{AppState, LoggingEvent};
 use std::{path::Path, sync::Arc};
 use tauri::Manager;
 use thiserror::Error;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tracing_subscriber::prelude::*;
 use usbipd::UsbipdError;
 use util::SystemCommandError;
@@ -97,21 +97,24 @@ async fn main() -> anyhow::Result<()> {
 
     let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
     let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel(1);
-    let (sig_shutdown_tx, mut sig_shutdown_rx) = mpsc::channel(1);
+    let (sig_shutdown_tx, mut sig_shutdown_rx) = mpsc::channel::<oneshot::Sender<()>>(1);
     tokio::spawn(async move {
-        let _ = sig_shutdown_rx.recv().await;
+        let tx = sig_shutdown_rx.recv().await.unwrap();
         drop(shutdown_rx);
+        let _ = shutdown_complete_rx.recv().await;
+        let _ = tx.send(());
     });
 
     // FIXME: test
     tokio::spawn({
         let shutdown_tx = shutdown_tx.clone();
-        let sig_shutdown_tx = sig_shutdown_tx.clone();
+        let shutdown_complete_tx = shutdown_complete_tx.clone();
         async move {
             let _ = shutdown_tx.closed().await;
             tracing::info!("close signal received");
             tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
-            drop(sig_shutdown_tx);
+            tracing::info!("exit");
+            drop(shutdown_complete_tx);
         }
     });
 
@@ -172,8 +175,9 @@ async fn main() -> anyhow::Result<()> {
                 let app_handle = app_handle.clone();
                 let sig_shutdown_tx = sig_shutdown_tx.clone();
                 tokio::spawn(async move {
-                    let _ = sig_shutdown_tx.send(()).await;
-                    let _ = shutdown_complete_rx.recv().await;
+                    let (tx, rx) = oneshot::channel();
+                    let _ = sig_shutdown_tx.send(tx).await;
+                    let _ = rx.await;
                     app_handle.exit(0);
                 });
             }
