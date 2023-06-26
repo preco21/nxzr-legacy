@@ -51,7 +51,7 @@ pub struct NxzrService {
     device: Arc<device::Device>,
     conn_state: Arc<Mutex<ConnectionState>>,
     shutdown_token: CancellationToken,
-    shutdown_complete_tx: mpsc::Sender<()>,
+    shutdown_complete_tx: mpsc::WeakSender<()>,
 }
 
 #[derive(Debug)]
@@ -72,7 +72,7 @@ impl NxzrService {
             device,
             conn_state: Arc::new(Mutex::new(ConnectionState::NotConnected)),
             shutdown_token,
-            shutdown_complete_tx,
+            shutdown_complete_tx: shutdown_complete_tx.downgrade(),
         })
     }
 }
@@ -124,7 +124,7 @@ impl Nxzr for NxzrService {
             mpsc::unbounded_channel::<Result<ConnectSwitchResponse, Status>>();
 
         tokio::spawn({
-            let shutdown_complete_guard = self.shutdown_complete_tx.clone();
+            let shutdown_complete_guard = self.shutdown_complete_tx.clone().upgrade().unwrap();
             let shutdown_token = self.shutdown_token.clone();
             let device = self.device.clone();
             let conn_state = self.conn_state.clone();

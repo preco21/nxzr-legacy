@@ -11,12 +11,16 @@ pub struct AppState {
     pub agent_manager: Arc<AgentManager>,
     pub logging: Arc<LoggingState>,
     pub task_handles: Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>,
+    pub shutdown_tx: mpsc::Sender<()>,
+    pub shutdown_complete_tx: mpsc::WeakSender<()>,
 }
 
 impl AppState {
     pub fn new(
-        log_sub_tx: mpsc::Sender<SubscriptionReq<LoggingEvent>>,
         agent_manager: Arc<AgentManager>,
+        log_sub_tx: mpsc::Sender<SubscriptionReq<LoggingEvent>>,
+        shutdown_tx: mpsc::Sender<()>,
+        shutdown_complete_tx: mpsc::Sender<()>,
     ) -> Self {
         Self {
             agent_manager,
@@ -25,6 +29,8 @@ impl AppState {
                 log_sub_tx,
             }),
             task_handles: Mutex::new(HashMap::new()),
+            shutdown_tx,
+            shutdown_complete_tx: shutdown_complete_tx.downgrade(),
         }
     }
 

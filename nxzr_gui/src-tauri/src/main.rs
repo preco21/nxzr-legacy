@@ -95,8 +95,16 @@ async fn main() -> anyhow::Result<()> {
     let (log_sub_tx, log_sub_rx) = mpsc::channel(1);
     LoggingEvent::handle_events(log_out_rx, log_sub_rx)?;
 
+    let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+    let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel(1);
+    let (sig_shutdown_tx, mut sig_shutdown_rx) = mpsc::channel(1);
+    tokio::spawn(async move {
+        let _ = sig_shutdown_rx.recv().await;
+        drop(shutdown_rx);
+    });
+
     let agent_manager = Arc::new(agent::AgentManager::new().await?);
-    let app_state = AppState::new(log_sub_tx, agent_manager);
+    let app_state = AppState::new(agent_manager, log_sub_tx, shutdown_tx, shutdown_complete_tx);
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(app_state)
@@ -145,8 +153,16 @@ async fn main() -> anyhow::Result<()> {
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             tracing::info!("{}, {:?}, {}", app.package_info().name, argv, cwd);
         }))
-        .run(tauri::generate_context!())
-        .map_err(|err| anyhow::anyhow!("error while running application: {}", err))?;
+        .build(tauri::generate_context!())
+        .map_err(|err| anyhow::anyhow!("error while running application: {}", err))?
+        .run(move |app_handle, event| match event {
+            tauri::RunEvent::ExitRequested { .. } => {
+                let _ = sig_shutdown_tx.blocking_send(());
+                let _ = shutdown_complete_rx.blocking_recv();
+                app_handle.exit(0);
+            }
+            _ => {}
+        });
 
     Ok(())
 }
