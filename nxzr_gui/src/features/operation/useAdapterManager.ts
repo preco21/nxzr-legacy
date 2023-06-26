@@ -49,10 +49,12 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
   const refreshAdapterList = useCallback(async () => {
     try {
       setPending(true);
-      setAdapters([]);
       const newAdapters = await listHidAdapters();
       handleAdapterUpdate(newAdapters, selectedAdapter);
       setAdapters(newAdapters);
+    } catch (err) {
+      setAdapters([]);
+      throw err;
     } finally {
       setPending(false);
     }

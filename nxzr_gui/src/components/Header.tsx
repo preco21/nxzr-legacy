@@ -22,7 +22,7 @@ export function Header(props: HeaderProps): React.ReactElement {
           <AdapterDisplayButton
             icon="antenna"
             disabled={disabled}
-            loading={adapterPending}
+            loading={adapterInfo == null && adapterPending}
             small
             onClick={onAdapterDisplayClick}
           >

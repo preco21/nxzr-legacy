@@ -42,10 +42,10 @@ export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactE
   };
   useEffect(() => {
     const currentAdapter = adapterManager.selectedAdapter;
-    if (currentAdapter != null) {
+    if (isOpen && currentAdapter != null) {
       setSelectedAdapterId(currentAdapter.id);
     }
-  }, [adapterManager.selectedAdapter]);
+  }, [isOpen, adapterManager.selectedAdapter]);
   const pending = adapterManager.pending;
   return (
     <Container className={className}>
