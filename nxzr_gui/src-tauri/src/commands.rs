@@ -190,7 +190,11 @@ pub async fn detach_hid_adapter(hardware_id: String) -> Result<(), AppError> {
 // Wsl
 #[tauri::command]
 pub async fn launch_wsl_instance(state: tauri::State<'_, AppState>) -> Result<(), AppError> {
-    state.agent_manager.launch_wsl_instance().await?;
+    // The instance may already be launched, we're ignoring it when it's the case.
+    let res = state.agent_manager.launch_wsl_instance().await;
+    if let Err(err) = res {
+        tracing::error!("failed to launch wsl instance: {}", err);
+    }
     Ok(())
 }
 

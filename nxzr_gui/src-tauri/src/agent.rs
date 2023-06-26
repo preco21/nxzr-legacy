@@ -48,8 +48,7 @@ impl AgentManager {
     }
 
     pub async fn launch_wsl_instance(&self) -> Result<(), AgentManagerError> {
-        let rx = self.wsl_instance_tx.subscribe();
-        if rx.borrow().is_some() {
+        if self.wsl_instance_tx.borrow().is_some() {
             return Err(AgentManagerError::WslInstanceAlreadyLaunched);
         }
         let child = wsl::spawn_wsl_shell_process().await?;
@@ -59,7 +58,7 @@ impl AgentManager {
 
     pub async fn wsl_ready(&self) {
         let mut rx = self.wsl_instance_tx.subscribe();
-        while rx.borrow().is_some() {
+        while rx.borrow().is_none() {
             rx.changed().await.unwrap();
         }
     }

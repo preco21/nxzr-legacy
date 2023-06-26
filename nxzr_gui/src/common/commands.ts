@@ -80,7 +80,7 @@ export async function detachHidAdapter(hardwareId: string): Promise<void> {
 
 // WSL
 export async function launchWslInstance(): Promise<void> {
-  await wrapError(invoke('launch_wsl'));
+  await wrapError(invoke('launch_wsl_instance'));
 }
 
 async function wrapError<T>(promise: Promise<T>): Promise<T> {
