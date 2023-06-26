@@ -169,10 +169,13 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("error while running application: {}", err))?
         .run(move |app_handle, event| match event {
             tauri::RunEvent::ExitRequested { api, .. } => {
-                api.prevent_exit();
-                let _ = sig_shutdown_tx.blocking_send(());
-                let _ = shutdown_complete_rx.blocking_recv();
-                app_handle.exit(0);
+                let app_handle = app_handle.clone();
+                let sig_shutdown_tx = sig_shutdown_tx.clone();
+                tokio::spawn(async move {
+                    let _ = sig_shutdown_tx.send(()).await;
+                    let _ = shutdown_complete_rx.recv().await;
+                    app_handle.exit(0);
+                });
             }
             _ => {}
         });
