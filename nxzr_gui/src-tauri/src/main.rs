@@ -103,6 +103,18 @@ async fn main() -> anyhow::Result<()> {
         drop(shutdown_rx);
     });
 
+    // FIXME: test
+    tokio::spawn({
+        let shutdown_tx = shutdown_tx.clone();
+        let sig_shutdown_tx = sig_shutdown_tx.clone();
+        async move {
+            let _ = shutdown_tx.closed().await;
+            tracing::info!("close signal received");
+            tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
+            drop(sig_shutdown_tx);
+        }
+    });
+
     let agent_manager = Arc::new(agent::AgentManager::new().await?);
     let app_state = AppState::new(agent_manager, log_sub_tx, shutdown_tx, shutdown_complete_tx);
     tauri::async_runtime::set(tokio::runtime::Handle::current());
@@ -156,7 +168,8 @@ async fn main() -> anyhow::Result<()> {
         .build(tauri::generate_context!())
         .map_err(|err| anyhow::anyhow!("error while running application: {}", err))?
         .run(move |app_handle, event| match event {
-            tauri::RunEvent::ExitRequested { .. } => {
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                api.prevent_exit();
                 let _ = sig_shutdown_tx.blocking_send(());
                 let _ = shutdown_complete_rx.blocking_recv();
                 app_handle.exit(0);
