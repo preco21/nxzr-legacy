@@ -18,6 +18,7 @@ mod agent;
 mod commands;
 mod config;
 mod installer;
+mod shutdown;
 mod state;
 mod usbipd;
 mod util;
@@ -104,9 +105,10 @@ async fn main() -> anyhow::Result<()> {
         let _ = shutdown_complete_rx.recv().await;
         let _ = tx.send(());
     });
+    let shutdown = shutdown::Shutdown::new(shutdown_tx, shutdown_complete_tx);
 
-    let agent_manager = Arc::new(agent::AgentManager::new().await?);
-    let app_state = AppState::new(agent_manager, log_sub_tx, shutdown_tx, shutdown_complete_tx);
+    let agent_manager = Arc::new(agent::AgentManager::new(shutdown.clone()).await?);
+    let app_state = AppState::new(agent_manager, log_sub_tx, shutdown);
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(app_state)

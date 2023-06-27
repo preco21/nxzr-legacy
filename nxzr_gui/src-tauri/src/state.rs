@@ -1,4 +1,4 @@
-use crate::{agent::AgentManager, AppError};
+use crate::{agent::AgentManager, shutdown::Shutdown, AppError};
 use nxzr_shared::{event::SubscriptionReq, setup_event};
 use ringbuf::Rb;
 use std::{collections::HashMap, future::Future, sync::Arc};
@@ -10,28 +10,27 @@ use tokio::{
 pub struct AppState {
     pub agent_manager: Arc<AgentManager>,
     pub logging: Arc<LoggingState>,
-    pub task_handles: Arc<Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>>,
-    pub shutdown_tx: mpsc::Sender<()>,
-    pub shutdown_complete_tx: mpsc::WeakSender<()>,
+    task_handles: Arc<Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>>,
+    shutdown: Shutdown,
 }
 
 impl AppState {
     pub fn new(
         agent_manager: Arc<AgentManager>,
         log_sub_tx: mpsc::Sender<SubscriptionReq<LoggingEvent>>,
-        shutdown_tx: mpsc::Sender<()>,
-        shutdown_complete_tx: mpsc::Sender<()>,
+        shutdown: Shutdown,
     ) -> Self {
         let task_handles: HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>> =
             HashMap::new();
         let task_handles = Arc::new(Mutex::new(task_handles));
+        // FIXME: revisit, this may not be necessary
         // Spawn a task to handle cleanup for task handles.
         tokio::spawn({
-            let shutdown_tx = shutdown_tx.clone();
-            let shutdown_complete_tx = shutdown_complete_tx.clone();
+            let shutdown = shutdown.clone();
             let task_handles = task_handles.clone();
             async move {
-                shutdown_tx.closed().await;
+                let _shutdown_guard = shutdown.guard();
+                shutdown.recv_shutdown().await;
                 let mut task_handles = task_handles.lock().await;
                 for value in task_handles.values_mut() {
                     if let Some(join_handle) = value.take() {
@@ -39,7 +38,6 @@ impl AppState {
                         let _ = join_handle.await;
                     }
                 }
-                drop(shutdown_complete_tx);
             }
         });
         Self {
@@ -49,8 +47,7 @@ impl AppState {
                 log_sub_tx,
             }),
             task_handles,
-            shutdown_tx,
-            shutdown_complete_tx: shutdown_complete_tx.downgrade(),
+            shutdown,
         }
     }
 

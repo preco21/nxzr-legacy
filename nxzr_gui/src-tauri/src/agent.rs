@@ -1,13 +1,16 @@
-use command_group::AsyncGroupChild;
+use std::sync::Arc;
+
 use nxzr_shared::{
     event::{self, SubscriptionReq},
     setup_event,
 };
-use std::{future::Future, sync::Arc};
 use thiserror::Error;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex};
+use tokio::{
+    sync::{mpsc, oneshot, watch},
+    task::JoinHandle,
+};
 
-use crate::wsl;
+use crate::{shutdown::Shutdown, wsl};
 
 #[derive(Debug, Error)]
 pub enum AgentManagerError {
@@ -17,33 +20,29 @@ pub enum AgentManagerError {
     WslError(#[from] wsl::WslError),
     #[error(transparent)]
     Event(#[from] event::EventError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 #[derive(Debug)]
 pub struct AgentManager {
-    wsl_instance_tx: watch::Sender<Option<AsyncGroupChild>>,
+    wsl_instance_tx: Arc<watch::Sender<Option<JoinHandle<Result<(), AgentManagerError>>>>>,
     msg_tx: mpsc::Sender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
-    sig_close_tx: broadcast::Sender<()>,
-    closed_tx: mpsc::Sender<()>,
+    shutdown: Shutdown,
 }
 
 impl AgentManager {
-    pub async fn new() -> Result<Self, AgentManagerError> {
-        let (closed_tx, closed_rx) = mpsc::channel(1);
-        let (sig_close_tx, mut sig_close_rx) = broadcast::channel(1);
-
+    pub async fn new(shutdown: Shutdown) -> Result<Self, AgentManagerError> {
         let (msg_tx, msg_rx) = mpsc::channel(256);
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
 
-        // Inner를 따로 만들어야 할 수도 있다 async task 때문에...
         Ok(Self {
-            wsl_instance_tx: watch::channel(None).0,
+            wsl_instance_tx: Arc::new(watch::channel(None).0),
             msg_tx,
             event_sub_tx,
-            sig_close_tx,
-            closed_tx,
+            shutdown,
         })
     }
 
@@ -51,8 +50,23 @@ impl AgentManager {
         if self.wsl_instance_tx.borrow().is_some() {
             return Err(AgentManagerError::WslInstanceAlreadyLaunched);
         }
-        let child = wsl::spawn_wsl_shell_process().await?;
-        self.wsl_instance_tx.send_replace(Some(child));
+        let mut child = wsl::spawn_wsl_shell_process().await?;
+        let handle = tokio::spawn({
+            let shutdown = self.shutdown.clone();
+            let wsl_instance_tx = self.wsl_instance_tx.clone();
+            async move {
+                let _shutdown_guard = shutdown.guard();
+                tokio::select! {
+                    _ = shutdown.recv_shutdown() => {
+                        let _ = child.kill();
+                    },
+                    _ = child.wait() => {},
+                }
+                wsl_instance_tx.send_replace(None);
+                Ok::<_, AgentManagerError>(())
+            }
+        });
+        self.wsl_instance_tx.send_replace(Some(handle));
         Ok(())
     }
 
@@ -87,21 +101,6 @@ impl AgentManager {
         Event::subscribe(&mut self.event_sub_tx.clone())
             .await
             .map_err(|err| AgentManagerError::from(err))
-    }
-
-    pub async fn wait(&self) -> impl Future<Output = ()> {
-        let closed_tx = self.closed_tx.clone();
-        async move { closed_tx.closed().await }
-    }
-
-    pub fn close(&self) {
-        let _ = self.sig_close_tx.send(());
-    }
-}
-
-impl Drop for AgentManager {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 
