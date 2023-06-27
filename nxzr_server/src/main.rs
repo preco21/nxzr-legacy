@@ -48,6 +48,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     match args.command {
         Cmd::Run => {
+            tracing::info!("running daemon...");
             // Checks for system requirements.
             system::check_privileges().await?;
             system::check_system_requirements().await?;
@@ -55,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
             run(signal::ctrl_c()).await?
         }
         Cmd::Check => {
+            tracing::info!("running system check...");
             // Checks for system requirements only, then exits.
             system::check_privileges().await?;
             system::check_system_requirements().await?;

@@ -21,6 +21,7 @@ pub async fn check_privileges() -> Result<(), SysCheckError> {
 }
 
 pub async fn check_system_requirements() -> Result<(), SysCheckError> {
+    tracing::info!("checking system requirements...");
     // Check Bluetooth service is available.
     //
     // This will fail if there's no Kernel support for the Bluetooth drivers. Which essentially leads the Bluetooth service to crash.
@@ -103,7 +104,7 @@ pub(crate) async fn set_device_class(
 
 #[tracing::instrument(target = "system")]
 pub async fn check_bluetooth_service() -> Result<(), SystemCommandError> {
-    tracing::info!("checking if Bluetooth service available");
+    tracing::info!("checking for Bluetooth service available");
     run_system_command({
         let mut cmd = Command::new("service");
         cmd.args(&["bluetooth", "status"]);
