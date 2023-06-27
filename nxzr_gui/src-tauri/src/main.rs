@@ -105,19 +105,6 @@ async fn main() -> anyhow::Result<()> {
         let _ = tx.send(());
     });
 
-    // FIXME: test
-    tokio::spawn({
-        let shutdown_tx = shutdown_tx.clone();
-        let shutdown_complete_tx = shutdown_complete_tx.clone();
-        async move {
-            let _ = shutdown_tx.closed().await;
-            tracing::info!("close signal received");
-            tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
-            tracing::info!("exit");
-            drop(shutdown_complete_tx);
-        }
-    });
-
     let agent_manager = Arc::new(agent::AgentManager::new().await?);
     let app_state = AppState::new(agent_manager, log_sub_tx, shutdown_tx, shutdown_complete_tx);
     tauri::async_runtime::set(tokio::runtime::Handle::current());
@@ -172,14 +159,19 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("error while running application: {}", err))?
         .run(move |app_handle, event| match event {
             tauri::RunEvent::ExitRequested { api, .. } => {
+                // Gracefully shutdown the application.
+                api.prevent_exit();
                 let app_handle = app_handle.clone();
                 let sig_shutdown_tx = sig_shutdown_tx.clone();
-                tokio::spawn(async move {
+                tokio::task::block_in_place(move || {
                     let (tx, rx) = oneshot::channel();
-                    let _ = sig_shutdown_tx.send(tx).await;
-                    let _ = rx.await;
+                    // Send shutdown request.
+                    let _ = sig_shutdown_tx.blocking_send(tx);
+                    // Wait for the all tasks to complete.
+                    let _ = rx.blocking_recv();
+                    // Manually exit the application.
                     app_handle.exit(0);
-                });
+                })
             }
             _ => {}
         });
