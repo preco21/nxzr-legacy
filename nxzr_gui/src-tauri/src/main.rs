@@ -99,11 +99,17 @@ async fn main() -> anyhow::Result<()> {
     let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
     let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel(1);
     let (sig_shutdown_tx, mut sig_shutdown_rx) = mpsc::channel::<oneshot::Sender<()>>(1);
-    tokio::spawn(async move {
-        let tx = sig_shutdown_rx.recv().await.unwrap();
-        drop(shutdown_rx);
-        let _ = shutdown_complete_rx.recv().await;
-        let _ = tx.send(());
+    tokio::spawn({
+        // Retain the final shutdown complete signal so that prevents the
+        // [WeakSender] from dropping immediately.
+        let shutdown_complete_tx = shutdown_complete_tx.clone();
+        async move {
+            let tx = sig_shutdown_rx.recv().await.unwrap();
+            drop(shutdown_rx);
+            drop(shutdown_complete_tx);
+            let _ = shutdown_complete_rx.recv().await;
+            let _ = tx.send(());
+        }
     });
     let shutdown = shutdown::Shutdown::new(shutdown_tx, shutdown_complete_tx);
 
