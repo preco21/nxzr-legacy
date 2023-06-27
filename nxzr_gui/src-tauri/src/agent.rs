@@ -16,6 +16,8 @@ use crate::{shutdown::Shutdown, wsl};
 pub enum AgentManagerError {
     #[error("wsl instance already launched")]
     WslInstanceAlreadyLaunched,
+    #[error("wsl instance is not ready")]
+    WslInstanceNotReady,
     #[error(transparent)]
     WslError(#[from] wsl::WslError),
     #[error(transparent)]
@@ -50,6 +52,7 @@ impl AgentManager {
         if self.wsl_instance_tx.borrow().is_some() {
             return Err(AgentManagerError::WslInstanceAlreadyLaunched);
         }
+        tracing::info!("launching WSL process...");
         let mut child = wsl::spawn_wsl_shell_process().await?;
         let handle = tokio::spawn({
             let shutdown = self.shutdown.clone();
@@ -62,12 +65,17 @@ impl AgentManager {
                     },
                     _ = child.wait() => {},
                 }
+                tracing::info!("terminating WSL process...");
                 wsl_instance_tx.send_replace(None);
                 Ok::<_, AgentManagerError>(())
             }
         });
         self.wsl_instance_tx.send_replace(Some(handle));
         Ok(())
+    }
+
+    pub fn is_wsl_ready(&self) -> bool {
+        self.wsl_instance_tx.borrow().is_some()
     }
 
     pub async fn wsl_ready(&self) {
@@ -77,10 +85,11 @@ impl AgentManager {
         }
     }
 
-    // FIXME: 페이즈2
-    // FIXME: 아예 다른 struct로 분리하는 것도 고려해보기
-    pub async fn launch_agent_daemon() -> Result<(), AgentManagerError> {
-        // 1. wsl이 준비되었는지 확인, wsl 준비가 안되었으면 에러, 기다리기 없음
+    pub async fn launch_agent_daemon(&self) -> Result<(), AgentManagerError> {
+        if !self.is_wsl_ready() {
+            return Err(AgentManagerError::WslInstanceNotReady);
+        }
+
         // 2. nxzr_server agent check 진행 -> 실패하면 이벤트 발생, bail out
         // 3. nxzr_server agent 핸들 잡고 있는 데몬 task 생성
         // 4. multiplex 사용할 수 있도록 즉시 connect하여 channel 상태에 저장
