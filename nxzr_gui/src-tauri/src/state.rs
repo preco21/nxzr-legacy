@@ -10,7 +10,7 @@ use tokio::{
 pub struct AppState {
     pub agent_manager: Arc<AgentManager>,
     pub logging: Arc<LoggingState>,
-    pub task_handles: Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>,
+    pub task_handles: Arc<Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>>,
     pub shutdown_tx: mpsc::Sender<()>,
     pub shutdown_complete_tx: mpsc::WeakSender<()>,
 }
@@ -22,13 +22,33 @@ impl AppState {
         shutdown_tx: mpsc::Sender<()>,
         shutdown_complete_tx: mpsc::Sender<()>,
     ) -> Self {
+        let task_handles: HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>> =
+            HashMap::new();
+        let task_handles = Arc::new(Mutex::new(task_handles));
+        // Spawn a task to handle cleanup for task handles.
+        tokio::spawn({
+            let shutdown_tx = shutdown_tx.clone();
+            let shutdown_complete_tx = shutdown_complete_tx.clone();
+            let task_handles = task_handles.clone();
+            async move {
+                shutdown_tx.closed().await;
+                let mut task_handles = task_handles.lock().await;
+                for value in task_handles.values_mut() {
+                    if let Some(join_handle) = value.take() {
+                        join_handle.abort();
+                        let _ = join_handle.await;
+                    }
+                }
+                drop(shutdown_complete_tx);
+            }
+        });
         Self {
             agent_manager,
             logging: Arc::new(LoggingState {
                 seen_buf: Mutex::new(ringbuf::HeapRb::new(1024)),
                 log_sub_tx,
             }),
-            task_handles: Mutex::new(HashMap::new()),
+            task_handles,
             shutdown_tx,
             shutdown_complete_tx: shutdown_complete_tx.downgrade(),
         }
