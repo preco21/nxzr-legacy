@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { css } from 'styled-components';
-import { launchWslInstance } from '../common/commands';
+import { launchWslInstance, runWslAgentCheck } from '../common/commands';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
@@ -20,6 +20,7 @@ function AppPage(): React.ReactElement {
     onCheckComplete: useCallback(async () => {
       await launchWslInstance();
       await adapterManager.refreshAdapterList();
+      await runWslAgentCheck();
     }, []),
     onRebootRequest: useCallback(() => {
       setRebootRequested(true);

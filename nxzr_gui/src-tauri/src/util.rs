@@ -281,6 +281,30 @@ pub async fn run_powershell_script(
     Ok(())
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct TracingJsonLogData {
+    pub timestamp: String,
+    pub level: String,
+    pub fields: TracingJsonLogDataFields,
+    pub target: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct TracingJsonLogDataFields {
+    pub message: String,
+}
+
+pub fn parse_tracing_json_log_data(json: &str) -> Result<TracingJsonLogData, serde_json::Error> {
+    serde_json::from_str(json)
+}
+
+pub fn format_tracing_json_log_data(data: &TracingJsonLogData) -> String {
+    format!(
+        "[child]: [{}] [{}] [{}]: {}",
+        data.timestamp, data.level, data.target, data.fields.message
+    )
+}
+
 #[derive(Debug, Clone)]
 pub struct TracingChannelWriter<T: From<String> + Clone> {
     writer_tx: Arc<mpsc::Sender<T>>,

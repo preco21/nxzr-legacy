@@ -1,5 +1,6 @@
 use crate::{config, util};
 use command_group::AsyncGroupChild;
+use std::path::Path;
 use thiserror::Error;
 use tokio::{sync::mpsc, time};
 
@@ -9,10 +10,12 @@ const WSL_FULL_REFRESH_SCRIPT: &str = include_str!("scripts/full-refresh-wsl.ps1
 pub enum WslError {
     #[error("WSL shutdown failed")]
     WslShutdownFailed,
-    #[error("WSL distribution warm up failed")]
-    WslDistroWarmUpFailed,
+    #[error("path conversion failed")]
+    PathConversionFailed,
     #[error(transparent)]
     SystemCommandError(#[from] util::SystemCommandError),
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -30,20 +33,6 @@ pub async fn shutdown_wsl() -> Result<(), WslError> {
     time::sleep(time::Duration::from_secs(8)).await;
     Ok(())
 }
-
-// FIXME: unused
-// pub async fn ensure_agent_distro_running() -> Result<(), WslError> {
-//     let output = util::run_system_command({
-//         let mut cmd = tokio::process::Command::new("wsl.exe");
-//         cmd.args(&["-d", config::WSL_AGENT_NAME, "--", "echo", "ok"]);
-//         cmd
-//     })
-//     .await?;
-//     if output.is_empty() {
-//         return Err(WslError::WslDistroWarmUpFailed);
-//     }
-//     Ok(())
-// }
 
 pub async fn full_refresh_wsl() -> Result<(), WslError> {
     let (output_tx, mut output_rx) = mpsc::unbounded_channel();
@@ -64,4 +53,45 @@ pub async fn spawn_wsl_shell_process() -> Result<AsyncGroupChild, WslError> {
     })
     .await?;
     Ok(child)
+}
+
+pub async fn run_wsl_agent_check(server_exec_path: &Path) -> Result<(), WslError> {
+    let path = convert_windows_path_to_wsl(&server_exec_path).await?;
+    let output = util::run_system_command({
+        let mut cmd = tokio::process::Command::new("wsl.exe");
+        cmd.args(&["-d", config::WSL_AGENT_NAME, "--", path.as_str(), "check"]);
+        cmd
+    })
+    .await?;
+    for line in output.split("\n").filter(|l| !l.trim().is_empty()) {
+        tracing::info!(
+            "{}",
+            util::format_tracing_json_log_data(&util::parse_tracing_json_log_data(line)?)
+        )
+    }
+    Ok(())
+}
+
+pub async fn convert_windows_path_to_wsl(path: &Path) -> Result<String, WslError> {
+    let output = util::run_system_command({
+        let mut cmd = tokio::process::Command::new("wsl.exe");
+        cmd.args(&[
+            "-d",
+            config::WSL_AGENT_NAME,
+            "--",
+            "wslpath",
+            "-u",
+            escape_wsl_path(path)
+                .ok_or(WslError::PathConversionFailed)?
+                .as_str(),
+        ]);
+        cmd
+    })
+    .await?;
+    Ok(output.trim().into())
+}
+
+fn escape_wsl_path(path: &Path) -> Option<String> {
+    path.to_str()
+        .and_then(|s| Some(s.replace("\\", "\\\\").replace(" ", "\\ ")))
 }

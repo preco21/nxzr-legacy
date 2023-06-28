@@ -1,16 +1,14 @@
-use std::sync::Arc;
-
+use crate::{shutdown::Shutdown, wsl};
 use nxzr_shared::{
     event::{self, SubscriptionReq},
     setup_event,
 };
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch},
     task::JoinHandle,
 };
-
-use crate::{shutdown::Shutdown, wsl};
 
 #[derive(Debug, Error)]
 pub enum AgentManagerError {
