@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { css } from 'styled-components';
-import { launchWslInstance, runWslAgentCheck } from '../common/commands';
+import { launchAgentDaemon, launchWslAnchorInstance, runWslAgentCheck } from '../common/commands';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
@@ -9,18 +9,17 @@ import { StepDisplay, useSetupGuard } from '../features/setup/useSetupGuard';
 import { RebootAlert } from '../features/setup/RebootAlert';
 import { useAdapterManager } from '../features/operation/useAdapterManager';
 import { AdapterSelectModal } from '../features/operation/AdapterSelectModal';
+import { Button } from '@blueprintjs/core';
 
 const FAILURE_STATUS: StepDisplay['status'][] = ['checkFailed', 'installFailed'];
 
 function AppPage(): React.ReactElement {
   const [rebootRequested, setRebootRequested] = useState(false);
-  const adapterManager = useAdapterManager({
-  });
+  const adapterManager = useAdapterManager({ });
   const setupGuard = useSetupGuard({
     onCheckComplete: useCallback(async () => {
-      await launchWslInstance();
+      await launchWslAnchorInstance();
       await adapterManager.refreshAdapterList();
-      await runWslAgentCheck();
     }, []),
     onRebootRequest: useCallback(() => {
       setRebootRequested(true);
@@ -52,7 +51,13 @@ function AppPage(): React.ReactElement {
         />
       )}
       {setupGuard.ready && (
-        <div>hooray!</div>
+        <Button onClick={async () => {
+          await runWslAgentCheck();
+          await launchAgentDaemon();
+        }}
+        >
+          Connect to Agent
+        </Button>
       )}
       <RebootAlert isOpen={rebootRequested} onConfirm={() => setRebootRequested(false)} />
       <AdapterSelectModal

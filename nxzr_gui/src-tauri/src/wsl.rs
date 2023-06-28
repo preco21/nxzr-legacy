@@ -2,7 +2,11 @@ use crate::{config, util};
 use command_group::AsyncGroupChild;
 use std::path::Path;
 use thiserror::Error;
-use tokio::{sync::mpsc, time};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncReadExt},
+    sync::mpsc,
+    time,
+};
 
 const WSL_FULL_REFRESH_SCRIPT: &str = include_str!("scripts/full-refresh-wsl.ps1");
 
@@ -45,7 +49,7 @@ pub async fn full_refresh_wsl() -> Result<(), WslError> {
     Ok(())
 }
 
-pub async fn spawn_wsl_shell_process() -> Result<AsyncGroupChild, WslError> {
+pub async fn spawn_wsl_bare_shell() -> Result<AsyncGroupChild, WslError> {
     let (child, _stdout, _stderr) = util::spawn_system_command({
         let mut cmd = tokio::process::Command::new("wsl.exe");
         cmd.args(&["-d", config::WSL_AGENT_NAME]);
@@ -63,6 +67,7 @@ pub async fn run_wsl_agent_check(server_exec_path: &Path) -> Result<(), WslError
         cmd
     })
     .await?;
+    // Log `check` outputs from the WSL agent.
     for line in output.split("\n").filter(|l| !l.trim().is_empty()) {
         tracing::info!(
             "{}",
@@ -70,6 +75,29 @@ pub async fn run_wsl_agent_check(server_exec_path: &Path) -> Result<(), WslError
         )
     }
     Ok(())
+}
+
+pub async fn spawn_wsl_agent_daemon(server_exec_path: &Path) -> Result<AsyncGroupChild, WslError> {
+    let path = convert_windows_path_to_wsl(&server_exec_path).await?;
+    let (child, stdout, stderr) = util::spawn_system_command({
+        let mut cmd = tokio::process::Command::new("wsl.exe");
+        cmd.args(&["-d", config::WSL_AGENT_NAME, "--", path.as_str(), "run"]);
+        cmd
+    })
+    .await?;
+    let mut combined_lines = stdout.chain(stderr).lines();
+    // Spawn a task to read the stdout/stderr of the child process for logging.
+    tokio::spawn(async move {
+        while let Some(line) = combined_lines.next_line().await.unwrap() {
+            match util::parse_tracing_json_log_data(&line) {
+                Ok(data) => {
+                    tracing::info!("[child]: {}", util::format_tracing_json_log_data(&data))
+                }
+                Err(_) => tracing::info!("[child]: {}", line),
+            }
+        }
+    });
+    Ok(child)
 }
 
 pub async fn convert_windows_path_to_wsl(path: &Path) -> Result<String, WslError> {

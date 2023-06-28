@@ -298,9 +298,10 @@ pub fn parse_tracing_json_log_data(json: &str) -> Result<TracingJsonLogData, ser
     serde_json::from_str(json)
 }
 
+// FIXME: handle log levels
 pub fn format_tracing_json_log_data(data: &TracingJsonLogData) -> String {
     format!(
-        "[child]: [{}] [{}] [{}]: {}",
+        "[{}] [{}] [{}]: {}",
         data.timestamp, data.level, data.target, data.fields.message
     )
 }

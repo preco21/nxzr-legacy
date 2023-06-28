@@ -134,10 +134,11 @@ async fn main() -> anyhow::Result<()> {
             commands::list_hid_adapters,
             commands::attach_hid_adapter,
             commands::detach_hid_adapter,
-            commands::launch_wsl_instance,
             commands::shutdown_wsl,
             commands::full_refresh_wsl,
+            commands::launch_wsl_anchor_instance,
             commands::run_wsl_agent_check,
+            commands::launch_agent_daemon,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

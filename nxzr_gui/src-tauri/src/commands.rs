@@ -189,16 +189,6 @@ pub async fn detach_hid_adapter(hardware_id: String) -> Result<(), AppError> {
 
 // Wsl
 #[tauri::command]
-pub async fn launch_wsl_instance(state: tauri::State<'_, AppState>) -> Result<(), AppError> {
-    // The instance may already be launched, we're ignoring it when it's the case.
-    let res = state.agent_manager.launch_wsl_instance().await;
-    if let Err(err) = res {
-        tracing::error!("failed to launch wsl instance: {}", err);
-    }
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn shutdown_wsl() -> Result<(), AppError> {
     wsl::shutdown_wsl().await?;
     Ok(())
@@ -211,9 +201,37 @@ pub async fn full_refresh_wsl() -> Result<(), AppError> {
 }
 
 #[tauri::command]
+pub async fn launch_wsl_anchor_instance(state: tauri::State<'_, AppState>) -> Result<(), AppError> {
+    // The instance may already be launched, we're ignoring it when it's the case.
+    let res = state.agent_manager.launch_wsl_anchor_instance().await;
+    if let Err(err) = res {
+        tracing::error!("failed to launch wsl instance: {}", err);
+    }
+    Ok(())
+}
+
+// FIXME: use this check to determine if the WSL should be restarted or not.
+#[tauri::command]
 pub async fn run_wsl_agent_check(handle: tauri::AppHandle) -> Result<(), AppError> {
     let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
         .ok_or(anyhow::anyhow!("failed to resolve server exec path"))?;
     wsl::run_wsl_agent_check(&server_exec_path).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn launch_agent_daemon(
+    handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), AppError> {
+    let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
+        .ok_or(anyhow::anyhow!("failed to resolve server exec path"))?;
+    let res = state
+        .agent_manager
+        .launch_agent_daemon(&server_exec_path)
+        .await;
+    if let Err(err) = res {
+        tracing::error!("failed to launch wsl instance: {}", err);
+    }
     Ok(())
 }

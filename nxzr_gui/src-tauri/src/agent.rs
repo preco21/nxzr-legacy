@@ -3,12 +3,13 @@ use nxzr_shared::{
     event::{self, SubscriptionReq},
     setup_event,
 };
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch},
     task::JoinHandle,
 };
+use tonic::transport::{Channel, Endpoint};
 
 #[derive(Debug, Error)]
 pub enum AgentManagerError {
@@ -16,8 +17,12 @@ pub enum AgentManagerError {
     WslInstanceAlreadyLaunched,
     #[error("wsl instance is not ready")]
     WslInstanceNotReady,
+    #[error("agent instance already launched")]
+    AgentInstanceAlreadyLaunched,
     #[error(transparent)]
     WslError(#[from] wsl::WslError),
+    #[error(transparent)]
+    Tonic(#[from] tonic::transport::Error),
     #[error(transparent)]
     Event(#[from] event::EventError),
     #[error(transparent)]
@@ -27,6 +32,8 @@ pub enum AgentManagerError {
 #[derive(Debug)]
 pub struct AgentManager {
     wsl_instance_tx: Arc<watch::Sender<Option<JoinHandle<Result<(), AgentManagerError>>>>>,
+    agent_instance_tx:
+        Arc<watch::Sender<Option<(JoinHandle<Result<(), AgentManagerError>>, Channel)>>>,
     msg_tx: mpsc::Sender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     shutdown: Shutdown,
@@ -40,18 +47,19 @@ impl AgentManager {
 
         Ok(Self {
             wsl_instance_tx: Arc::new(watch::channel(None).0),
+            agent_instance_tx: Arc::new(watch::channel(None).0),
             msg_tx,
             event_sub_tx,
             shutdown,
         })
     }
 
-    pub async fn launch_wsl_instance(&self) -> Result<(), AgentManagerError> {
+    pub async fn launch_wsl_anchor_instance(&self) -> Result<(), AgentManagerError> {
         if self.wsl_instance_tx.borrow().is_some() {
             return Err(AgentManagerError::WslInstanceAlreadyLaunched);
         }
         tracing::info!("launching WSL process...");
-        let mut child = wsl::spawn_wsl_shell_process().await?;
+        let mut child = wsl::spawn_wsl_bare_shell().await?;
         let handle = tokio::spawn({
             let shutdown = self.shutdown.clone();
             let wsl_instance_tx = self.wsl_instance_tx.clone();
@@ -83,20 +91,42 @@ impl AgentManager {
         }
     }
 
-    pub async fn launch_agent_daemon(&self) -> Result<(), AgentManagerError> {
+    pub async fn launch_agent_daemon(
+        &self,
+        server_exec_path: &Path,
+    ) -> Result<(), AgentManagerError> {
         if !self.is_wsl_ready() {
             return Err(AgentManagerError::WslInstanceNotReady);
         }
-
-        // 2. nxzr_server agent check 진행 -> 실패하면 이벤트 발생, bail out
-        // 3. nxzr_server agent 핸들 잡고 있는 데몬 task 생성
-        // 4. multiplex 사용할 수 있도록 즉시 connect하여 channel 상태에 저장
-        // ㄴ 만약 connect에서 터지면, 각 레벨에서 알아서 처리 (이벤트 등으로 ui 에 오류 표시 등)
-        // use tonic::transport::Endpoint;
-        // let channel = Endpoint::from_static("http://[::1]:50052")
-        //   .connect()
-        //   .await?;
-        unimplemented!()
+        if self.agent_instance_tx.borrow().is_some() {
+            return Err(AgentManagerError::AgentInstanceAlreadyLaunched);
+        }
+        tracing::info!("launching agent daemon process...");
+        // FIXME: kill dangling if there's dangling child...
+        let mut child = wsl::spawn_wsl_agent_daemon(server_exec_path).await?;
+        // FIXME: Immediately connect to the agent daemon may fail... find a way to wait for the agent daemon to be ready.
+        // FIXME: find out why the agent daemon is terminated immediately when there's duplicate agent daemon process.
+        let channel = Endpoint::from_static("http://[::1]:50052")
+            .connect()
+            .await?;
+        let handle = tokio::spawn({
+            let shutdown = self.shutdown.clone();
+            let agent_instance_tx = self.agent_instance_tx.clone();
+            async move {
+                let _shutdown_guard = shutdown.guard();
+                tokio::select! {
+                    _ = shutdown.recv_shutdown() => {
+                        let _ = child.kill();
+                    },
+                    _ = child.wait() => {},
+                }
+                tracing::info!("terminating agent daemon process...");
+                agent_instance_tx.send_replace(None);
+                Ok::<_, AgentManagerError>(())
+            }
+        });
+        self.agent_instance_tx.send_replace(Some((handle, channel)));
+        Ok(())
     }
 
     // FIXME: connection 관련 로직들은 따로 관리하는 것이 맞을까...?
