@@ -213,7 +213,7 @@ pub async fn full_refresh_wsl() -> Result<(), AppError> {
 #[tauri::command]
 pub async fn run_wsl_agent_check(handle: tauri::AppHandle) -> Result<(), AppError> {
     let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
-        .ok_or(anyhow::anyhow!("failed to resolve kernel image path"))?;
+        .ok_or(anyhow::anyhow!("failed to resolve server exec path"))?;
     wsl::run_wsl_agent_check(&server_exec_path).await?;
     Ok(())
 }
