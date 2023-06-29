@@ -1,7 +1,8 @@
-use crate::{shutdown::Shutdown, wsl};
+use crate::wsl;
 use nxzr_shared::{
     event::{self, SubscriptionReq},
     setup_event,
+    shutdown::Shutdown,
 };
 use std::{path::Path, sync::Arc};
 use thiserror::Error;

@@ -1,5 +1,5 @@
-use crate::{agent::AgentManager, shutdown::Shutdown, AppError};
-use nxzr_shared::{event::SubscriptionReq, setup_event};
+use crate::{agent::AgentManager, AppError};
+use nxzr_shared::{event::SubscriptionReq, setup_event, shutdown::Shutdown};
 use ringbuf::Rb;
 use std::{collections::HashMap, future::Future, sync::Arc};
 use tokio::{
