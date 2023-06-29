@@ -123,13 +123,12 @@ impl Transport {
             let inner = inner.clone();
             async move {
                 close_tx.closed().await;
-                tracing::info!("close signal received, terminating the transport.");
                 // Generally, it's recommended to pause from caller before it
                 // ended up here. We are assuming that the user may not be able
                 // to call [TransportInner::pause()] anyway.
                 inner.pause();
                 set.shutdown().await;
-                tracing::info!("transport terminated");
+                tracing::info!("transport terminated.");
                 drop(closed_rx);
             }
             .instrument(tracing::info_span!("transport_worker"))

@@ -114,7 +114,7 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
             tracing::info!("internal shutdown request received, closing...");
         },
     }
-    tracing::info!("terminating process...");
+    tracing::info!("initiating process shutdown...");
 
     // When `shutdown_rx` is dropped, all tasks which have called
     // `shutdown_tx.closed()` will receive the shutdown signal and can exit.
