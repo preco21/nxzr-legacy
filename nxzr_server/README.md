@@ -33,6 +33,10 @@ You can use [wslu](https://wslutiliti.es/) to make things easy for working betwe
 Assuming you are on Ubuntu, to install `wslu`:
 
 ```shell
+# From Alpine Linux
+sudo apk add wslu
+
+# From Ubuntu
 sudo add-apt-repository ppa:wslutilities/wslu
 sudo apt update
 sudo apt install wslu
