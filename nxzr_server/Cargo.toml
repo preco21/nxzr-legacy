@@ -28,6 +28,5 @@ tokio-stream = "0.1.14"
 nxzr_core = { path = "../nxzr_core" }
 nxzr_device = { path = "../nxzr_device" }
 nxzr_proto = { path = "../nxzr_proto" }
-tokio-util = "0.7.8"
 prost-types = "0.11.9"
 clap = { version = "4.3.4", features = ["derive"] }

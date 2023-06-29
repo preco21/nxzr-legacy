@@ -16,7 +16,6 @@ use std::{
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream};
-use tokio_util::sync::CancellationToken;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 
 type ServiceResult<T> = Result<Response<T>, Status>;

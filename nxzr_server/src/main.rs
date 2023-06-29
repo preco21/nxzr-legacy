@@ -7,7 +7,6 @@ use nxzr_device::{
 use service::NxzrService;
 use std::{future::Future, net::ToSocketAddrs, sync::Arc};
 use tokio::{signal, sync::mpsc};
-use tokio_util::sync::CancellationToken;
 use tracing_subscriber::prelude::*;
 
 mod controller;
