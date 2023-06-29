@@ -104,7 +104,7 @@ pub(crate) async fn set_device_class(
 
 #[tracing::instrument(target = "system")]
 pub async fn check_bluetooth_service() -> Result<(), SystemCommandError> {
-    tracing::info!("checking for Bluetooth service available");
+    tracing::info!("checking for Bluetooth service available.");
     run_system_command({
         let mut cmd = Command::new("service");
         cmd.args(&["bluetooth", "status"]);
@@ -116,7 +116,7 @@ pub async fn check_bluetooth_service() -> Result<(), SystemCommandError> {
 
 #[tracing::instrument(target = "system")]
 pub async fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
-    tracing::info!("attempting to restart Bluetooth service");
+    tracing::info!("attempting to restart Bluetooth service.");
     run_system_command({
         let mut cmd = Command::new("service");
         cmd.args(&["bluetooth", "restart"]);
