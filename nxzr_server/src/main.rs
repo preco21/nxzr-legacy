@@ -107,16 +107,16 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
 
     tokio::select! {
         _ = shutdown => {
-            tracing::info!("SIGKILL received, closing...");
+            tracing::info!("kill signal received, closing...");
         },
         // A cloned `shutdown_token` can be passed to each task so that the task
         // can issue a shutdown from inside of it, which will also have to be
         // considered as a normal shutdown signal.
         _ = shutdown_token.cancelled() => {
-            tracing::info!("internal shutdown signal received, closing...");
+            tracing::info!("internal shutdown request received, closing...");
         },
     }
-    tracing::info!("terminating the process...");
+    tracing::info!("terminating process...");
 
     // When this called, all tasks which have subscribed for `.cancelled()` will
     // receive the shutdown signal and can exit.
@@ -135,7 +135,7 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     // dropped above, the only remaining `Sender` instances are held by
     // background tasks. When those drop, the `mpsc` channel will close and
     // `recv()` will return `None`.
-    tracing::info!("waiting for the background tasks to finish processing...");
+    tracing::info!("waiting for background tasks to finish cleanup...");
     let _ = shutdown_complete_rx.recv().await;
 
     // Finally, wait for the device instance to close.
@@ -143,6 +143,6 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     drop(device_handle);
     device.closed().await;
 
-    tracing::info!("shutdown completed.");
+    tracing::info!("daemon successfully terminated.");
     Ok(())
 }
