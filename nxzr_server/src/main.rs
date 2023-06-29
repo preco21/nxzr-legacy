@@ -106,13 +106,17 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     });
 
     tokio::select! {
-        _ = shutdown => {},
+        _ = shutdown => {
+            tracing::info!("SIGKILL received, closing...");
+        },
         // A cloned `shutdown_token` can be passed to each task so that the task
         // can issue a shutdown from inside of it, which will also have to be
         // considered as a normal shutdown signal.
-        _ = shutdown_token.cancelled() => {},
+        _ = shutdown_token.cancelled() => {
+            tracing::info!("internal shutdown signal received, closing...");
+        },
     }
-    tracing::info!("shutdown signal received, terminating...");
+    tracing::info!("terminating the process...");
 
     // When this called, all tasks which have subscribed for `.cancelled()` will
     // receive the shutdown signal and can exit.
