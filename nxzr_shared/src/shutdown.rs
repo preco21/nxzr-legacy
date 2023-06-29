@@ -28,7 +28,7 @@ impl Shutdown {
     }
 
     /// Creates a new shutdown guard. Drop it to signal shutdown.
-    pub fn guard(&self) -> mpsc::Sender<()> {
+    pub fn drop_guard(&self) -> mpsc::Sender<()> {
         self.shutdown_complete_tx.clone().upgrade().unwrap()
     }
 }
