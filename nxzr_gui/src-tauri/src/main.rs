@@ -153,6 +153,19 @@ async fn main() -> anyhow::Result<()> {
             _ => {}
         })
         .setup(|app| {
+            // Handle kill signals.
+            tokio::spawn({
+                let windows = app.windows();
+                async move {
+                    let _ = tokio::signal::ctrl_c().await;
+                    tracing::info!("kill signal received, closing all windows");
+                    for window in windows.values() {
+                        if window.is_closable().unwrap() {
+                            window.close().unwrap();
+                        }
+                    }
+                }
+            });
             // Enable devtools.
             #[cfg(debug_assertions)]
             {

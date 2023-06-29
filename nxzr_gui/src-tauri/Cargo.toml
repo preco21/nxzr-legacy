@@ -24,9 +24,10 @@ serde_json = "1.0.99"
 tokio = { version = "1.28.2", features = [
     "rt",
     "rt-multi-thread",
+    "macros",
     "sync",
     "time",
-    "macros",
+    "signal",
     "fs",
     "process",
     "io-util",
