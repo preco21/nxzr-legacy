@@ -8,6 +8,7 @@ use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch},
     task::JoinHandle,
+    time,
 };
 use tonic::transport::{Channel, Endpoint};
 
@@ -120,6 +121,8 @@ impl AgentManager {
                     },
                     _ = child.wait() => {},
                 }
+                // Wait for seconds loosely to make sure the agent daemon is terminated.
+                let _ = time::timeout(time::Duration::from_millis(3000), child.wait()).await;
                 tracing::info!("terminating agent daemon process...");
                 agent_instance_tx.send_replace(None);
                 Ok::<_, AgentManagerError>(())
