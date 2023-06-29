@@ -87,7 +87,7 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
         .to_socket_addrs()?
         .next()
         .ok_or(anyhow::anyhow!("failed to select an address to bind"))?;
-    tracing::info!("service listening on {}", addr.to_string());
+    tracing::info!("service listening on: {}", addr.to_string());
     let service_task_handle = tokio::spawn({
         let device = device.clone();
         let shutdown_token = shutdown_token.clone();
