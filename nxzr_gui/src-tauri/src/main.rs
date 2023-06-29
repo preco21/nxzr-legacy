@@ -171,16 +171,18 @@ async fn main() -> anyhow::Result<()> {
             tauri::RunEvent::ExitRequested { api, .. } => {
                 // Gracefully shutdown the application.
                 api.prevent_exit();
-                let app_handle = app_handle.clone();
-                let sig_shutdown_tx = sig_shutdown_tx.clone();
-                tokio::task::block_in_place(move || {
-                    let (tx, rx) = oneshot::channel();
-                    // Send shutdown request.
-                    let _ = sig_shutdown_tx.blocking_send(tx);
-                    // Wait for the all tasks to complete.
-                    let _ = rx.blocking_recv();
-                    // Manually exit the application.
-                    app_handle.exit(0);
+                tokio::task::block_in_place({
+                    let app_handle = app_handle.clone();
+                    let sig_shutdown_tx = sig_shutdown_tx.clone();
+                    move || {
+                        let (tx, rx) = oneshot::channel();
+                        // Send shutdown request.
+                        let _ = sig_shutdown_tx.blocking_send(tx);
+                        // Wait for the all tasks to complete.
+                        let _ = rx.blocking_recv();
+                        // Manually exit the application.
+                        app_handle.exit(0);
+                    }
                 })
             }
             _ => {}

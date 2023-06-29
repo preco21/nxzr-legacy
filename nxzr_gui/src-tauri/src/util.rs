@@ -86,8 +86,7 @@ pub enum SystemCommandError {
 }
 
 pub async fn run_system_command(mut command: Command) -> Result<String, SystemCommandError> {
-    command.kill_on_drop(true);
-    let output = command.output().await?;
+    let output = command.kill_on_drop(true).output().await?;
     if !output.status.success() {
         return Err(SystemCommandError::CommandFailed(
             std::str::from_utf8(&output.stderr)?.to_owned(),
@@ -106,10 +105,11 @@ pub async fn spawn_system_command(
     ),
     SystemCommandError,
 > {
-    command.kill_on_drop(true);
-    command.stdout(Stdio::piped());
-    command.stderr(Stdio::piped());
-    let mut child = command.group_spawn()?;
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .group_spawn()?;
     let stdout = child
         .inner()
         .stdout
