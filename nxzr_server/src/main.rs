@@ -4,6 +4,7 @@ use nxzr_device::{
     device::{self, DeviceConfig},
     system,
 };
+use nxzr_shared::shutdown::Shutdown;
 use service::NxzrService;
 use std::{future::Future, net::ToSocketAddrs, sync::Arc};
 use tokio::{signal, sync::mpsc};
@@ -66,8 +67,9 @@ async fn main() -> anyhow::Result<()> {
 }
 
 pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
-    let shutdown_token = CancellationToken::new();
-    let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel::<()>(1);
+    let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+    let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel(1);
+    let shutdown_token = Shutdown::new(shutdown_tx, shutdown_complete_tx.clone());
 
     // Setup a device.
     //
@@ -86,19 +88,16 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
         .next()
         .ok_or(anyhow::anyhow!("failed to select an address to bind"))?;
     tracing::info!("service listening on {}", addr.to_string());
-    let nxzr_task_handle = tokio::spawn({
+    let service_task_handle = tokio::spawn({
         let device = device.clone();
         let shutdown_token = shutdown_token.clone();
-        let shutdown_complete_tx = shutdown_complete_tx.clone();
         async move {
-            let _shutdown_guard = shutdown_token.clone().drop_guard();
-            let nxzr_service =
-                NxzrService::new(device, shutdown_token.clone(), shutdown_complete_tx.clone())
-                    .await?;
+            let _shutdown_guard = shutdown_token.drop_guard();
+            let nxzr_service = NxzrService::new(device, shutdown_token.clone()).await?;
             let svc = nxzr_proto::nxzr_server::NxzrServer::new(nxzr_service);
             tonic::transport::Server::builder()
                 .add_service(svc)
-                .serve_with_shutdown(addr, shutdown_token.cancelled())
+                .serve_with_shutdown(addr, shutdown_token.recv_shutdown())
                 .await?;
             Ok(())
         }
@@ -108,24 +107,22 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
         _ = shutdown => {
             tracing::info!("kill signal received, closing...");
         },
-        // A cloned `shutdown_token` can be passed to each task so that the task
-        // can issue a shutdown from inside of it, which will also have to be
-        // considered as a normal shutdown signal.
-        _ = shutdown_token.cancelled() => {
+        // A cloned `shutdown_token` is passed to each task so that the task can
+        // issue a shutdown internally, this will be considered as a normal
+        // shutdown signal too.
+        _ = shutdown_token.recv_shutdown() => {
             tracing::info!("internal shutdown request received, closing...");
         },
     }
     tracing::info!("terminating process...");
 
-    // When this called, all tasks which have subscribed for `.cancelled()` will
-    // receive the shutdown signal and can exit.
-    shutdown_token.cancel();
-    // Drop final `Sender` of `shutdown_complete_tx` so the `Receiver` below can complete.
-    drop(shutdown_complete_tx);
+    // When `shutdown_rx` is dropped, all tasks which have called
+    // `shutdown_tx.closed()` will receive the shutdown signal and can exit.
+    drop(shutdown_rx);
 
     // Wait for the service to close.
     tracing::info!("waiting for services to close...");
-    if let Err(err) = nxzr_task_handle.await {
+    if let Err(err) = service_task_handle.await {
         tracing::error!("error while terminating NXZR task handle: {}", err);
     };
 
@@ -135,6 +132,8 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
     // background tasks. When those drop, the `mpsc` channel will close and
     // `recv()` will return `None`.
     tracing::info!("waiting for background tasks to finish cleanup...");
+    // Drop final `Sender` of `shutdown_complete_tx` so the `Receiver` half can complete.
+    drop(shutdown_complete_tx);
     let _ = shutdown_complete_rx.recv().await;
 
     // Finally, wait for the device instance to close.

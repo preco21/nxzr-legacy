@@ -8,6 +8,7 @@ use nxzr_proto::{
     ImuControlStreamResponse, ReconnectSwitchRequest, ReconnectSwitchResponse,
     StickControlStreamRequest, StickControlStreamResponse,
 };
+use nxzr_shared::shutdown::Shutdown;
 use std::{
     pin::Pin,
     sync::{Arc, Mutex},
@@ -49,8 +50,7 @@ impl From<NxzrServiceError> for Status {
 pub struct NxzrService {
     device: Arc<device::Device>,
     conn_state: Arc<Mutex<ConnectionState>>,
-    shutdown_token: CancellationToken,
-    shutdown_complete_tx: mpsc::WeakSender<()>,
+    shutdown: Shutdown,
 }
 
 #[derive(Debug)]
@@ -62,16 +62,11 @@ enum ConnectionState {
 }
 
 impl NxzrService {
-    pub async fn new(
-        device: Arc<device::Device>,
-        shutdown_token: CancellationToken,
-        shutdown_complete_tx: mpsc::Sender<()>,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(device: Arc<device::Device>, shutdown: Shutdown) -> anyhow::Result<Self> {
         Ok(Self {
             device,
             conn_state: Arc::new(Mutex::new(ConnectionState::NotConnected)),
-            shutdown_token,
-            shutdown_complete_tx: shutdown_complete_tx.downgrade(),
+            shutdown,
         })
     }
 }
@@ -123,16 +118,16 @@ impl Nxzr for NxzrService {
             mpsc::unbounded_channel::<Result<ConnectSwitchResponse, Status>>();
 
         tokio::spawn({
-            let shutdown_complete_guard = self.shutdown_complete_tx.clone().upgrade().unwrap();
-            let shutdown_token = self.shutdown_token.clone();
+            let shutdown = self.shutdown.clone();
             let device = self.device.clone();
             let conn_state = self.conn_state.clone();
             async move {
+                let _shutdown_guard = shutdown.drop_guard();
                 let connect_switch_fut = handle_connect_switch(device, stream_tx.clone());
                 let res = tokio::select! {
                     res = connect_switch_fut => Some(res),
                     _ = stream_tx.closed() => None,
-                    _ = shutdown_token.cancelled() => None,
+                    _ = shutdown.recv_shutdown() => None,
                 };
                 match res {
                     Some(Ok((conn, conn_handle))) => {
@@ -165,7 +160,7 @@ impl Nxzr for NxzrService {
                             _ = stream_tx.closed() => {
                                 tracing::warn!("terminating connection due to stream closed");
                             },
-                            _ = shutdown_token.cancelled() => {
+                            _ = shutdown.recv_shutdown() => {
                                 tracing::warn!("terminating connection due to shutdown signal");
                             },
                         }
@@ -217,7 +212,6 @@ impl Nxzr for NxzrService {
                     })),
                     ..Default::default()
                 }));
-                drop(shutdown_complete_guard);
             }
         });
 
