@@ -2383,6 +2383,7 @@ dependencies = [
  "nxzr_core",
  "nxzr_device",
  "nxzr_proto",
+ "nxzr_shared",
  "prost",
  "prost-types",
  "thiserror",
