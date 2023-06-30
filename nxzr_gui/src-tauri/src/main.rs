@@ -1,59 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use nxzr_shared::{event::EventError, shutdown::Shutdown};
-use state::{AgentManagerError, AppState, LoggingManagerError};
+use nxzr_shared::shutdown::Shutdown;
+use state::AppState;
 use std::{path::Path, sync::Arc};
-use support::{installer::InstallerError, usbipd::UsbipdError, wsl::WslError};
 use tauri::Manager;
 use tokio::sync::{mpsc, oneshot};
 use tracing_subscriber::prelude::*;
-use util::SystemCommandError;
 
 mod commands;
 mod config;
 mod state;
 mod support;
 mod util;
-
-#[derive(Debug, thiserror::Error)]
-pub enum AppError {
-    #[error("failed to show window on ready")]
-    WindowReadyFailed,
-    #[error("task already running")]
-    TaskAlreadyRunning,
-    #[error("no such task found")]
-    TaskNotFound,
-    #[error(transparent)]
-    AgentManagerError(#[from] AgentManagerError),
-    #[error(transparent)]
-    LoggingManagerError(#[from] LoggingManagerError),
-    #[error(transparent)]
-    InstallerError(#[from] InstallerError),
-    #[error(transparent)]
-    WslError(#[from] WslError),
-    #[error(transparent)]
-    UsbipdError(#[from] UsbipdError),
-    #[error(transparent)]
-    EventError(#[from] EventError),
-    #[error(transparent)]
-    SystemCommandError(#[from] SystemCommandError),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error(transparent)]
-    Tauri(#[from] tauri::Error),
-    #[error(transparent)]
-    Anyhow(#[from] anyhow::Error),
-}
-
-impl serde::Serialize for AppError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        serializer.serialize_str(self.to_string().as_ref())
-    }
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -106,11 +65,12 @@ async fn main() -> anyhow::Result<()> {
 
     let agent_manager = Arc::new(state::AgentManager::new(shutdown.clone()).await?);
     let logging_manager = Arc::new(state::LoggingManager::new(log_out_rx)?);
-    let app_state = AppState::new(agent_manager, logging_manager, shutdown);
-
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
-        .manage(app_state)
+        .manage(AppState {
+            agent_manager,
+            logging_manager,
+        })
         .invoke_handler(tauri::generate_handler![
             commands::window_ready,
             commands::cancel_task,
