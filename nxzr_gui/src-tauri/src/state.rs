@@ -29,7 +29,7 @@ impl AppState {
             let shutdown = shutdown.clone();
             let task_handles = task_handles.clone();
             async move {
-                let _shutdown_guard = shutdown.guard();
+                let _shutdown_guard = shutdown.drop_guard();
                 shutdown.recv_shutdown().await;
                 let mut task_handles = task_handles.lock().await;
                 for value in task_handles.values_mut() {

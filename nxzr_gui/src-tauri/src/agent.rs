@@ -66,7 +66,7 @@ impl AgentManager {
             let shutdown = self.shutdown.clone();
             let wsl_instance_tx = self.wsl_instance_tx.clone();
             async move {
-                let _shutdown_guard = shutdown.guard();
+                let _shutdown_guard = shutdown.drop_guard();
                 tokio::select! {
                     _ = shutdown.recv_shutdown() => {
                         let _ = child.kill();
@@ -115,7 +115,7 @@ impl AgentManager {
             let shutdown = self.shutdown.clone();
             let agent_instance_tx = self.agent_instance_tx.clone();
             async move {
-                let _shutdown_guard = shutdown.guard();
+                let _shutdown_guard = shutdown.drop_guard();
                 tokio::select! {
                     _ = shutdown.recv_shutdown() => {
                         let _ = child.kill();
