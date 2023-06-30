@@ -1,7 +1,6 @@
-use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum EventError {
     #[error("failed to subscribe events")]
     SubscriptionFailed,

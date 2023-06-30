@@ -1,10 +1,8 @@
-use thiserror::Error;
-
 pub mod input;
 pub mod output;
 pub mod subcommand;
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum ReportError {
     // Invalid value range has been entered.
     #[error("invalid value range supplied")]

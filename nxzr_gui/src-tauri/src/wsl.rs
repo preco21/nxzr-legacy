@@ -1,7 +1,6 @@
 use crate::{config, util};
 use command_group::AsyncGroupChild;
 use std::path::Path;
-use thiserror::Error;
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt},
     sync::mpsc,
@@ -10,7 +9,7 @@ use tokio::{
 
 const WSL_FULL_REFRESH_SCRIPT: &str = include_str!("scripts/full-refresh-wsl.ps1");
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum WslError {
     #[error("WSL shutdown failed")]
     WslShutdownFailed,

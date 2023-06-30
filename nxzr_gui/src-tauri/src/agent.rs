@@ -5,7 +5,6 @@ use nxzr_shared::{
     shutdown::Shutdown,
 };
 use std::{path::Path, sync::Arc};
-use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch},
     task::JoinHandle,
@@ -14,7 +13,7 @@ use tokio::{
 use tokio_retry::{strategy::FixedInterval, Retry};
 use tonic::transport::{Channel, Endpoint};
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum AgentManagerError {
     #[error("wsl instance already launched")]
     WslInstanceAlreadyLaunched,

@@ -1,8 +1,7 @@
 use crate::Address;
-use thiserror::Error;
 use tokio::{process::Command, time::error::Elapsed};
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum SysCheckError {
     #[error("privilege error, this program is required to run as root user")]
     RootPrivilegeRequired,
@@ -126,7 +125,7 @@ pub async fn restart_bluetooth_service() -> Result<(), SystemCommandError> {
     Ok(())
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SystemCommandError {
     #[error("failed to execute a command: {0}")]
     CommandFailed(String),
@@ -136,7 +135,7 @@ pub enum SystemCommandError {
     Internal(SystemCommandInternalError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SystemCommandInternalError {
     #[error("utf8: {0}")]
     Utf8Error(std::str::Utf8Error),

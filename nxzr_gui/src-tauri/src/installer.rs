@@ -1,6 +1,5 @@
 use crate::{config, util, wsl};
 use std::path::{Path, PathBuf};
-use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
 use tokio::{
@@ -11,7 +10,7 @@ use tokio::{
 
 const INSTALL_DEPS_SCRIPT: &str = include_str!("scripts/install-deps.ps1");
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum InstallerError {
     #[error("WSL is not available")]
     WslNotAvailable,

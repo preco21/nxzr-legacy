@@ -1,13 +1,12 @@
 use crate::{device, session, system, transport, Address};
 use nxzr_core::{controller::ControllerType, protocol};
 use strum::Display;
-use thiserror::Error;
 use tokio::{
     sync::mpsc,
     time::{self, Duration},
 };
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
     #[error("failed to resolve paired switches automatically")]
     FailedToResolvePairedSwitches,

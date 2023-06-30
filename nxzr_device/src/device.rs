@@ -1,6 +1,5 @@
 use crate::{system, Address, Uuid};
 use std::{collections::HashSet, future::Future, str::FromStr};
-use thiserror::Error;
 use tokio::sync::mpsc;
 
 // Gamepad/Joystick device class
@@ -11,7 +10,7 @@ const SWITCH_MAC_PREFIX: &[u8] = &[0x94, 0x59, 0xCB];
 const SWITCH_SDP_RECORD_STRING: &str = include_str!("sdp/switch-controller.xml");
 const SWITCH_HID_UUID: &str = "00001124-0000-1000-8000-00805f9b34fb";
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum DeviceError {
     #[error("failed to create a session, maybe Bluetooth is disabled?; bluer: {0}")]
     SessionCreationFailed(bluer::Error),
@@ -25,7 +24,7 @@ pub enum DeviceError {
     Internal(DeviceInternalError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum DeviceInternalError {
     #[error("io: {0}")]
     Io(#[from] std::io::Error),

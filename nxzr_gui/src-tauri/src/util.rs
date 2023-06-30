@@ -7,7 +7,6 @@ use std::{
     sync::Arc,
 };
 use tempfile::TempDir;
-use thiserror::Error;
 use tokio::{
     fs::{self, File},
     io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader},
@@ -73,7 +72,7 @@ pub async fn create_file_from_raw_bytes(path: &Path, raw_bytes: &[u8]) -> io::Re
     Ok(())
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SystemCommandError {
     #[error("failed to execute a command: {0}")]
     CommandFailed(String),

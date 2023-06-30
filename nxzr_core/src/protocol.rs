@@ -13,7 +13,6 @@ use nxzr_shared::{
 use std::future::Future;
 use std::sync::Arc;
 use strum::{Display, IntoStaticStr};
-use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
 use tokio::time::{self, Duration};
@@ -23,7 +22,7 @@ pub use crate::controller::protocol::{
     ControllerProtocolConfig as ProtocolConfig, TransportRead, TransportWrite,
 };
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum ProtocolError {
     #[error("protocol is being closed, aborting the requested action")]
     ActionAbortedDueToClosing,
@@ -31,7 +30,7 @@ pub enum ProtocolError {
     Internal(ProtocolInternalError),
 }
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum ProtocolInternalError {
     #[error("task join failed: {0}")]
     JoinError(String),

@@ -1,12 +1,11 @@
 use super::{spi_flash::SpiFlash, ControllerType};
 use button::ButtonState;
 use stick::{StickCalibration, StickState, StickStateConfig};
-use thiserror::Error;
 
 pub mod button;
 pub mod stick;
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum StateError {
     // Invalid value range has been entered.
     #[error("invalid value range supplied")]

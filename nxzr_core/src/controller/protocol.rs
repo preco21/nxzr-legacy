@@ -18,13 +18,12 @@ use nxzr_shared::{
 };
 use std::{future::Future, sync::Mutex};
 use strum::{Display, IntoStaticStr};
-use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch, Notify},
     time::{self, Duration},
 };
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum ControllerProtocolError {
     #[error("failed to parse output report from raw buffer, ignoring")]
     OutputReportParseFailed,
@@ -55,7 +54,7 @@ pub enum ControllerProtocolError {
     Internal(ControllerProtocolInternalError),
 }
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum ControllerProtocolInternalError {
     #[error("report: {0}")]
     Report(ReportError),

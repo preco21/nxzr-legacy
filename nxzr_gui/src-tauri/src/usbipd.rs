@@ -1,8 +1,7 @@
 use crate::{config, util, wsl};
-use thiserror::Error;
 use tokio::time::{self, Duration};
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum UsbipdError {
     #[error("failed to retrieve usbipd state: {0}")]
     UsbipdStateLookupFailed(String),

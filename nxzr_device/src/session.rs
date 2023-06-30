@@ -2,12 +2,11 @@ use crate::{
     sock::{self, l2cap},
     Address,
 };
-use thiserror::Error;
 
 const DEFAULT_CTL_PSM: u16 = 17;
 const DEFAULT_ITR_PSM: u16 = 19;
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SessionError {
     #[error("control/interrupt socket address must match with each other")]
     CtlItrSocketAddrMismatch,
@@ -19,7 +18,7 @@ pub enum SessionError {
     Internal(SessionInternalError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SessionInternalError {
     #[error("io: {0}")]
     Io(#[from] std::io::Error),

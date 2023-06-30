@@ -14,7 +14,6 @@ use std::{
     sync::{Arc, Mutex},
     time::SystemTime,
 };
-use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream};
 use tonic::{async_trait, Request, Response, Status, Streaming};
@@ -22,7 +21,7 @@ use tonic::{async_trait, Request, Response, Status, Streaming};
 type ServiceResult<T> = Result<Response<T>, Status>;
 type ResponseStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send>>;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum NxzrServiceError {
     #[error("connection state must be `NotConnected` in order to connect/reconnect")]
     ConnectionStateInvariant,

@@ -7,7 +7,6 @@ use nxzr_shared::{event::EventError, shutdown::Shutdown};
 use state::{AppState, LoggingEvent};
 use std::{path::Path, sync::Arc};
 use tauri::Manager;
-use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 use tracing_subscriber::prelude::*;
 use usbipd::UsbipdError;
@@ -23,7 +22,7 @@ mod usbipd;
 mod util;
 mod wsl;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("failed to show window on ready")]
     WindowReadyFailed,

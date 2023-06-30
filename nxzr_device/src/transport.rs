@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use std::future::Future;
 use std::sync::Arc;
-use thiserror::Error;
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
 use tokio::time::{self, Duration};
@@ -16,7 +15,7 @@ const MTU_THRESHOLD: usize = 400;
 const DEFAULT_FLOW_CONTROL_PERMITS: usize = 4;
 const DEFAULT_READ_BUF_SIZE: usize = 50;
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum TransportError {
     #[error("operation called when transport is closed")]
     OperationWhileClosed,
@@ -32,7 +31,7 @@ pub enum TransportError {
     Internal(TransportInternalError),
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum TransportInternalError {
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
