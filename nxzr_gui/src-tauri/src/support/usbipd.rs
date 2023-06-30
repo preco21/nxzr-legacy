@@ -1,4 +1,5 @@
-use crate::{config, util, wsl};
+use super::wsl;
+use crate::{config, util};
 use tokio::time::{self, Duration};
 
 #[derive(Debug, thiserror::Error)]
@@ -143,7 +144,7 @@ fn parse_hardware_id(raw: &str) -> Option<(String, String)> {
 
 #[cfg(test)]
 mod tests {
-    use crate::usbipd::UsbipdState;
+    use crate::support::usbipd::UsbipdState;
 
     use super::parse_hardware_id;
 

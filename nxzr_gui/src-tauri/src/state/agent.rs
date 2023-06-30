@@ -1,4 +1,4 @@
-use crate::wsl;
+use crate::support::wsl;
 use nxzr_shared::{
     event::{self, SubscriptionReq},
     setup_event,
@@ -46,7 +46,6 @@ impl AgentManager {
         let (msg_tx, msg_rx) = mpsc::channel(256);
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
-
         Ok(Self {
             wsl_instance_tx: Arc::new(watch::channel(None).0),
             agent_instance_tx: Arc::new(watch::channel(None).0),
@@ -100,9 +99,9 @@ impl AgentManager {
         if !self.is_wsl_ready() {
             return Err(AgentManagerError::WslInstanceNotReady);
         }
-        // if self.agent_instance_tx.borrow().is_some() {
-        //     return Err(AgentManagerError::AgentInstanceAlreadyLaunched);
-        // }
+        if self.agent_instance_tx.borrow().is_some() {
+            return Err(AgentManagerError::AgentInstanceAlreadyLaunched);
+        }
         tracing::info!("launching agent daemon process...");
         // FIXME: kill dangling if there's dangling child...
         let mut child = wsl::spawn_wsl_agent_daemon(server_exec_path).await?;
@@ -141,9 +140,7 @@ impl AgentManager {
     }
 
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, AgentManagerError> {
-        Event::subscribe(&mut self.event_sub_tx.clone())
-            .await
-            .map_err(|err| AgentManagerError::from(err))
+        Ok(Event::subscribe(&mut self.event_sub_tx.clone()).await?)
     }
 }
 

@@ -7,7 +7,7 @@ use tokio::{
     time::{self, Duration},
 };
 
-const WSL_FULL_REFRESH_SCRIPT: &str = include_str!("scripts/full-refresh-wsl.ps1");
+const WSL_FULL_REFRESH_SCRIPT: &str = include_str!("../scripts/full-refresh-wsl.ps1");
 
 #[derive(Debug, thiserror::Error)]
 pub enum WslError {

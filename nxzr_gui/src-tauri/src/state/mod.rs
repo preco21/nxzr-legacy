@@ -1,15 +1,16 @@
-use crate::{agent::AgentManager, AppError};
-use nxzr_shared::{event::SubscriptionReq, setup_event, shutdown::Shutdown};
-use ringbuf::Rb;
+use crate::AppError;
+use nxzr_shared::shutdown::Shutdown;
 use std::{collections::HashMap, future::Future, sync::Arc};
-use tokio::{
-    sync::{mpsc, oneshot, Mutex},
-    task,
-};
+use tokio::{sync::Mutex, task};
+
+mod agent;
+pub use agent::*;
+mod logging;
+pub use logging::*;
 
 pub struct AppState {
     pub agent_manager: Arc<AgentManager>,
-    pub logging: Arc<LoggingState>,
+    pub logging_manager: Arc<LoggingManager>,
     task_handles: Arc<Mutex<HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>>>>,
     shutdown: Shutdown,
 }
@@ -17,7 +18,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(
         agent_manager: Arc<AgentManager>,
-        log_sub_tx: mpsc::Sender<SubscriptionReq<LoggingEvent>>,
+        logging_manager: Arc<LoggingManager>,
         shutdown: Shutdown,
     ) -> Self {
         let task_handles: HashMap<String, Option<task::JoinHandle<Result<(), AppError>>>> =
@@ -42,10 +43,7 @@ impl AppState {
         });
         Self {
             agent_manager,
-            logging: Arc::new(LoggingState {
-                seen_buf: Mutex::new(ringbuf::HeapRb::new(1024)),
-                log_sub_tx,
-            }),
+            logging_manager,
             task_handles,
             shutdown,
         }
@@ -96,45 +94,5 @@ impl AppState {
         } else {
             Err(AppError::TaskNotFound)
         }
-    }
-}
-
-pub struct LoggingState {
-    seen_buf: Mutex<ringbuf::HeapRb<String>>,
-    log_sub_tx: mpsc::Sender<SubscriptionReq<LoggingEvent>>,
-}
-
-impl LoggingState {
-    pub async fn push_log(&self, event: &str) {
-        let mut seen_buf = self.seen_buf.lock().await;
-        seen_buf.push_overwrite(event.to_string());
-    }
-
-    pub async fn logs(&self) -> Vec<String> {
-        let seen_buf = self.seen_buf.lock().await;
-        seen_buf.iter().cloned().collect::<Vec<_>>()
-    }
-
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<LoggingEvent>, AppError> {
-        Ok(LoggingEvent::subscribe(&mut self.log_sub_tx.clone()).await?)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LoggingEvent(String);
-
-impl LoggingEvent {
-    pub fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
-impl LoggingEvent {
-    setup_event!(LoggingEvent);
-}
-
-impl From<String> for LoggingEvent {
-    fn from(value: String) -> Self {
-        Self(value)
     }
 }

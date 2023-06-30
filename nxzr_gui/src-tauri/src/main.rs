@@ -1,26 +1,20 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use agent::AgentManagerError;
-use installer::InstallerError;
 use nxzr_shared::{event::EventError, shutdown::Shutdown};
-use state::{AppState, LoggingEvent};
+use state::{AgentManagerError, AppState, LoggingManagerError};
 use std::{path::Path, sync::Arc};
+use support::{installer::InstallerError, usbipd::UsbipdError, wsl::WslError};
 use tauri::Manager;
 use tokio::sync::{mpsc, oneshot};
 use tracing_subscriber::prelude::*;
-use usbipd::UsbipdError;
 use util::SystemCommandError;
-use wsl::WslError;
 
-mod agent;
 mod commands;
 mod config;
-mod installer;
 mod state;
-mod usbipd;
+mod support;
 mod util;
-mod wsl;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -31,21 +25,23 @@ pub enum AppError {
     #[error("no such task found")]
     TaskNotFound,
     #[error(transparent)]
-    Io(#[from] std::io::Error),
+    AgentManagerError(#[from] AgentManagerError),
     #[error(transparent)]
-    Tauri(#[from] tauri::Error),
+    LoggingManagerError(#[from] LoggingManagerError),
+    #[error(transparent)]
+    InstallerError(#[from] InstallerError),
+    #[error(transparent)]
+    WslError(#[from] WslError),
+    #[error(transparent)]
+    UsbipdError(#[from] UsbipdError),
     #[error(transparent)]
     EventError(#[from] EventError),
     #[error(transparent)]
     SystemCommandError(#[from] SystemCommandError),
     #[error(transparent)]
-    InstallerError(#[from] InstallerError),
+    Io(#[from] std::io::Error),
     #[error(transparent)]
-    AgentManagerError(#[from] AgentManagerError),
-    #[error(transparent)]
-    WslError(#[from] WslError),
-    #[error(transparent)]
-    UsbipdError(#[from] UsbipdError),
+    Tauri(#[from] tauri::Error),
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 }
@@ -91,9 +87,6 @@ async fn main() -> anyhow::Result<()> {
         );
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let (log_sub_tx, log_sub_rx) = mpsc::channel(1);
-    LoggingEvent::handle_events(log_out_rx, log_sub_rx)?;
-
     let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
     let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel(1);
     let (sig_shutdown_tx, mut sig_shutdown_rx) = mpsc::channel::<oneshot::Sender<()>>(1);
@@ -111,8 +104,10 @@ async fn main() -> anyhow::Result<()> {
     });
     let shutdown = Shutdown::new(shutdown_tx, shutdown_complete_tx);
 
-    let agent_manager = Arc::new(agent::AgentManager::new(shutdown.clone()).await?);
-    let app_state = AppState::new(agent_manager, log_sub_tx, shutdown);
+    let agent_manager = Arc::new(state::AgentManager::new(shutdown.clone()).await?);
+    let logging_manager = Arc::new(state::LoggingManager::new(log_out_rx)?);
+    let app_state = AppState::new(agent_manager, logging_manager, shutdown);
+
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(app_state)

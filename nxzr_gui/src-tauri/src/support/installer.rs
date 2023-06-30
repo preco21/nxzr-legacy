@@ -1,4 +1,5 @@
-use crate::{config, util, wsl};
+use super::wsl;
+use crate::{config, util};
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
@@ -8,7 +9,7 @@ use tokio::{
     time,
 };
 
-const INSTALL_DEPS_SCRIPT: &str = include_str!("scripts/install-deps.ps1");
+const INSTALL_DEPS_SCRIPT: &str = include_str!("../scripts/install-deps.ps1");
 
 #[derive(Debug, thiserror::Error)]
 pub enum InstallerError {

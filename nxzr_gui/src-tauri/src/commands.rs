@@ -1,8 +1,12 @@
 use crate::{
-    config, installer,
+    config,
     state::AppState,
-    usbipd::{self, AdapterInfo},
-    util, wsl, AppError,
+    support::{
+        installer,
+        usbipd::{self, AdapterInfo},
+        wsl,
+    },
+    util, AppError,
 };
 use std::path::Path;
 use tauri::Manager;
@@ -79,10 +83,10 @@ pub async fn subscribe_logging(
     let mut logs: Option<Vec<String>> = None;
     state
         .register_task(&task_label, async {
-            logs = Some(state.logging.logs().await);
-            let mut log_rx = state.logging.events().await?;
+            logs = Some(state.logging_manager.full_logs().await);
+            let mut log_rx = state.logging_manager.logs().await?;
             let handle = tokio::spawn({
-                let logging = state.logging.clone();
+                let logging = state.logging_manager.clone();
                 async move {
                     while let Some(event) = log_rx.recv().await {
                         let log_string = event.to_string();
