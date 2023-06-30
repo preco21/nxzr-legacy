@@ -99,6 +99,7 @@ pub async fn run(shutdown: impl Future) -> anyhow::Result<()> {
                 .add_service(svc)
                 .serve_with_shutdown(addr, shutdown_token.recv_shutdown())
                 .await?;
+            tracing::info!("service terminated.");
             Ok(())
         }
     });
