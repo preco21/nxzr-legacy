@@ -101,12 +101,12 @@ pub async fn check_wslconfig(kernel_path: &Path) -> Result<(), InstallerError> {
 pub async fn check_agent_registered() -> Result<(), InstallerError> {
     // Checks if `nxzr-agent` as a WSL distro is properly installed.
     let wsl = wslapi::Library::new()?;
-    if !wsl.is_distribution_registered(config::WSL_AGENT_NAME) {
+    if !wsl.is_distribution_registered(config::WSL_DISTRO_NAME) {
         return Err(InstallerError::AgentNotRegistered);
     }
     // Checks for the distro's WSL version.
     let conf = wsl
-        .get_distribution_configuration(config::WSL_AGENT_NAME)
+        .get_distribution_configuration(config::WSL_DISTRO_NAME)
         .map_err(|_err| InstallerError::AgentNotRegistered)?;
     if conf.version != 2 {
         return Err(InstallerError::AgentWslVersionMismatch);
@@ -175,19 +175,19 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
     // However, to make sure there's no clutter around agent registration, we
     // just blindly check and unregister it here as if there was no check held
     // in advance.
-    if wsl.is_distribution_registered(config::WSL_AGENT_NAME) {
+    if wsl.is_distribution_registered(config::WSL_DISTRO_NAME) {
         tracing::info!("agent distro found, unregistering...");
         // TODO: unregister
         util::run_system_command({
             let mut cmd = tokio::process::Command::new("wsl.exe");
-            cmd.args(&["--terminate", config::WSL_AGENT_NAME]);
+            cmd.args(&["--terminate", config::WSL_DISTRO_NAME]);
             cmd
         })
         .await
         .map_err(|_err| InstallerError::WslDistroUnregisterFailed)?;
         util::run_system_command({
             let mut cmd = tokio::process::Command::new("wsl.exe");
-            cmd.args(&["--unregister", config::WSL_AGENT_NAME]);
+            cmd.args(&["--unregister", config::WSL_DISTRO_NAME]);
             cmd
         })
         .await
@@ -198,7 +198,7 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
     let app_dirs = util::get_app_dirs().ok_or(InstallerError::AppDirResolveFailed)?;
     let install_dir = app_dirs
         .data_dir()
-        .join(Path::new(config::WSL_AGENT_INSTALL_FOLDER_NAME))
+        .join(Path::new(config::WSL_DISTRO_INSTALL_FOLDER_NAME))
         .to_str()
         .ok_or(InstallerError::PathConversionFailed)?
         .to_owned();
@@ -212,7 +212,7 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
         let mut cmd = tokio::process::Command::new("wsl.exe");
         cmd.args(&[
             "--import",
-            config::WSL_AGENT_NAME,
+            config::WSL_DISTRO_NAME,
             &install_dir,
             &agent_archive_path,
         ]);

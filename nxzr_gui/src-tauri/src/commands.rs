@@ -2,7 +2,7 @@ use crate::{
     config,
     state::{self, AppState},
     support::{
-        installer,
+        agent, installer,
         usbipd::{self, AdapterInfo},
         wsl,
     },
@@ -35,6 +35,8 @@ pub enum CommandError {
     WslError(#[from] wsl::WslError),
     #[error(transparent)]
     UsbipdError(#[from] usbipd::UsbipdError),
+    #[error(transparent)]
+    AgentError(#[from] agent::AgentError),
     #[error(transparent)]
     EventError(#[from] event::EventError),
     #[error(transparent)]
@@ -185,7 +187,7 @@ pub async fn install_2_ensure_wslconfig(handle: tauri::AppHandle) -> Result<(), 
 
 #[tauri::command]
 pub async fn install_3_register_agent(handle: tauri::AppHandle) -> Result<(), CommandError> {
-    let agent_archive_path = util::get_resource(&handle, config::WSL_AGENT_ARCHIVE_NAME)
+    let agent_archive_path = util::get_resource(&handle, config::WSL_DISTRO_ARCHIVE_NAME)
         .ok_or(CommandError::AgentArchiveResolveFailed)?;
     installer::register_agent(&agent_archive_path).await?;
     Ok(())
@@ -244,7 +246,7 @@ pub async fn launch_wsl_anchor_instance(
 pub async fn run_wsl_agent_check(handle: tauri::AppHandle) -> Result<(), CommandError> {
     let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
         .ok_or(CommandError::ServerExecResolveFailed)?;
-    wsl::run_wsl_agent_check(&server_exec_path).await?;
+    agent::run_agent_check(&server_exec_path).await?;
     Ok(())
 }
 

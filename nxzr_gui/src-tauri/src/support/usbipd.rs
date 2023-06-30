@@ -69,7 +69,7 @@ pub async fn list_hid_adapters() -> Result<Vec<AdapterInfo>, UsbipdError> {
                 return None;
             };
             let is_attached = match &device.client_wsl_instance {
-                Some(wsl_instance) => wsl_instance == config::WSL_AGENT_NAME,
+                Some(wsl_instance) => wsl_instance == config::WSL_DISTRO_NAME,
                 None => false,
             };
             let Some((vid_pid, serial)) = parse_hardware_id(&device.instance_id) else {
@@ -100,7 +100,7 @@ pub async fn attach_hid_adapter(hardware_id: &str) -> Result<(), UsbipdError> {
             "wsl",
             "attach",
             "-d",
-            config::WSL_AGENT_NAME,
+            config::WSL_DISTRO_NAME,
             "-i",
             hardware_id,
         ]);

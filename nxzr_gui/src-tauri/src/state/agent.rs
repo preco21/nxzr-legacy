@@ -1,4 +1,7 @@
-use crate::support::wsl;
+use crate::{
+    support::{agent, wsl},
+    util,
+};
 use nxzr_shared::{
     event::{self, SubscriptionReq},
     setup_event,
@@ -23,6 +26,10 @@ pub enum AgentManagerError {
     AgentInstanceAlreadyLaunched,
     #[error(transparent)]
     WslError(#[from] wsl::WslError),
+    #[error(transparent)]
+    SystemCommandError(#[from] util::SystemCommandError),
+    #[error(transparent)]
+    AgentError(#[from] agent::AgentError),
     #[error(transparent)]
     Event(#[from] event::EventError),
     #[error(transparent)]
@@ -103,7 +110,7 @@ impl AgentManager {
         }
         tracing::info!("launching agent daemon process...");
         // FIXME: kill dangling if there's dangling child...
-        let mut child = wsl::spawn_wsl_agent_daemon(server_exec_path).await?;
+        let mut child = agent::spawn_wsl_agent_daemon(server_exec_path).await?;
         let try_connect = || async move {
             let channel = Endpoint::from_static("http://[::1]:50052")
                 .connect()
