@@ -9,7 +9,7 @@ use nxzr_shared::{
 };
 use std::{path::Path, sync::Arc};
 use tokio::{
-    sync::{mpsc, oneshot, watch},
+    sync::{mpsc, oneshot, watch, Mutex},
     task::JoinHandle,
     time::{self, Duration},
 };
@@ -40,8 +40,7 @@ pub enum AgentManagerError {
 
 pub struct AgentManager {
     wsl_instance_tx: Arc<watch::Sender<Option<JoinHandle<Result<(), AgentManagerError>>>>>,
-    agent_instance_tx:
-        Arc<watch::Sender<Option<(JoinHandle<Result<(), AgentManagerError>>, Channel)>>>,
+    agent_instance: Arc<Mutex<Option<(JoinHandle<Result<(), AgentManagerError>>, Channel)>>>,
     msg_tx: mpsc::Sender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     shutdown: Shutdown,
@@ -54,7 +53,7 @@ impl AgentManager {
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
             wsl_instance_tx: Arc::new(watch::channel(None).0),
-            agent_instance_tx: Arc::new(watch::channel(None).0),
+            agent_instance: Arc::new(Mutex::new(None)),
             msg_tx,
             event_sub_tx,
             shutdown,
@@ -105,11 +104,13 @@ impl AgentManager {
         if !self.is_wsl_ready() {
             return Err(AgentManagerError::WslInstanceNotReady);
         }
-        if self.agent_instance_tx.borrow().is_some() {
+        let mut agent_instance = self.agent_instance.lock().await;
+        if agent_instance.is_some() {
             return Err(AgentManagerError::AgentInstanceAlreadyLaunched);
         }
         tracing::info!("launching agent daemon process...");
-        // FIXME: kill dangling if there's dangling child...
+        // Sometimes, the agent daemon process is not terminated properly, so here we are trying to kill the dangling process.
+        agent::kill_dangling_agent().await?;
         let mut child = agent::spawn_wsl_agent_daemon(server_exec_path).await?;
         let try_connect = || async move {
             let channel = Endpoint::from_static("http://[::1]:50052")
@@ -120,7 +121,7 @@ impl AgentManager {
         let channel = Retry::spawn(FixedInterval::from_millis(1000).take(3), try_connect).await?;
         let handle = tokio::spawn({
             let shutdown = self.shutdown.clone();
-            let agent_instance_tx = self.agent_instance_tx.clone();
+            let agent_instance = self.agent_instance.clone();
             async move {
                 let _shutdown_guard = shutdown.drop_guard();
                 tokio::select! {
@@ -132,11 +133,12 @@ impl AgentManager {
                 // Wait for seconds loosely to make sure the agent daemon is terminated.
                 let _ = time::timeout(Duration::from_millis(3000), child.wait()).await;
                 tracing::info!("terminating agent daemon process...");
-                agent_instance_tx.send_replace(None);
+                let mut agent_instance = agent_instance.lock().await;
+                let _ = agent_instance.take();
                 Ok::<_, AgentManagerError>(())
             }
         });
-        self.agent_instance_tx.send_replace(Some((handle, channel)));
+        agent_instance.replace((handle, channel));
         Ok(())
     }
 
