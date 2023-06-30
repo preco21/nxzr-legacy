@@ -297,12 +297,25 @@ pub fn parse_tracing_json_log_data(json: &str) -> Result<TracingJsonLogData, ser
     serde_json::from_str(json)
 }
 
-// FIXME: handle log levels
 pub fn format_tracing_json_log_data(data: &TracingJsonLogData) -> String {
     format!(
         "[{}] [{}] [{}]: {}",
         data.timestamp, data.level, data.target, data.fields.message
     )
+}
+
+pub fn forward_trace_json_log_data(raw: &str) {
+    match parse_tracing_json_log_data(raw) {
+        Ok(data) => match data.level.as_str() {
+            "ERROR" => tracing::error!("[child]: {}", format_tracing_json_log_data(&data)),
+            "WARN" => tracing::warn!("[child]: {}", format_tracing_json_log_data(&data)),
+            "INFO" => tracing::info!("[child]: {}", format_tracing_json_log_data(&data)),
+            "DEBUG" => tracing::debug!("[child]: {}", format_tracing_json_log_data(&data)),
+            "TRACE" => tracing::trace!("[child]: {}", format_tracing_json_log_data(&data)),
+            _ => tracing::info!("[child]: {}", format_tracing_json_log_data(&data)),
+        },
+        Err(_) => tracing::error!("[child raw]: {}", raw),
+    }
 }
 
 #[derive(Debug, Clone)]

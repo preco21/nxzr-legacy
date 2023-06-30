@@ -26,10 +26,7 @@ pub async fn run_agent_check(server_exec_path: &Path) -> Result<(), AgentError> 
     .await?;
     // Log `check` outputs from the WSL agent.
     for line in output.split("\n").filter(|l| !l.trim().is_empty()) {
-        tracing::info!(
-            "{}",
-            util::format_tracing_json_log_data(&util::parse_tracing_json_log_data(line)?)
-        )
+        util::forward_trace_json_log_data(&line);
     }
     Ok(())
 }
@@ -48,12 +45,7 @@ pub async fn spawn_wsl_agent_daemon(
     // Spawn a task to read the stdout/stderr of the child process for logging.
     tokio::spawn(async move {
         while let Some(line) = combined_lines.next_line().await.unwrap() {
-            match util::parse_tracing_json_log_data(&line) {
-                Ok(data) => {
-                    tracing::info!("[child]: {}", util::format_tracing_json_log_data(&data))
-                }
-                Err(_) => tracing::info!("[child]: {}", line),
-            }
+            util::forward_trace_json_log_data(&line);
         }
     });
     Ok(child)

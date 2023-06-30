@@ -241,7 +241,6 @@ pub async fn launch_wsl_anchor_instance(
     Ok(())
 }
 
-// FIXME: use this check to determine if the WSL should be restarted or not.
 #[tauri::command]
 pub async fn run_wsl_agent_check(handle: tauri::AppHandle) -> Result<(), CommandError> {
     let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
