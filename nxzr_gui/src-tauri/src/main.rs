@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .with(
             tracing_subscriber::fmt::Layer::default()
-                .event_format(tracing_subscriber::fmt::format().compact())
+                .event_format(tracing_subscriber::fmt::format().compact().with_ansi(false))
                 .with_writer(log_file_appender),
         );
     tracing::subscriber::set_global_default(subscriber)?;
