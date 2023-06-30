@@ -58,9 +58,9 @@ function LogPage(): React.ReactElement {
     // Set initial logs by copying the currently stored logs.
     //
     // Otherwise, the initial logs will be incorrectly set with duplicated entries.
-    const initialLogs = logger.logListener.initialLogs.map(convertLogEntryToMessage);
+    const initialLogs = logger.loggingSub.initialLogs.map(convertLogEntryToMessage);
     setLogs(initialLogs);
-    const unsubscribe = logger.logListener.onLog((entry) => {
+    const unsubscribe = logger.loggingSub.onLog((entry) => {
       setLogs((prev) => [...prev, convertLogEntryToMessage(entry)]);
       if (autoScrollRef.current) {
         requestAnimationFrame(() => {

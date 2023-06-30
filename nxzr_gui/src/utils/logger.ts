@@ -14,7 +14,7 @@ export interface LogEntry {
   target: string;
 }
 
-export class LogListener {
+export class LoggingSub {
   private state: 'init' | 'pending' | 'ready' = 'init';
   private listeners: Set<(entry: LogEntry) => void> = new Set();
   private internalLoggerHandle: UnlistenFn | undefined = undefined;
@@ -61,7 +61,7 @@ export class LogListener {
   }
 }
 
-export const logListener = new LogListener();
+export const loggingSub = new LoggingSub();
 
 export async function info(message: string): Promise<void> {
   await sendLog('info', message);
@@ -76,12 +76,12 @@ export async function error(message: string): Promise<void> {
 }
 
 export async function setupListenerHook(): Promise<void> {
-  await logListener.init();
+  await loggingSub.init();
   appWindow.once('tauri://close-requested', async () => {
-    await logListener.dispose();
+    await loggingSub.dispose();
     appWindow.close();
   });
   window.addEventListener('beforeunload', () => {
-    logListener.dispose();
+    loggingSub.dispose();
   });
 }
