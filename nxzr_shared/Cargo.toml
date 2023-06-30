@@ -1,7 +1,7 @@
 [package]
 name = "nxzr_shared"
 version = { workspace = true }
-description = "NXZR Project: Shared utilities across the project"
+description = "NXZR Project: Shared utilities used across the project"
 readme = "README.md"
 authors = { workspace = true }
 repository = { workspace = true }

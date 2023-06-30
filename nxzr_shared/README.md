@@ -1,3 +1,3 @@
 # nxzr_shared
 
-> NXZR Project: Shared utilities across the project
+> NXZR Project: Shared utilities used across the project
