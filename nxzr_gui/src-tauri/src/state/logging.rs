@@ -71,11 +71,6 @@ impl LoggingManager {
         Ok(())
     }
 
-    pub async fn push_log(&self, event: &str) {
-        let mut seen_buf = self.seen_buf.lock().await;
-        seen_buf.push_overwrite(event.to_string());
-    }
-
     pub async fn full_logs(&self) -> Vec<String> {
         let seen_buf = self.seen_buf.lock().await;
         seen_buf.iter().cloned().collect::<Vec<_>>()
