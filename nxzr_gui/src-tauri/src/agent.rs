@@ -11,7 +11,7 @@ use tokio::{
     time::{self, Duration},
 };
 use tokio_retry::{strategy::FixedInterval, Retry};
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::{Channel, Endpoint, Error as TonicError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AgentManagerError {
@@ -24,9 +24,9 @@ pub enum AgentManagerError {
     #[error(transparent)]
     WslError(#[from] wsl::WslError),
     #[error(transparent)]
-    Tonic(#[from] tonic::transport::Error),
-    #[error(transparent)]
     Event(#[from] event::EventError),
+    #[error(transparent)]
+    Tonic(#[from] TonicError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -100,24 +100,19 @@ impl AgentManager {
         if !self.is_wsl_ready() {
             return Err(AgentManagerError::WslInstanceNotReady);
         }
-        if self.agent_instance_tx.borrow().is_some() {
-            return Err(AgentManagerError::AgentInstanceAlreadyLaunched);
-        }
+        // if self.agent_instance_tx.borrow().is_some() {
+        //     return Err(AgentManagerError::AgentInstanceAlreadyLaunched);
+        // }
         tracing::info!("launching agent daemon process...");
         // FIXME: kill dangling if there's dangling child...
         let mut child = wsl::spawn_wsl_agent_daemon(server_exec_path).await?;
-        // FIXME: Immediately connect to the agent daemon may fail... find a way to wait for the agent daemon to be ready.
-        // FIXME: find out why the agent daemon is terminated immediately when there's duplicate agent daemon process.
         let try_connect = || async move {
             let channel = Endpoint::from_static("http://[::1]:50052")
                 .connect()
                 .await?;
-            Ok::<Channel, tonic::transport::Error>(channel)
+            Ok::<Channel, TonicError>(channel)
         };
-        let res = Retry::spawn(FixedInterval::from_millis(1000).take(3), try_connect).await;
-        let channel = Endpoint::from_static("http://[::1]:50052")
-            .connect()
-            .await?;
+        let channel = Retry::spawn(FixedInterval::from_millis(1000).take(3), try_connect).await?;
         let handle = tokio::spawn({
             let shutdown = self.shutdown.clone();
             let agent_instance_tx = self.agent_instance_tx.clone();
