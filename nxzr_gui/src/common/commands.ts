@@ -77,17 +77,18 @@ export async function detachHidAdapter(hardwareId: string): Promise<void> {
   await wrapError(invoke('detach_hid_adapter', { hardwareId }));
 }
 
-// WSL
-export async function launchWslAnchorInstance(): Promise<void> {
-  await wrapError(invoke('launch_wsl_anchor_instance'));
-}
-
-export async function runWslAgentCheck(): Promise<void> {
-  await wrapError(invoke('run_wsl_agent_check'));
+// Agent
+export async function runAgentCheck(): Promise<void> {
+  await wrapError(invoke('run_agent_check'));
 }
 
 export async function launchAgentDaemon(): Promise<void> {
   await wrapError(invoke('launch_agent_daemon'));
+}
+
+// WSL
+export async function launchWslAnchorInstance(): Promise<void> {
+  await wrapError(invoke('launch_wsl_anchor_instance'));
 }
 
 // Helpers

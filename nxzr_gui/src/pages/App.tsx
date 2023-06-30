@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { css } from 'styled-components';
-import { launchAgentDaemon, launchWslAnchorInstance, runWslAgentCheck } from '../common/commands';
+import { launchAgentDaemon, launchWslAnchorInstance, runAgentCheck } from '../common/commands';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
@@ -52,7 +52,7 @@ function AppPage(): React.ReactElement {
       )}
       {setupGuard.ready && (
         <Button onClick={async () => {
-          await runWslAgentCheck();
+          await runAgentCheck();
           await launchAgentDaemon();
         }}
         >

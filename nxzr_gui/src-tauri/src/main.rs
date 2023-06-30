@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
             commands::shutdown_wsl,
             commands::full_refresh_wsl,
             commands::launch_wsl_anchor_instance,
-            commands::run_wsl_agent_check,
+            commands::run_agent_check,
             commands::launch_agent_daemon,
         ])
         .on_window_event(|event| match event.event() {

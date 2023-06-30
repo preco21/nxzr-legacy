@@ -242,7 +242,7 @@ pub async fn launch_wsl_anchor_instance(
 }
 
 #[tauri::command]
-pub async fn run_wsl_agent_check(handle: tauri::AppHandle) -> Result<(), CommandError> {
+pub async fn run_agent_check(handle: tauri::AppHandle) -> Result<(), CommandError> {
     let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
         .ok_or(CommandError::ServerExecResolveFailed)?;
     agent::run_agent_check(&server_exec_path).await?;
