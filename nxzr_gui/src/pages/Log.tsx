@@ -63,9 +63,9 @@ function LogPage(): React.ReactElement {
     const unsubscribe = logger.loggingSub.onLog((entry) => {
       setLogs((prev) => [...prev, convertLogEntryToMessage(entry)]);
       if (autoScrollRef.current) {
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           consoleRef.current?.scrollTo(0, consoleRef.current.scrollHeight);
-        });
+        }, 50);
       }
     });
     return () => {
