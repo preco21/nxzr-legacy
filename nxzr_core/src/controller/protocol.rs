@@ -21,7 +21,7 @@ use strum::{Display, IntoStaticStr};
 use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch, Notify},
-    time,
+    time::{self, Duration},
 };
 
 #[derive(Clone, Error, Debug)]
@@ -37,7 +37,7 @@ pub enum ControllerProtocolError {
     #[error("unknown report mode is used for generating input report")]
     UnknownInputReportMode,
     #[error("write operation is slower than usual: {0:?}, ignoring")]
-    LaggedWrites(time::Duration),
+    LaggedWrites(Duration),
     #[error("write operation is triggered while paused, ignoring")]
     WriteWhilePaused,
     #[error("a report mode has been set, which is identical to previous one")]
@@ -293,7 +293,7 @@ impl ControllerProtocol {
         if state.send_interval == f64::INFINITY {
             self.notify_writer_wake.notified().await
         } else {
-            let send_interval = time::Duration::from_secs_f64(state.send_interval);
+            let send_interval = Duration::from_secs_f64(state.send_interval);
             let elapsed = now.elapsed();
             let shim_delay = match send_interval.checked_sub(elapsed) {
                 Some(delay) => delay,

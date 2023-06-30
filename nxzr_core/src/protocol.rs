@@ -16,7 +16,7 @@ use strum::{Display, IntoStaticStr};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
-use tokio::time;
+use tokio::time::{self, Duration};
 
 // Re-exports subset of internal protocol module exports.
 pub use crate::controller::protocol::{
@@ -162,7 +162,7 @@ impl Protocol {
                 tokio::select! {
                     _ = controller_protocol.writer_ready() => {
                         // Allow the task to send one last command.
-                        time::sleep(time::Duration::from_millis(1000)).await;
+                        time::sleep(Duration::from_millis(1000)).await;
                     },
                     _ = sig_close_rx.recv() => {},
                 }
@@ -386,7 +386,7 @@ async fn setup_blank_report_sender(
             res = protocol.send_blank_input_report(&transport) => {
                 // Propagate errors immediately to the caller if any.
                 res?;
-                time::sleep(time::Duration::from_millis(1000)).await;
+                time::sleep(Duration::from_millis(1000)).await;
             },
             _ = connected_tx.closed() => break,
         }

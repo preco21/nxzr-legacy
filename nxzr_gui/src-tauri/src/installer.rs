@@ -2,6 +2,7 @@ use crate::{config, util, wsl};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
+use tokio::time::Duration;
 use tokio::{
     fs::{self, File},
     sync::mpsc,
@@ -192,7 +193,7 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
         .await
         .map_err(|_err| InstallerError::WslDistroUnregisterFailed)?;
         // Wait for a few seconds to make sure the distro is properly unregistered.
-        time::sleep(time::Duration::from_secs(8)).await;
+        time::sleep(Duration::from_secs(8)).await;
     }
     let app_dirs = util::get_app_dirs().ok_or(InstallerError::AppDirResolveFailed)?;
     let install_dir = app_dirs
@@ -219,6 +220,6 @@ pub async fn register_agent(agent_archive_path: &Path) -> Result<(), InstallerEr
     })
     .await
     .map_err(|_err| InstallerError::AgentWslRegistrationFailed)?;
-    time::sleep(time::Duration::from_secs(1)).await;
+    time::sleep(Duration::from_secs(1)).await;
     Ok(())
 }

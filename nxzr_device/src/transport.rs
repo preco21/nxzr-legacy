@@ -8,7 +8,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
-use tokio::time;
+use tokio::time::{self, Duration};
 use tracing::Instrument;
 
 const MTU_THRESHOLD: usize = 400;
@@ -263,7 +263,7 @@ impl TransportInner {
         };
         if buf[5] < 5 {
             self.pause_write();
-            time::sleep(time::Duration::from_millis(1000)).await;
+            time::sleep(Duration::from_millis(1000)).await;
             self.resume_write();
         }
         Ok(())

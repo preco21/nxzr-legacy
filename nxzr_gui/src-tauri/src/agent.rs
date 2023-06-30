@@ -9,8 +9,9 @@ use thiserror::Error;
 use tokio::{
     sync::{mpsc, oneshot, watch},
     task::JoinHandle,
-    time,
+    time::{self, Duration},
 };
+use tokio_retry::{strategy::FixedInterval, Retry};
 use tonic::transport::{Channel, Endpoint};
 
 #[derive(Debug, Error)]
@@ -108,6 +109,13 @@ impl AgentManager {
         let mut child = wsl::spawn_wsl_agent_daemon(server_exec_path).await?;
         // FIXME: Immediately connect to the agent daemon may fail... find a way to wait for the agent daemon to be ready.
         // FIXME: find out why the agent daemon is terminated immediately when there's duplicate agent daemon process.
+        let try_connect = || async move {
+            let channel = Endpoint::from_static("http://[::1]:50052")
+                .connect()
+                .await?;
+            Ok::<Channel, tonic::transport::Error>(channel)
+        };
+        let res = Retry::spawn(FixedInterval::from_millis(1000).take(3), try_connect).await;
         let channel = Endpoint::from_static("http://[::1]:50052")
             .connect()
             .await?;
@@ -123,7 +131,7 @@ impl AgentManager {
                     _ = child.wait() => {},
                 }
                 // Wait for seconds loosely to make sure the agent daemon is terminated.
-                let _ = time::timeout(time::Duration::from_millis(3000), child.wait()).await;
+                let _ = time::timeout(Duration::from_millis(3000), child.wait()).await;
                 tracing::info!("terminating agent daemon process...");
                 agent_instance_tx.send_replace(None);
                 Ok::<_, AgentManagerError>(())

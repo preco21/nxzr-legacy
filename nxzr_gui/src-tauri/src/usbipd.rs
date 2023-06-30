@@ -1,6 +1,6 @@
 use crate::{config, util, wsl};
 use thiserror::Error;
-use tokio::time;
+use tokio::time::{self, Duration};
 
 #[derive(Debug, Error)]
 pub enum UsbipdError {
@@ -92,7 +92,7 @@ pub async fn attach_hid_adapter(hardware_id: &str) -> Result<(), UsbipdError> {
     // Always detach already attached adapter before attaching new one.
     detach_hid_adapter(&hardware_id).await?;
     // Wait for a second to make sure the detach is complete.
-    time::sleep(time::Duration::from_millis(1000)).await;
+    time::sleep(Duration::from_millis(1000)).await;
     tracing::info!("attaching hid adapter to WSL: {}", hardware_id);
     util::run_system_command({
         let mut cmd = tokio::process::Command::new("usbipd.exe");

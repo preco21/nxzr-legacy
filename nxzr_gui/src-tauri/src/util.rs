@@ -14,7 +14,7 @@ use tokio::{
     process::{ChildStderr, ChildStdout, Command},
     sync::mpsc,
     task::JoinError,
-    time,
+    time::{self, Duration},
 };
 use tracing_subscriber::fmt::MakeWriter;
 
@@ -181,7 +181,7 @@ pub async fn run_powershell_script_privileged(
                 if !content.is_empty() {
                     let _ = output_tx.send(content.into());
                 }
-                time::sleep(time::Duration::from_millis(400)).await;
+                time::sleep(Duration::from_millis(400)).await;
             }
             #[allow(unreachable_code)]
             Ok::<(), SystemCommandError>(())

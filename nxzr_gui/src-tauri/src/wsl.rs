@@ -5,7 +5,7 @@ use thiserror::Error;
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt},
     sync::mpsc,
-    time,
+    time::{self, Duration},
 };
 
 const WSL_FULL_REFRESH_SCRIPT: &str = include_str!("scripts/full-refresh-wsl.ps1");
@@ -34,7 +34,7 @@ pub async fn shutdown_wsl() -> Result<(), WslError> {
     .map_err(|_err| WslError::WslShutdownFailed)?;
     // We must wait for 8 seconds to make sure that the WSL is shutdown completely.
     // Please refer the document for more details: https://learn.microsoft.com/en-us/windows/wsl/wsl-config#the-8-second-rule
-    time::sleep(time::Duration::from_secs(8)).await;
+    time::sleep(Duration::from_secs(8)).await;
     Ok(())
 }
 

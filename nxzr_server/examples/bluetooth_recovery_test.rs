@@ -1,5 +1,5 @@
 use nxzr_device::{device, system};
-use tokio::time;
+use tokio::time::{self, Duration};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,6 +25,6 @@ async fn main() -> anyhow::Result<()> {
         let res = fut.await;
         tracing::trace!("{:?}", res);
 
-        time::sleep(time::Duration::from_millis(1000)).await;
+        time::sleep(Duration::from_millis(1000)).await;
     }
 }

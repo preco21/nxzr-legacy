@@ -1,5 +1,5 @@
 use nxzr_device::sock::l2cap::{SeqPacket, SeqPacketListener, SocketAddr};
-use tokio::time;
+use tokio::time::{self, Duration};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
 
     handle.await?;
     println!("No error, exiting...");
-    time::sleep(time::Duration::from_secs(1)).await;
+    time::sleep(Duration::from_secs(1)).await;
 
     Ok(())
 }

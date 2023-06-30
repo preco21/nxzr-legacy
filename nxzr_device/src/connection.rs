@@ -2,7 +2,10 @@ use crate::{device, session, system, transport, Address};
 use nxzr_core::{controller::ControllerType, protocol};
 use strum::Display;
 use thiserror::Error;
-use tokio::{sync::mpsc, time};
+use tokio::{
+    sync::mpsc,
+    time::{self, Duration},
+};
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
@@ -75,7 +78,7 @@ pub async fn create_session_listener_with_fallback(
         drop(device);
         drop(device_handle);
         system::restart_bluetooth_service().await?;
-        time::sleep(time::Duration::from_millis(1000)).await;
+        time::sleep(Duration::from_millis(1000)).await;
         let (device, device_handle) = device::Device::create(device::DeviceConfig {
             dev_id: Some(dev_id),
         })
