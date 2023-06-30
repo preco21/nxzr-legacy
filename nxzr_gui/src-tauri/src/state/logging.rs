@@ -67,7 +67,7 @@ impl LoggingManager {
         }
         let handle = log_watch.take().unwrap();
         handle.abort();
-        handle.await;
+        let _ = handle.await;
         Ok(())
     }
 

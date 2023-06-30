@@ -123,10 +123,7 @@ pub async fn subscribe_logging(
 }
 
 #[tauri::command]
-pub async fn unsubscribe_logging(
-    state: tauri::State<'_, AppState>,
-    task_label: String,
-) -> Result<(), CommandError> {
+pub async fn unsubscribe_logging(state: tauri::State<'_, AppState>) -> Result<(), CommandError> {
     state.logging_manager.stop_watch().await?;
     Ok(())
 }

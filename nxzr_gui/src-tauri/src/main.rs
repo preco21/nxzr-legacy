@@ -76,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
             commands::send_log,
             commands::open_log_window,
             commands::subscribe_logging,
+            commands::unsubscribe_logging,
             commands::reveal_log_folder,
             commands::check_1_setup_installed,
             commands::check_2_wslconfig,
