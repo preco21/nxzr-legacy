@@ -73,8 +73,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .invoke_handler(tauri::generate_handler![
             commands::window_ready,
-            commands::cancel_task,
-            commands::log,
+            commands::send_log,
             commands::open_log_window,
             commands::subscribe_logging,
             commands::reveal_log_folder,

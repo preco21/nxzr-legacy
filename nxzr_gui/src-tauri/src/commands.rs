@@ -11,7 +11,7 @@ use crate::{
 use nxzr_shared::event;
 use std::path::Path;
 use tauri::Manager;
-use tokio::process::Command;
+use tokio::{process::Command, sync::mpsc};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CommandError {
@@ -64,16 +64,7 @@ pub fn window_ready(window: tauri::Window, name: String) -> Result<(), CommandEr
 }
 
 #[tauri::command]
-pub async fn cancel_task(
-    state: tauri::State<'_, AppState>,
-    task_label: String,
-) -> Result<(), CommandError> {
-    state.cancel_task(&task_label).await?;
-    Ok(())
-}
-
-#[tauri::command]
-pub fn log(kind: String, message: String) {
+pub fn send_log(kind: String, message: String) {
     match kind.as_str() {
         "info" => tracing::info!("[renderer]: {}", message),
         "warn" => tracing::warn!("[renderer]: {}", message),
@@ -113,7 +104,6 @@ pub async fn open_log_window(handle: tauri::AppHandle) -> Result<(), CommandErro
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct SubscribeLoggingResponse {
     logs: Vec<String>,
-    task_label: String,
 }
 
 #[tauri::command]
@@ -121,30 +111,24 @@ pub async fn subscribe_logging(
     window: tauri::Window,
     state: tauri::State<'_, AppState>,
 ) -> Result<SubscribeLoggingResponse, CommandError> {
-    let task_label = "logging".to_owned();
-    let mut logs: Option<Vec<String>> = None;
-    state
-        .register_task(&task_label, async {
-            logs = Some(state.logging_manager.full_logs().await);
-            let mut log_rx = state.logging_manager.logs().await?;
-            let handle = tokio::spawn({
-                let logging = state.logging_manager.clone();
-                async move {
-                    while let Some(event) = log_rx.recv().await {
-                        let log_string = event.to_string();
-                        logging.push_log(log_string.as_str()).await;
-                        window.emit("logging:log", log_string).unwrap();
-                    }
-                    Ok::<(), CommandError>(())
-                }
-            });
-            Ok(handle)
-        })
-        .await?;
-    Ok(SubscribeLoggingResponse {
-        logs: logs.unwrap_or(Vec::new()),
-        task_label,
-    })
+    let (log_tx, mut log_rx) = mpsc::channel(1);
+    let logs = state.logging_manager.start_watch(log_tx).await?;
+    tokio::spawn(async move {
+        while let Some(event) = log_rx.recv().await {
+            let log_string = event.to_string();
+            window.emit("logging:log", log_string).unwrap();
+        }
+    });
+    Ok(SubscribeLoggingResponse { logs })
+}
+
+#[tauri::command]
+pub async fn unsubscribe_logging(
+    state: tauri::State<'_, AppState>,
+    task_label: String,
+) -> Result<(), CommandError> {
+    state.logging_manager.stop_watch().await?;
+    Ok(())
 }
 
 #[tauri::command]

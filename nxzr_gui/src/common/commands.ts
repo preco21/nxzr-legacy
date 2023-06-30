@@ -5,10 +5,6 @@ export async function windowReady(name: string): Promise<void> {
   await wrapError(invoke('window_ready', { name }));
 }
 
-export async function cancelTask(taskLabel: string): Promise<void> {
-  await wrapError(invoke('cancel_task', { taskLabel }));
-}
-
 // Logging
 export async function openLogWindow(): Promise<void> {
   await wrapError(invoke('open_log_window'));
@@ -16,15 +12,18 @@ export async function openLogWindow(): Promise<void> {
 
 export interface SubscribeLoggingResponse {
   logs: string[];
-  taskLabel: string;
 }
 
 export async function subscribeLogging(): Promise<SubscribeLoggingResponse> {
   return wrapError(invoke<SubscribeLoggingResponse>('subscribe_logging'));
 }
 
+export async function unsubscribeLogging(): Promise<SubscribeLoggingResponse> {
+  return wrapError(invoke<SubscribeLoggingResponse>('unsubscribe_logging'));
+}
+
 export async function sendLog(kind: 'info' | 'warn' | 'error', message: string): Promise<void> {
-  await wrapError(invoke('log', { kind, message }));
+  await wrapError(invoke('send_log', { kind, message }));
 }
 
 export async function revealLogFolder(): Promise<void> {

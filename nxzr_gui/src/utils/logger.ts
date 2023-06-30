@@ -1,6 +1,6 @@
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
-import { SubscribeLoggingResponse, cancelTask, sendLog, subscribeLogging } from '../common/commands';
+import { SubscribeLoggingResponse, sendLog, subscribeLogging, unsubscribeLogging } from '../common/commands';
 
 export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
 
@@ -16,7 +16,6 @@ export interface LogEntry {
 
 export class LogListener {
   private state: 'init' | 'pending' | 'ready' = 'init';
-  private taskLabel: string | undefined = undefined;
   private listeners: Set<(entry: LogEntry) => void> = new Set();
   private internalLoggerHandle: UnlistenFn | undefined = undefined;
   private logId: number = 0;
@@ -40,7 +39,6 @@ export class LogListener {
       ...JSON.parse(logString) as LogEntry,
       id: this.logId++,
     }));
-    this.taskLabel = res.taskLabel;
     this.state = 'ready';
   }
 
@@ -56,9 +54,8 @@ export class LogListener {
       return;
     }
     this.internalLoggerHandle?.();
-    await cancelTask(this.taskLabel!);
+    await unsubscribeLogging();
     this.initialLogs = [];
-    this.taskLabel = undefined;
     this.listeners.clear();
     this.state = 'init';
   }

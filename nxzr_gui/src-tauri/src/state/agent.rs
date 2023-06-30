@@ -31,7 +31,6 @@ pub enum AgentManagerError {
     Io(#[from] std::io::Error),
 }
 
-#[derive(Debug)]
 pub struct AgentManager {
     wsl_instance_tx: Arc<watch::Sender<Option<JoinHandle<Result<(), AgentManagerError>>>>>,
     agent_instance_tx:
