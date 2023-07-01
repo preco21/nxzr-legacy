@@ -10,7 +10,7 @@ FocusStyleManager.onlyShowFocusOnTabs();
 
 ReactDOM.createRoot(document.getElementById('__root__') as HTMLElement).render(
   <AlertManagerProvider>
-    <AppPage />,
+    <AppPage />
   </AlertManagerProvider>,
 );
 
