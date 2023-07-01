@@ -14,7 +14,7 @@ export interface AdapterSelectModalProps {
 export function AdapterSelectModal(props: AdapterSelectModalProps): React.ReactElement {
   const { className, isOpen, adapterManager, onClose } = props;
   const [error, setError] = useState<string | undefined>(undefined);
-  const [selectedAdapterId, setSelectedAdapterId] = useState<string | undefined>(undefined);
+  const [selectedAdapterId, setSelectedAdapterId] = useState<string | undefined>();
   const handleClose = (): void => {
     if (adapterManager.pending) {
       return;

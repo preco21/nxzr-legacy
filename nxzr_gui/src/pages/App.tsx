@@ -13,6 +13,8 @@ import { Button } from '@blueprintjs/core';
 
 const FAILURE_STATUS: StepDisplay['status'][] = ['checkFailed', 'installFailed'];
 
+let didInit = false;
+
 function AppPage(): React.ReactElement {
   const [rebootRequested, setRebootRequested] = useState(false);
   const adapterManager = useAdapterManager({ });
@@ -29,8 +31,11 @@ function AppPage(): React.ReactElement {
 
   const [adapterModalOpen, setAdapterModalOpen] = useState<boolean>(false);
   useEffect(() => {
-    // Run a program check at initial render.
-    setupGuard.performCheck();
+    if (!didInit) {
+      didInit = true;
+      // Run a program check at initial render.
+      setupGuard.performCheck();
+    }
   }, []);
   return (
     <MainContainer>

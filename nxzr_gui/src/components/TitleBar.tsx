@@ -1,6 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Colors } from '@blueprintjs/core';
 
@@ -10,7 +10,7 @@ export interface TitleBarProps {
 
 export function TitleBar(props: TitleBarProps): React.ReactElement {
   const { className } = props;
-  const [isMaximized, setMaximized] = React.useState(false);
+  const [isMaximized, setMaximized] = useState(false);
 
   useEffect(() => {
     let unlisten: () => void;
