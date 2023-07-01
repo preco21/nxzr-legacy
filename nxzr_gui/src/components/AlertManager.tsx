@@ -1,10 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, IconName, Intent } from '@blueprintjs/core';
 import { createContext, useContext } from 'react';
+import { generateId } from '../utils/general';
 
 export type UseAlertManager = AlertManagerActions;
 
 export interface AlertManagerState {
+  id: number;
   isOpen: boolean;
   message?: React.ReactNode;
   intent?: Intent;
@@ -14,8 +16,8 @@ export interface AlertManagerState {
 }
 
 export interface AlertManagerActions {
-  open: (options: AlertManagerOpenOptions) => void;
-  close: () => void;
+  open: (options: AlertManagerOpenOptions) => number;
+  close: (id: number) => void;
 }
 
 export interface AlertManagerOpenOptions {
@@ -28,8 +30,7 @@ export interface AlertManagerOpenOptions {
 
 export const AlertManagerContext = createContext<AlertManagerActions | undefined>(undefined);
 
-const DEFAULT_STATE: AlertManagerState = {
-  isOpen: false,
+const PARTIAL_DEFAULT: Partial<AlertManagerState> = {
   message: undefined,
   intent: undefined,
   icon: undefined,
@@ -39,34 +40,39 @@ const DEFAULT_STATE: AlertManagerState = {
 
 export function AlertManagerProvider(props: React.PropsWithChildren<{}>): React.ReactElement {
   const { children } = props;
-  const [state, setState] = useState<AlertManagerState>(DEFAULT_STATE);
+  const [queue, setQueue] = useState<AlertManagerState[]>([]);
   const handleOpen = useCallback((options: AlertManagerOpenOptions) => {
-    setState({ ...options, isOpen: true });
+    const id = generateId();
+    setQueue((prev) => [...prev, { ...PARTIAL_DEFAULT, ...options, id, isOpen: true }]);
+    return id;
   }, []);
-  const handleClose = useCallback(() => setState(DEFAULT_STATE), []);
-  const handleConfirm = useCallback(() => {
-    state.onConfirm?.();
-    handleClose();
-  }, [state.onConfirm]);
+  const handleClose = useCallback((id: number) => {
+    setQueue((prev) => prev.filter((item) => item.id === id));
+  }, []);
   const value = {
-    state,
     open: handleOpen,
     close: handleClose,
-  };
+  } satisfies AlertManagerActions;
   return (
     <AlertManagerContext.Provider value={value}>
       {children}
-      <Alert
-        className="bp5-dark"
-        isOpen={state.isOpen}
-        intent={state.intent}
-        icon={state.icon}
-        onConfirm={handleConfirm}
-        onCancel={handleClose}
-        onClose={handleClose}
-      >
-        {state.message}
-      </Alert>
+      {queue.map((item) => (
+        <Alert
+          key={item.id}
+          className="bp5-dark"
+          isOpen={item.isOpen}
+          intent={item.intent}
+          icon={item.icon}
+          onConfirm={() => {
+            item.onConfirm?.();
+            handleClose(item.id);
+          }}
+          onCancel={() => handleClose(item.id)}
+          onClose={() => handleClose(item.id)}
+        >
+          {item.message}
+        </Alert>
+      ))}
     </AlertManagerContext.Provider>
   );
 }
