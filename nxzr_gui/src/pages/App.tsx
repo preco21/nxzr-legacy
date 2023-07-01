@@ -71,8 +71,6 @@ function AppPage(): React.ReactElement {
   useWslStatus({
     onUpdate: useCallback((status: WslStatus) => {
       if (!status.isReady) {
-        adapterManager.reset();
-        // FIXME: reset all
         alertManager.open({
           message: 'Has lost connection to WSL. Please restart the application.',
           intent: 'danger',

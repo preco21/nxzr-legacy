@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { launchAgentDaemon, runAgentCheck, terminateAgentDaemon } from '../../common/commands';
+import { WslStatus, useWslStatus } from './useWslStatus';
 
 export interface UseAgent {
   pending: boolean;
@@ -50,6 +51,13 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
       setPending(false);
     }
   }, []);
+  useWslStatus({
+    onUpdate: useCallback((status: WslStatus) => {
+      if (!status.isReady) {
+        setIsReady(false);
+      }
+    }, []),
+  });
   // FIXME: handle events: agent:status_change
   return {
     pending,

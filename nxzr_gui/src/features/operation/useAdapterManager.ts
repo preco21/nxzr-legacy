@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { AdapterInfo, attachHidAdapter, detachHidAdapter, listHidAdapters } from '../../common/commands';
+import { WslStatus, useWslStatus } from './useWslStatus';
 
 export interface UseAdapterManagerOptions {
   onAdapterLost?: (adapter: AdapterInfo) => void;
@@ -15,7 +16,6 @@ export interface UseAdapterManager {
   refreshAdapterList: () => Promise<void>;
   attachAdapter: (id: string) => Promise<void>;
   detachAdapter: (id: string) => Promise<void>;
-  reset: () => void;
 }
 
 export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapterManager {
@@ -108,11 +108,16 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
       setPending(false);
     }
   }, [options?.onDetached]);
-  const reset = useCallback(() => {
-    setPending(false);
-    setAdapters([]);
-    setCurrentAdapterId(undefined);
-  }, []);
+  // Reset all state when WSL is not ready or lost connection.
+  useWslStatus({
+    onUpdate: useCallback((status: WslStatus) => {
+      if (!status.isReady) {
+        setPending(false);
+        setAdapters([]);
+        setCurrentAdapterId(undefined);
+      }
+    }, []),
+  });
   return {
     pending,
     adapters,
@@ -120,6 +125,5 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     refreshAdapterList,
     attachAdapter,
     detachAdapter,
-    reset,
   };
 }

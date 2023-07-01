@@ -17,13 +17,6 @@ export function useWslAnchor(options?: UseWslAnchorOptions): UseWslAnchor {
   const [isReady, setIsReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
-  useWslStatus({
-    onUpdate: useCallback((status: WslStatus) => {
-      if (!status.isReady) {
-        setIsReady(false);
-      }
-    }, []),
-  });
   const launchAnchorInstance = useCallback(async () => {
     if (pending) {
       return;
@@ -39,6 +32,13 @@ export function useWslAnchor(options?: UseWslAnchorOptions): UseWslAnchor {
       setPending(false);
     }
   }, [pending, options?.onFailure]);
+  useWslStatus({
+    onUpdate: useCallback((status: WslStatus) => {
+      if (!status.isReady) {
+        setIsReady(false);
+      }
+    }, []),
+  });
   return {
     pending,
     isReady,
