@@ -32,7 +32,7 @@ function AppPage(): React.ReactElement {
 
   // Agent
   const agent = useAgent({
-    onFailure: useCallback((err: Error) => {
+    onLaunchFailed: useCallback((err: Error) => {
       alertManager.open({
         message: `Failed to launch the agent. Please restart the application. (detail: ${err.message})`,
         intent: 'danger',
@@ -43,9 +43,12 @@ function AppPage(): React.ReactElement {
 
   // Adapter
   const adapterManager = useAdapterManager({
-    onAttached: useCallback(async () => {
-      //
+    onDetached: useCallback(async () => {
+      await agent.shutdownAgentDaemon();
     }, []),
+    onAttached: useCallback(async () => {
+      await agent.launchAgentDaemon();
+    }, [agent]),
   });
   const [adapterModalOpen, setAdapterModalOpen] = useState<boolean>(false);
 

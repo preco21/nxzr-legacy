@@ -67,6 +67,9 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     }
     try {
       setPending(true);
+      if (selectedAdapter != null) {
+        options?.onDetached?.(selectedAdapter);
+      }
       await attachHidAdapter(targetAdapter.hardwareId);
       // Fetch new adapter state.
       const newAdapters = await listHidAdapters();
@@ -81,7 +84,13 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     } finally {
       setPending(false);
     }
-  }, [adapters, handleAdapterUpdate, options?.onAttached]);
+  }, [
+    adapters,
+    handleAdapterUpdate,
+    selectedAdapter,
+    options?.onAttached,
+    options?.onDetached,
+  ]);
   const detachAdapter = useCallback(async (id: string) => {
     const targetAdapter = adapters.find((adapter) => adapter.id === id);
     if (targetAdapter == null) {
