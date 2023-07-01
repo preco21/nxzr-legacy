@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Tag } from '@blueprintjs/core';
-import { launchAgentDaemon, runAgentCheck } from '../common/commands';
+import { Tag } from '@blueprintjs/core';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
@@ -11,6 +10,7 @@ import { useAdapterManager } from '../features/operation/useAdapterManager';
 import { AdapterSelectModal } from '../features/operation/AdapterSelectModal';
 import { WslStatus, useWslStatus } from '../features/operation/useWslStatus';
 import { useWslAnchor } from '../features/operation/useWslAnchor';
+import { useAgent } from '../features/operation/useAgent';
 
 const FAILURE_STATUS: StepDisplay['status'][] = ['checkFailed', 'installFailed'];
 
@@ -21,9 +21,20 @@ function AppPage(): React.ReactElement {
 
   // Wsl
   const wslAnchor = useWslAnchor({
-    onFail: useCallback((err: Error) => {
+    onFailure: useCallback((err: Error) => {
       alertManager.open({
         message: `Failed to launch WSL anchor shell. Please restart the application. (detail: ${err.message})`,
+        intent: 'danger',
+        icon: 'error',
+      });
+    }, [alertManager]),
+  });
+
+  // Agent
+  const agent = useAgent({
+    onFailure: useCallback((err: Error) => {
+      alertManager.open({
+        message: `Failed to launch the agent. Please restart the application. (detail: ${err.message})`,
         intent: 'danger',
         icon: 'error',
       });
@@ -95,15 +106,7 @@ function AppPage(): React.ReactElement {
         />
       )}
       <Tag>Wsl status: {wslAnchor.pending ? 'Loading...' : 'Ready'}</Tag>
-      {setupGuard.ready && (
-        <Button onClick={async () => {
-          await runAgentCheck();
-          await launchAgentDaemon();
-        }}
-        >
-          Connect to Agent
-        </Button>
-      )}
+      <Tag>Agent status: {agent.pending ? 'Loading...' : 'Ready'}</Tag>
       <AdapterSelectModal
         isOpen={adapterModalOpen}
         adapterManager={adapterManager}

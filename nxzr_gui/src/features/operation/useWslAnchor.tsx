@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 
 export interface UseWslAnchorOptions {
-  onFail?: (error: Error) => void;
+  onFailure?: (error: Error) => void;
 }
 
 export interface UseWslAnchor {
@@ -19,11 +19,11 @@ export function useWslAnchor(options?: UseWslAnchorOptions): UseWslAnchor {
       await launchAnchorInstance();
     } catch (err) {
       setError(err as Error);
-      options?.onFail?.(err as Error);
+      options?.onFailure?.(err as Error);
     } finally {
       setPending(false);
     }
-  }, [options?.onFail]);
+  }, [options?.onFailure]);
   return {
     pending,
     error,

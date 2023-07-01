@@ -3,12 +3,43 @@
 // 2. agent check 성공시 agent daemon 실행
 // 3. agent daemon 실행 중 터질 경우 이벤트 받아서 에러만 alert (warn error)로 표시하고, 다시 실행, 연결은 다시 안 함 -> 그래도 터지면 프로그램 다시 키도록 가이드
 
-// status 이벤트는 하나로 퉁쳐서 받을까? agent:status_change?
+import { useCallback, useState } from 'react';
+import { runAgentCheck } from '../../common/commands';
 
 export interface UseAgent {
+  pending: boolean;
   isReady: boolean;
   error?: Error;
-  // FIXME: Handles agent check too
   launchAgentDaemon: () => Promise<void>;
-  shutdownAgentDaemon: () => Promise<void>;
+  // shutdownAgentDaemon: () => Promise<void>;
+}
+
+export interface UseAgentOptions {
+  onFailure?: (error: Error) => void;
+}
+
+export function useAgent(options?: UseAgentOptions): UseAgent {
+  const [isReady, setIsReady] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<Error | undefined>(undefined);
+  const launchAgentDaemon = useCallback(async () => {
+    try {
+      setPending(true);
+      await runAgentCheck();
+      await launchAgentDaemon();
+      setIsReady(true);
+    } catch (err) {
+      setError(err as Error);
+      options?.onFailure?.(err as Error);
+    } finally {
+      setPending(false);
+    }
+  }, []);
+  // FIXME: handle events: agent:status_change
+  return {
+    pending,
+    isReady,
+    error,
+    launchAgentDaemon,
+  };
 }
