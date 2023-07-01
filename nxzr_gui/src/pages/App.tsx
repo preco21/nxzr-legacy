@@ -90,6 +90,26 @@ function AppPage(): React.ReactElement {
     }
   }, [setupGuard]);
 
+  const wslStatusText = (() => {
+    if (wslAnchor.pending) {
+      return 'Loading...';
+    }
+    if (!wslAnchor.isReady) {
+      return 'Not ready';
+    }
+    return 'Ready';
+  })();
+
+  const agentStatusText = (() => {
+    if (agent.pending) {
+      return 'Loading...';
+    }
+    if (!agent.isReady) {
+      return 'Not ready';
+    }
+    return 'Ready';
+  })();
+
   return (
     <MainContainer>
       <TitleBar />
@@ -108,8 +128,12 @@ function AppPage(): React.ReactElement {
           onInstall={() => setupGuard.performInstall()}
         />
       )}
-      <Tag>Wsl status: {wslAnchor.pending ? 'Loading...' : 'Ready'}</Tag>
-      <Tag>Agent status: {agent.pending ? 'Loading...' : 'Ready'}</Tag>
+      {setupGuard.ready && (
+        <div>
+          <Tag>Wsl status: {wslStatusText}</Tag>
+          <Tag>Agent status: {agentStatusText}</Tag>
+        </div>
+      )}
       <AdapterSelectModal
         isOpen={adapterModalOpen}
         adapterManager={adapterManager}

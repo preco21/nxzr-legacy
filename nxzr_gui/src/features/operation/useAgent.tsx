@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
-import { runAgentCheck } from '../../common/commands';
+import { launchAgentDaemon, runAgentCheck, terminateAgentDaemon } from '../../common/commands';
 
 export interface UseAgent {
   pending: boolean;
   isReady: boolean;
   error?: Error;
-  launchAgentDaemon: () => Promise<void>;
-  shutdownAgentDaemon: () => Promise<void>;
+  launchDaemon: () => Promise<void>;
+  terminateDaemon: () => Promise<void>;
 }
 
 export interface UseAgentOptions {
@@ -19,7 +19,10 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
   const [isReady, setIsReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
-  const launchAgentDaemon = useCallback(async () => {
+  const launchDaemon = useCallback(async () => {
+    if (pending) {
+      return;
+    }
     try {
       setPending(true);
       // TODO: we can fallback to restarting wsl instead of restarting the entire app.
@@ -32,13 +35,27 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
     } finally {
       setPending(false);
     }
+  }, [pending]);
+  const terminateDaemon = useCallback(async () => {
+    if (pending) {
+      return;
+    }
+    try {
+      setPending(true);
+      await terminateAgentDaemon();
+      setIsReady(false);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setPending(false);
+    }
   }, []);
   // FIXME: handle events: agent:status_change
   return {
     pending,
     isReady,
     error,
-    launchAgentDaemon,
-    shutdownAgentDaemon: async () => {},
+    launchDaemon,
+    terminateDaemon,
   };
 }

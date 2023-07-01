@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, IconName, Intent } from '@blueprintjs/core';
 import { createContext, useContext } from 'react';
 import { generateId } from '../utils/general';
@@ -49,10 +49,14 @@ export function AlertManagerProvider(props: React.PropsWithChildren<{}>): React.
   const handleClose = useCallback((id: number) => {
     setQueue((prev) => prev.filter((item) => item.id === id));
   }, []);
-  const value = {
+
+  const value = useMemo(() => ({
     open: handleOpen,
     close: handleClose,
-  } satisfies AlertManagerActions;
+  } satisfies AlertManagerActions), [
+    handleOpen,
+    handleClose,
+  ]);
   return (
     <AlertManagerContext.Provider value={value}>
       {children}
@@ -78,12 +82,9 @@ export function AlertManagerProvider(props: React.PropsWithChildren<{}>): React.
 }
 
 export function useAlertManager(): UseAlertManager {
-  const context = useContext(AlertManagerContext);
-  if (context === undefined) {
+  const value = useContext(AlertManagerContext);
+  if (value === undefined) {
     throw new Error('`useAlertManager` must be used within a `AlertManagerProvider`');
   }
-  return {
-    open: context.open,
-    close: context.close,
-  };
+  return value;
 }

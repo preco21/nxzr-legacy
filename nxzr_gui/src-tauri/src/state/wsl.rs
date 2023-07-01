@@ -54,7 +54,6 @@ impl WslManager {
             }
         });
         self.wsl_instance_tx.send_replace(Some(handle));
-        window.emit("wsl:status_update", ()).unwrap();
         Ok(())
     }
 
