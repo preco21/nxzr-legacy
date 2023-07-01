@@ -36,7 +36,7 @@ function AppPage(): React.ReactElement {
       // Run a program check at initial render.
       setupGuard.performCheck();
     }
-  }, []);
+  }, [setupGuard]);
   return (
     <MainContainer>
       <TitleBar />
