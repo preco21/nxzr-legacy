@@ -95,6 +95,10 @@ export async function launchAgentDaemon(): Promise<void> {
   await wrapError(invoke('launch_agent_daemon'));
 }
 
+export async function terminateAgentDaemon(): Promise<void> {
+  await wrapError(invoke('terminate_agent_daemon'));
+}
+
 // Helpers
 async function wrapError<T>(promise: Promise<T>): Promise<T> {
   try {

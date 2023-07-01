@@ -21,6 +21,8 @@ pub enum AgentManagerError {
     WslInstanceNotReady,
     #[error("agent instance already launched")]
     AgentInstanceAlreadyLaunched,
+    #[error("failed to shutdown agent instance: the instance is not launched or unavailable")]
+    UnableToShutdownAgentInstance,
     #[error(transparent)]
     AgentError(#[from] agent::AgentError),
     #[error(transparent)]
@@ -31,8 +33,14 @@ pub enum AgentManagerError {
     Io(#[from] std::io::Error),
 }
 
+pub type AgentInstance = (
+    JoinHandle<Result<(), AgentManagerError>>,
+    Channel,
+    mpsc::Sender<oneshot::Sender<()>>,
+);
+
 pub struct AgentManager {
-    agent_instance: Arc<Mutex<Option<(JoinHandle<Result<(), AgentManagerError>>, Channel)>>>,
+    agent_instance: Arc<Mutex<Option<AgentInstance>>>,
     msg_tx: mpsc::Sender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     shutdown: Shutdown,
@@ -74,26 +82,47 @@ impl AgentManager {
             Ok::<Channel, TonicError>(channel)
         };
         let channel = Retry::spawn(FixedInterval::from_millis(1000).take(3), try_connect).await?;
+        let (req_terminate_tx, mut req_terminate_rx) = mpsc::channel::<oneshot::Sender<()>>(1);
         let handle = tokio::spawn({
             let shutdown = self.shutdown.clone();
             let agent_instance = self.agent_instance.clone();
             async move {
                 let _shutdown_guard = shutdown.drop_guard();
-                tokio::select! {
+                let notify_tx = tokio::select! {
+                    Some(tx) = req_terminate_rx.recv() => {
+                        let _ = child.kill();
+                        Some(tx)
+                    },
+                    _ = child.wait() => None,
                     _ = shutdown.recv_shutdown() => {
                         let _ = child.kill();
+                        None
                     },
-                    _ = child.wait() => {},
-                }
+                };
                 // Wait for seconds loosely to make sure the agent daemon is terminated.
                 let _ = time::timeout(Duration::from_millis(3000), child.wait()).await;
                 tracing::info!("terminating agent daemon process...");
                 let mut agent_instance = agent_instance.lock().await;
                 let _ = agent_instance.take();
+                if let Some(notify_tx) = notify_tx {
+                    let _ = notify_tx.send(());
+                }
                 Ok::<_, AgentManagerError>(())
             }
         });
-        agent_instance.replace((handle, channel));
+        agent_instance.replace((handle, channel, req_terminate_tx));
+        Ok(())
+    }
+
+    pub async fn terminate_agent_daemon(&self) -> Result<(), AgentManagerError> {
+        let (term_complete_tx, term_complete_rx) = oneshot::channel();
+        let agent_instance = self.agent_instance.lock().await;
+        let Some((.., req_terminate_tx)) = agent_instance.as_ref() else {
+            return Err(AgentManagerError::UnableToShutdownAgentInstance);
+        };
+        let _ = req_terminate_tx.send(term_complete_tx).await;
+        drop(agent_instance);
+        let _ = term_complete_rx.await;
         Ok(())
     }
 

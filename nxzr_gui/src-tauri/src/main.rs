@@ -95,6 +95,7 @@ async fn main() -> anyhow::Result<()> {
             commands::is_wsl_anchor_instance_ready,
             commands::run_agent_check,
             commands::launch_agent_daemon,
+            commands::terminate_agent_daemon,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

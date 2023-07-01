@@ -277,3 +277,9 @@ pub async fn launch_agent_daemon(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn terminate_agent_daemon(state: tauri::State<'_, AppState>) -> Result<(), CommandError> {
+    state.agent_manager.terminate_agent_daemon().await?;
+    Ok(())
+}
