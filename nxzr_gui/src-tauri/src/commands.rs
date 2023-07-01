@@ -11,10 +11,7 @@ use crate::{
 use nxzr_shared::event;
 use std::path::Path;
 use tauri::Manager;
-use tokio::{
-    process::Command,
-    sync::{mpsc, oneshot},
-};
+use tokio::{process::Command, sync::mpsc};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CommandError {
@@ -201,7 +198,7 @@ pub async fn install_3_register_agent(handle: tauri::AppHandle) -> Result<(), Co
 pub async fn list_hid_adapters(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<AdapterInfo>, CommandError> {
-    state.agent_manager.wsl_ready().await;
+    state.wsl_manager.wsl_ready().await;
     let adapters = usbipd::list_hid_adapters().await?;
     tracing::info!("hid adapters: {:?}", adapters);
     Ok(adapters)
@@ -237,24 +234,12 @@ pub async fn launch_wsl_anchor_instance(
     window: tauri::Window,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), CommandError> {
-    let (on_close_tx, on_close_rx) = oneshot::channel();
     let res = state
-        .agent_manager
-        .launch_wsl_anchor_instance(on_close_tx)
+        .wsl_manager
+        .launch_wsl_anchor_instance(window.clone())
         .await;
-    match res {
-        Ok(_) => {
-            tokio::spawn({
-                let window = window.clone();
-                async move {
-                    let _ = on_close_rx.await;
-                    window.emit("wsl:status_update", ()).unwrap();
-                }
-            });
-            window.emit("wsl:status_update", ()).unwrap();
-        }
-        // The instance may already be launched, we're ignoring it when it's the case.
-        Err(err) => tracing::warn!("failed to launch wsl instance: {}", err),
+    if let Err(err) = res {
+        tracing::warn!("failed to launch wsl instance: {}", err);
     }
     Ok(())
 }
@@ -263,7 +248,7 @@ pub async fn launch_wsl_anchor_instance(
 pub fn is_wsl_anchor_instance_ready(
     state: tauri::State<'_, AppState>,
 ) -> Result<bool, CommandError> {
-    let res = state.agent_manager.is_wsl_ready();
+    let res = state.wsl_manager.is_wsl_ready();
     Ok(res)
 }
 
@@ -285,7 +270,7 @@ pub async fn launch_agent_daemon(
         .ok_or(CommandError::ServerExecResolveFailed)?;
     let res = state
         .agent_manager
-        .launch_agent_daemon(&server_exec_path)
+        .launch_agent_daemon(&server_exec_path, state.wsl_manager.clone())
         .await;
     if let Err(err) = res {
         tracing::error!("failed to launch wsl instance: {}", err);

@@ -1,7 +1,4 @@
-use crate::{
-    support::{agent, wsl},
-    util,
-};
+use crate::support::agent;
 use nxzr_shared::{
     event::{self, SubscriptionReq},
     setup_event,
@@ -9,25 +6,21 @@ use nxzr_shared::{
 };
 use std::{path::Path, sync::Arc};
 use tokio::{
-    sync::{mpsc, oneshot, watch, Mutex},
+    sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
     time::{self, Duration},
 };
 use tokio_retry::{strategy::FixedInterval, Retry};
 use tonic::transport::{Channel, Endpoint, Error as TonicError};
 
+use super::WslManager;
+
 #[derive(Debug, thiserror::Error)]
 pub enum AgentManagerError {
-    #[error("wsl instance already launched")]
-    WslInstanceAlreadyLaunched,
     #[error("wsl instance is not ready")]
     WslInstanceNotReady,
     #[error("agent instance already launched")]
     AgentInstanceAlreadyLaunched,
-    #[error(transparent)]
-    WslError(#[from] wsl::WslError),
-    #[error(transparent)]
-    SystemCommandError(#[from] util::SystemCommandError),
     #[error(transparent)]
     AgentError(#[from] agent::AgentError),
     #[error(transparent)]
@@ -39,7 +32,6 @@ pub enum AgentManagerError {
 }
 
 pub struct AgentManager {
-    wsl_instance_tx: Arc<watch::Sender<Option<JoinHandle<Result<(), AgentManagerError>>>>>,
     agent_instance: Arc<Mutex<Option<(JoinHandle<Result<(), AgentManagerError>>, Channel)>>>,
     msg_tx: mpsc::Sender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
@@ -52,7 +44,6 @@ impl AgentManager {
         let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
         Event::handle_events(msg_rx, event_sub_rx)?;
         Ok(Self {
-            wsl_instance_tx: Arc::new(watch::channel(None).0),
             agent_instance: Arc::new(Mutex::new(None)),
             msg_tx,
             event_sub_tx,
@@ -60,52 +51,12 @@ impl AgentManager {
         })
     }
 
-    pub async fn launch_wsl_anchor_instance(
-        &self,
-        on_close_tx: oneshot::Sender<()>,
-    ) -> Result<(), AgentManagerError> {
-        if self.wsl_instance_tx.borrow().is_some() {
-            return Err(AgentManagerError::WslInstanceAlreadyLaunched);
-        }
-        tracing::info!("launching WSL process...");
-        let mut child = wsl::spawn_wsl_bare_shell().await?;
-        let handle = tokio::spawn({
-            let shutdown = self.shutdown.clone();
-            let wsl_instance_tx = self.wsl_instance_tx.clone();
-            async move {
-                let _shutdown_guard = shutdown.drop_guard();
-                tokio::select! {
-                    _ = shutdown.recv_shutdown() => {
-                        let _ = child.kill();
-                    },
-                    _ = child.wait() => {},
-                }
-                tracing::info!("terminating WSL process...");
-                wsl_instance_tx.send_replace(None);
-                let _ = on_close_tx.send(());
-                Ok::<_, AgentManagerError>(())
-            }
-        });
-        self.wsl_instance_tx.send_replace(Some(handle));
-        Ok(())
-    }
-
-    pub fn is_wsl_ready(&self) -> bool {
-        self.wsl_instance_tx.borrow().is_some()
-    }
-
-    pub async fn wsl_ready(&self) {
-        let mut rx = self.wsl_instance_tx.subscribe();
-        while rx.borrow().is_none() {
-            rx.changed().await.unwrap();
-        }
-    }
-
     pub async fn launch_agent_daemon(
         &self,
         server_exec_path: &Path,
+        wsl_manager: Arc<WslManager>,
     ) -> Result<(), AgentManagerError> {
-        if !self.is_wsl_ready() {
+        if !wsl_manager.is_wsl_ready() {
             return Err(AgentManagerError::WslInstanceNotReady);
         }
         let mut agent_instance = self.agent_instance.lock().await;

@@ -63,11 +63,13 @@ async fn main() -> anyhow::Result<()> {
     });
     let shutdown = Shutdown::new(shutdown_tx, shutdown_complete_tx);
 
+    let wsl_manager = Arc::new(state::WslManager::new(shutdown.clone()).await?);
     let agent_manager = Arc::new(state::AgentManager::new(shutdown.clone()).await?);
     let logging_manager = Arc::new(state::LoggingManager::new(log_out_rx)?);
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
         .manage(AppState {
+            wsl_manager,
             agent_manager,
             logging_manager,
         })
