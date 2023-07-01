@@ -1,35 +1,42 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { css } from 'styled-components';
 import { launchAgentDaemon, launchWslAnchorInstance, runAgentCheck } from '../common/commands';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
 import { Setup } from '../features/setup/Setup';
 import { StepDisplay, useSetupGuard } from '../features/setup/useSetupGuard';
-import { RebootAlert } from '../features/setup/RebootAlert';
 import { useAdapterManager } from '../features/operation/useAdapterManager';
 import { AdapterSelectModal } from '../features/operation/AdapterSelectModal';
 import { Button } from '@blueprintjs/core';
+import { useAlertManager } from '../components/AlertManager';
 
 const FAILURE_STATUS: StepDisplay['status'][] = ['checkFailed', 'installFailed'];
 
 let didInit = false;
 
 function AppPage(): React.ReactElement {
-  const [rebootRequested, setRebootRequested] = useState(false);
+  const alertManager = useAlertManager();
+
+  // Adapter
   const adapterManager = useAdapterManager({ });
+  const [adapterModalOpen, setAdapterModalOpen] = useState<boolean>(false);
+
+  // Setup
   const setupGuard = useSetupGuard({
     onCheckComplete: useCallback(async () => {
       await launchWslAnchorInstance();
       await adapterManager.refreshAdapterList();
     }, []),
     onRebootRequest: useCallback(() => {
-      setRebootRequested(true);
-    }, []),
+      alertManager.open({
+        message: 'In order to complete the setup, a reboot is required. Please close the application and restart your computer.',
+        intent: 'warning',
+        icon: 'warning-sign',
+      });
+    }, [alertManager]),
   });
   const firstSetupError = setupGuard.steps.find((step) => FAILURE_STATUS.includes(step.status));
 
-  const [adapterModalOpen, setAdapterModalOpen] = useState<boolean>(false);
   useEffect(() => {
     if (!didInit) {
       didInit = true;
@@ -64,7 +71,6 @@ function AppPage(): React.ReactElement {
           Connect to Agent
         </Button>
       )}
-      <RebootAlert isOpen={rebootRequested} onConfirm={() => setRebootRequested(false)} />
       <AdapterSelectModal
         isOpen={adapterModalOpen}
         adapterManager={adapterManager}
