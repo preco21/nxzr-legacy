@@ -55,6 +55,7 @@ export interface UseSetupGuardState {
   pending: boolean;
   inInstall: boolean;
   ready: boolean;
+  installRequired: boolean;
   steps: StepDisplay[];
   currentStepIndex?: number;
 }
@@ -62,6 +63,7 @@ export interface UseSetupGuardState {
 export interface UseSetupGuard {
   pending: boolean;
   ready: boolean;
+  installRequired: boolean;
   steps: StepDisplay[];
   currentStep?: StepDisplay;
   performCheck: () => void;
@@ -81,6 +83,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     pending: false,
     inInstall: false,
     ready: false,
+    installRequired: false,
     steps: SETUP_STEPS.map((step) => ({
       name: step.name,
       description: step.description,
@@ -96,6 +99,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     }
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = true;
+      draft.installRequired = false;
       for (const step of draft.steps) {
         step.status = 'wait';
         step.error = undefined;
@@ -132,6 +136,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = false;
       draft.ready = !aborted;
+      draft.installRequired = aborted;
     }));
     if (!aborted) {
       options?.onCheckComplete?.();
@@ -144,6 +149,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = true;
       draft.inInstall = true;
+      draft.installRequired = false;
       for (const step of draft.steps) {
         step.status = 'wait';
         step.error = undefined;
@@ -208,6 +214,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
       draft.pending = false;
       draft.inInstall = false;
       draft.ready = !aborted;
+      draft.installRequired = aborted;
     }));
     if (!aborted) {
       options?.onCheckComplete?.();

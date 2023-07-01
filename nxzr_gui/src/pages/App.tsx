@@ -44,10 +44,10 @@ function AppPage(): React.ReactElement {
   // Adapter
   const adapterManager = useAdapterManager({
     onDetached: useCallback(async () => {
-      await agent.shutdownAgentDaemon();
+      await agent.terminateDaemon();
     }, []),
     onAttached: useCallback(async () => {
-      await agent.launchAgentDaemon();
+      await agent.launchDaemon();
     }, [agent]),
   });
   const [adapterModalOpen, setAdapterModalOpen] = useState<boolean>(false);
@@ -124,6 +124,7 @@ function AppPage(): React.ReactElement {
           steps={setupGuard.steps}
           loading={setupGuard.pending}
           ready={setupGuard.ready}
+          installRequired={setupGuard.installRequired}
           error={firstSetupError?.error?.message}
           onInstall={() => setupGuard.performInstall()}
         />

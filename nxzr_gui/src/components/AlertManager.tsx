@@ -47,7 +47,7 @@ export function AlertManagerProvider(props: React.PropsWithChildren<{}>): React.
     return id;
   }, []);
   const handleClose = useCallback((id: number) => {
-    setQueue((prev) => prev.filter((item) => item.id === id));
+    setQueue((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   const value = useMemo(() => ({

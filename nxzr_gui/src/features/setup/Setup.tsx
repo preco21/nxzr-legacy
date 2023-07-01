@@ -9,6 +9,7 @@ export interface SetupProps {
   steps: StepDisplay[];
   loading: boolean;
   ready: boolean;
+  installRequired: boolean;
   error?: React.ReactNode;
   onInstall: () => void;
 }
@@ -19,6 +20,7 @@ export function Setup(props: SetupProps): React.ReactElement {
     steps,
     loading,
     ready,
+    installRequired,
     error,
     onInstall,
   } = props;
@@ -49,7 +51,7 @@ export function Setup(props: SetupProps): React.ReactElement {
                 {error}
               </Callout>
             )}
-            {!loading && !ready && (
+            {!loading && installRequired && (
               <Button
                 icon="archive"
                 intent="success"
