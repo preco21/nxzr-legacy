@@ -2,10 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, IconName, Intent } from '@blueprintjs/core';
 import { createContext, useContext } from 'react';
 
-export interface UseAlertManager {
-  open: (options: AlertManagerOpenOptions) => void;
-  close: () => void;
-}
+export type UseAlertManager = AlertManagerActions;
 
 export interface AlertManagerState {
   isOpen: boolean;
@@ -16,18 +13,17 @@ export interface AlertManagerState {
   onCancel?: () => void;
 }
 
-interface AlertManagerOpenOptions {
+export interface AlertManagerActions {
+  open: (options: AlertManagerOpenOptions) => void;
+  close: () => void;
+}
+
+export interface AlertManagerOpenOptions {
   message: React.ReactNode;
   intent?: Intent;
   icon?: IconName;
   onConfirm?: () => void;
   onCancel?: () => void;
-}
-
-export interface AlertManagerActions {
-  state: AlertManagerState;
-  open: (options: AlertManagerOpenOptions) => void;
-  close: () => void;
 }
 
 export const AlertManagerContext = createContext<AlertManagerActions | undefined>(undefined);
