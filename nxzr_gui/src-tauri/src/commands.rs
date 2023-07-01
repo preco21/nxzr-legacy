@@ -236,7 +236,7 @@ pub async fn launch_wsl_anchor_instance(
     // The instance may already be launched, we're ignoring it when it's the case.
     let res = state.agent_manager.launch_wsl_anchor_instance().await;
     if let Err(err) = res {
-        tracing::error!("failed to launch wsl instance: {}", err);
+        tracing::warn!("failed to launch wsl instance: {}", err);
     }
     Ok(())
 }
