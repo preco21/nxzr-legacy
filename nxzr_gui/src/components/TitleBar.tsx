@@ -1,4 +1,4 @@
-import { listen } from '@tauri-apps/api/event';
+import { UnlistenFn, listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
@@ -13,7 +13,7 @@ export function TitleBar(props: TitleBarProps): React.ReactElement {
   const [isMaximized, setMaximized] = useState(false);
 
   useEffect(() => {
-    let unlisten: () => void;
+    let unlisten: UnlistenFn;
     (async () => {
       unlisten = await listen('tauri://resize', async () => {
         const maximized = await appWindow.isMaximized();

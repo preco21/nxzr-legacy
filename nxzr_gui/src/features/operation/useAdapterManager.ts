@@ -15,6 +15,7 @@ export interface UseAdapterManager {
   refreshAdapterList: () => Promise<void>;
   attachAdapter: (id: string) => Promise<void>;
   detachAdapter: (id: string) => Promise<void>;
+  reset: () => void;
 }
 
 export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapterManager {
@@ -98,6 +99,11 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
       setPending(false);
     }
   }, [options?.onDetached]);
+  const reset = useCallback(() => {
+    setPending(false);
+    setAdapters([]);
+    setCurrentAdapterId(undefined);
+  }, []);
   return {
     pending,
     adapters,
@@ -105,5 +111,6 @@ export function useAdapterManager(options?: UseAdapterManagerOptions): UseAdapte
     refreshAdapterList,
     attachAdapter,
     detachAdapter,
+    reset,
   };
 }

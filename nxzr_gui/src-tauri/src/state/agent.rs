@@ -60,7 +60,10 @@ impl AgentManager {
         })
     }
 
-    pub async fn launch_wsl_anchor_instance(&self) -> Result<(), AgentManagerError> {
+    pub async fn launch_wsl_anchor_instance(
+        &self,
+        on_close_tx: oneshot::Sender<()>,
+    ) -> Result<(), AgentManagerError> {
         if self.wsl_instance_tx.borrow().is_some() {
             return Err(AgentManagerError::WslInstanceAlreadyLaunched);
         }
@@ -79,6 +82,7 @@ impl AgentManager {
                 }
                 tracing::info!("terminating WSL process...");
                 wsl_instance_tx.send_replace(None);
+                let _ = on_close_tx.send(());
                 Ok::<_, AgentManagerError>(())
             }
         });

@@ -11,7 +11,10 @@ use crate::{
 use nxzr_shared::event;
 use std::path::Path;
 use tauri::Manager;
-use tokio::{process::Command, sync::mpsc};
+use tokio::{
+    process::Command,
+    sync::{mpsc, oneshot},
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CommandError {
@@ -231,16 +234,40 @@ pub async fn full_refresh_wsl() -> Result<(), CommandError> {
 
 #[tauri::command]
 pub async fn launch_wsl_anchor_instance(
+    window: tauri::Window,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), CommandError> {
-    // The instance may already be launched, we're ignoring it when it's the case.
-    let res = state.agent_manager.launch_wsl_anchor_instance().await;
-    if let Err(err) = res {
-        tracing::warn!("failed to launch wsl instance: {}", err);
+    let (on_close_tx, on_close_rx) = oneshot::channel();
+    let res = state
+        .agent_manager
+        .launch_wsl_anchor_instance(on_close_tx)
+        .await;
+    match res {
+        Ok(_) => {
+            tokio::spawn({
+                let window = window.clone();
+                async move {
+                    let _ = on_close_rx.await;
+                    window.emit("wsl:status_update", ()).unwrap();
+                }
+            });
+            window.emit("wsl:status_update", ()).unwrap();
+        }
+        // The instance may already be launched, we're ignoring it when it's the case.
+        Err(err) => tracing::warn!("failed to launch wsl instance: {}", err),
     }
     Ok(())
 }
 
+#[tauri::command]
+pub fn is_wsl_anchor_instance_ready(
+    state: tauri::State<'_, AppState>,
+) -> Result<bool, CommandError> {
+    let res = state.agent_manager.is_wsl_ready();
+    Ok(res)
+}
+
+// Agent
 #[tauri::command]
 pub async fn run_agent_check(handle: tauri::AppHandle) -> Result<(), CommandError> {
     let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
