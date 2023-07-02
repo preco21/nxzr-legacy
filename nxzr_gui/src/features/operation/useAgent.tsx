@@ -69,7 +69,6 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
     })();
     return () => unlisten?.();
   }, []);
-  // FIXME: handle events: agent:status_change
   return {
     pending,
     isReady,
