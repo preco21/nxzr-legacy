@@ -1,4 +1,5 @@
 use crate::support::agent;
+use nxzr_proto::{nxzr_client::NxzrClient, GetDeviceStatusRequest, GetDeviceStatusResponse};
 use nxzr_shared::shutdown::Shutdown;
 use std::{path::Path, sync::Arc};
 use tokio::{
@@ -6,7 +7,10 @@ use tokio::{
     time::{self, Duration},
 };
 use tokio_retry::{strategy::FixedInterval, Retry};
-use tonic::transport::{Channel, Endpoint, Error as TonicError};
+use tonic::{
+    transport::{Channel, Endpoint, Error as TonicError},
+    Request, Status as TonicStatus,
+};
 
 use super::WslManager;
 
@@ -18,12 +22,25 @@ pub enum AgentManagerError {
     AgentInstanceAlreadyLaunched,
     #[error("failed to shutdown agent instance: the instance is not launched or unavailable")]
     UnableToShutdownAgentInstance,
+    #[error("agent is not ready")]
+    AgentNotReady,
+    #[error("rpc failed: {code} {message}")]
+    RpcFailed { code: tonic::Code, message: String },
     #[error(transparent)]
     AgentError(#[from] agent::AgentError),
     #[error(transparent)]
     Tonic(#[from] TonicError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+}
+
+impl From<TonicStatus> for AgentManagerError {
+    fn from(status: TonicStatus) -> Self {
+        Self::RpcFailed {
+            code: status.code(),
+            message: status.message().to_owned(),
+        }
+    }
 }
 
 pub struct AgentManager {
@@ -116,8 +133,14 @@ impl AgentManager {
         self.agent_instance.lock().await.is_some()
     }
 
-    pub async fn get_device_status(&self) -> Result<(), AgentManagerError> {
-        unimplemented!()
+    pub async fn get_device_status(&self) -> Result<GetDeviceStatusResponse, AgentManagerError> {
+        let chan = self.agent_client().await?;
+        let mut nxzr_client = NxzrClient::new(chan);
+        let request = Request::new(GetDeviceStatusRequest {});
+        let response: tonic::Response<GetDeviceStatusResponse> =
+            nxzr_client.get_device_status(request).await?;
+        let body = response.into_inner();
+        Ok(body)
     }
 
     pub async fn connect_switch(&self) -> Result<(), AgentManagerError> {
@@ -136,5 +159,13 @@ impl AgentManager {
 
     pub async fn create_button_control_stream(&self) -> Result<(), AgentManagerError> {
         unimplemented!()
+    }
+
+    async fn agent_client(&self) -> Result<Channel, AgentManagerError> {
+        let agent_instance = self.agent_instance.lock().await;
+        let Some((channel, ..)) = agent_instance.as_ref() else {
+            return Err(AgentManagerError::AgentNotReady);
+        };
+        Ok(channel.clone())
     }
 }

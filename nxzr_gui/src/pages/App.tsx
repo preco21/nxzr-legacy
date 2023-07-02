@@ -49,6 +49,9 @@ function AppPage(): React.ReactElement {
     onAttached: useCallback(async () => {
       await agent.launchDaemon();
     }, [agent]),
+    onAdapterAutoSelected: useCallback(async () => {
+      await agent.launchDaemon();
+    }, [agent]),
   });
   const [adapterModalOpen, setAdapterModalOpen] = useState<boolean>(false);
 

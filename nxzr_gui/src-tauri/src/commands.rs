@@ -291,3 +291,21 @@ pub async fn is_agent_daemon_ready(
 ) -> Result<bool, CommandError> {
     Ok(state.agent_manager.is_agent_daemon_ready().await)
 }
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct RpcGetDeviceStatusResponse {
+    pub adapter_address: String,
+    pub paired_switch_addresses: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn rpc_get_device_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<RpcGetDeviceStatusResponse, CommandError> {
+    let res = state.agent_manager.get_device_status().await?;
+    Ok(RpcGetDeviceStatusResponse {
+        adapter_address: res.adapter_address,
+        paired_switch_addresses: res.paired_switch_addresses,
+    })
+}

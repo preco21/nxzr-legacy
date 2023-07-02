@@ -97,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
             commands::launch_agent_daemon,
             commands::terminate_agent_daemon,
             commands::is_agent_daemon_ready,
+            commands::rpc_get_device_status,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {
