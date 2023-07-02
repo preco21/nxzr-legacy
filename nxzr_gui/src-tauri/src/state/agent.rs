@@ -33,18 +33,16 @@ pub enum AgentManagerError {
     Io(#[from] std::io::Error),
 }
 
-pub type AgentInstance = (
-    JoinHandle<Result<(), AgentManagerError>>,
-    Channel,
-    mpsc::Sender<oneshot::Sender<()>>,
-);
-
 pub struct AgentManager {
     agent_instance: Arc<Mutex<Option<AgentInstance>>>,
     msg_tx: mpsc::Sender<Event>,
     event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     shutdown: Shutdown,
 }
+
+pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
+
+pub struct SwitchConnection {}
 
 impl AgentManager {
     pub async fn new(shutdown: Shutdown) -> Result<Self, AgentManagerError> {
@@ -83,7 +81,7 @@ impl AgentManager {
         };
         let channel = Retry::spawn(FixedInterval::from_millis(1000).take(3), try_connect).await?;
         let (req_terminate_tx, mut req_terminate_rx) = mpsc::channel::<oneshot::Sender<()>>(1);
-        let handle = tokio::spawn({
+        tokio::spawn({
             let shutdown = self.shutdown.clone();
             let agent_instance = self.agent_instance.clone();
             async move {
@@ -110,7 +108,7 @@ impl AgentManager {
                 Ok::<_, AgentManagerError>(())
             }
         });
-        agent_instance.replace((handle, channel, req_terminate_tx));
+        agent_instance.replace((channel, req_terminate_tx));
         Ok(())
     }
 
@@ -126,8 +124,25 @@ impl AgentManager {
         Ok(())
     }
 
-    // FIXME: connection 관련 로직들은 따로 관리하는 것이 맞을까...?
-    pub async fn connect_switch() -> Result<(), AgentManagerError> {
+    pub async fn get_device_status(&self) -> Result<(), AgentManagerError> {
+        unimplemented!()
+    }
+
+    pub async fn connect_switch(&self) -> Result<(), AgentManagerError> {
+        // todo: spawn a task to monitor the switch connection
+        unimplemented!()
+    }
+
+    pub async fn reconnect_switch(&self) -> Result<(), AgentManagerError> {
+        // todo: spawn a task to monitor the switch connection
+        unimplemented!()
+    }
+
+    pub async fn get_protocol_state(&self) -> Result<(), AgentManagerError> {
+        unimplemented!()
+    }
+
+    pub async fn create_button_control_stream(&self) -> Result<(), AgentManagerError> {
         unimplemented!()
     }
 
