@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
     let shutdown = Shutdown::new(shutdown_tx, shutdown_complete_tx);
 
     let wsl_manager = Arc::new(state::WslManager::new(shutdown.clone()).await?);
-    let agent_manager = Arc::new(state::AgentManager::new(shutdown.clone()).await?);
+    let agent_manager = Arc::new(state::AgentManager::new(shutdown.clone()));
     let logging_manager = Arc::new(state::LoggingManager::new(log_out_rx)?);
     tauri::async_runtime::set(tokio::runtime::Handle::current());
     tauri::Builder::default()
@@ -96,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
             commands::run_agent_check,
             commands::launch_agent_daemon,
             commands::terminate_agent_daemon,
+            commands::is_agent_daemon_ready,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {

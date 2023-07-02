@@ -1,13 +1,8 @@
 use crate::support::agent;
-use nxzr_shared::{
-    event::{self, SubscriptionReq},
-    setup_event,
-    shutdown::Shutdown,
-};
+use nxzr_shared::shutdown::Shutdown;
 use std::{path::Path, sync::Arc};
 use tokio::{
     sync::{mpsc, oneshot, Mutex},
-    task::JoinHandle,
     time::{self, Duration},
 };
 use tokio_retry::{strategy::FixedInterval, Retry};
@@ -26,8 +21,6 @@ pub enum AgentManagerError {
     #[error(transparent)]
     AgentError(#[from] agent::AgentError),
     #[error(transparent)]
-    Event(#[from] event::EventError),
-    #[error(transparent)]
     Tonic(#[from] TonicError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -35,8 +28,6 @@ pub enum AgentManagerError {
 
 pub struct AgentManager {
     agent_instance: Arc<Mutex<Option<AgentInstance>>>,
-    msg_tx: mpsc::Sender<Event>,
-    event_sub_tx: mpsc::Sender<SubscriptionReq<Event>>,
     shutdown: Shutdown,
 }
 
@@ -45,22 +36,18 @@ pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
 pub struct SwitchConnection {}
 
 impl AgentManager {
-    pub async fn new(shutdown: Shutdown) -> Result<Self, AgentManagerError> {
-        let (msg_tx, msg_rx) = mpsc::channel(256);
-        let (event_sub_tx, event_sub_rx) = mpsc::channel(1);
-        Event::handle_events(msg_rx, event_sub_rx)?;
-        Ok(Self {
+    pub fn new(shutdown: Shutdown) -> Self {
+        Self {
             agent_instance: Arc::new(Mutex::new(None)),
-            msg_tx,
-            event_sub_tx,
             shutdown,
-        })
+        }
     }
 
     pub async fn launch_agent_daemon(
         &self,
         server_exec_path: &Path,
         wsl_manager: Arc<WslManager>,
+        window: tauri::Window,
     ) -> Result<(), AgentManagerError> {
         if !wsl_manager.is_wsl_ready() {
             return Err(AgentManagerError::WslInstanceNotReady);
@@ -86,7 +73,7 @@ impl AgentManager {
             let agent_instance = self.agent_instance.clone();
             async move {
                 let _shutdown_guard = shutdown.drop_guard();
-                let notify_tx = tokio::select! {
+                let sig_close_tx = tokio::select! {
                     Some(tx) = req_terminate_rx.recv() => {
                         let _ = child.kill();
                         Some(tx)
@@ -102,9 +89,10 @@ impl AgentManager {
                 tracing::info!("terminating agent daemon process...");
                 let mut agent_instance = agent_instance.lock().await;
                 let _ = agent_instance.take();
-                if let Some(notify_tx) = notify_tx {
+                if let Some(notify_tx) = sig_close_tx {
                     let _ = notify_tx.send(());
                 }
+                window.emit("agent:status_update", ()).unwrap();
                 Ok::<_, AgentManagerError>(())
             }
         });
@@ -122,6 +110,10 @@ impl AgentManager {
         drop(agent_instance);
         let _ = term_complete_rx.await;
         Ok(())
+    }
+
+    pub async fn is_agent_daemon_ready(&self) -> bool {
+        self.agent_instance.lock().await.is_some()
     }
 
     pub async fn get_device_status(&self) -> Result<(), AgentManagerError> {
@@ -145,18 +137,4 @@ impl AgentManager {
     pub async fn create_button_control_stream(&self) -> Result<(), AgentManagerError> {
         unimplemented!()
     }
-
-    pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, AgentManagerError> {
-        Ok(Event::subscribe(&mut self.event_sub_tx.clone()).await?)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Event {
-    WslLaunch,
-    WslTerminate,
-}
-
-impl Event {
-    setup_event!(Event);
 }

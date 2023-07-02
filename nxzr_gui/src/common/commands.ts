@@ -99,6 +99,10 @@ export async function terminateAgentDaemon(): Promise<void> {
   await wrapError(invoke('terminate_agent_daemon'));
 }
 
+export async function isAgentDaemonReady(): Promise<boolean> {
+  return wrapError(invoke<boolean>('is_agent_daemon_ready'));
+}
+
 // Helpers
 async function wrapError<T>(promise: Promise<T>): Promise<T> {
   try {

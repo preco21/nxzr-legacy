@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
-import { launchAgentDaemon, runAgentCheck, terminateAgentDaemon } from '../../common/commands';
+import { useCallback, useEffect, useState } from 'react';
+import { isAgentDaemonReady, launchAgentDaemon, runAgentCheck, terminateAgentDaemon } from '../../common/commands';
 import { WslStatus, useWslStatus } from './useWslStatus';
+import { UnlistenFn, listen } from '@tauri-apps/api/event';
 
 export interface UseAgent {
   pending: boolean;
@@ -58,6 +59,16 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
       }
     }, []),
   });
+  useEffect(() => {
+    let unlisten: UnlistenFn;
+    (async () => {
+      unlisten = await listen('agent:status_update', async () => {
+        const ready = await isAgentDaemonReady();
+        setIsReady(ready);
+      });
+    })();
+    return () => unlisten?.();
+  }, []);
   // FIXME: handle events: agent:status_change
   return {
     pending,

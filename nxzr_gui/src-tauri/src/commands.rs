@@ -264,13 +264,14 @@ pub async fn run_agent_check(handle: tauri::AppHandle) -> Result<(), CommandErro
 #[tauri::command]
 pub async fn launch_agent_daemon(
     handle: tauri::AppHandle,
+    window: tauri::Window,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), CommandError> {
     let server_exec_path = util::get_resource(&handle, config::WSL_SERVER_EXEC_NAME)
         .ok_or(CommandError::ServerExecResolveFailed)?;
     let res = state
         .agent_manager
-        .launch_agent_daemon(&server_exec_path, state.wsl_manager.clone())
+        .launch_agent_daemon(&server_exec_path, state.wsl_manager.clone(), window)
         .await;
     if let Err(err) = res {
         tracing::error!("failed to launch wsl instance: {}", err);
@@ -282,4 +283,11 @@ pub async fn launch_agent_daemon(
 pub async fn terminate_agent_daemon(state: tauri::State<'_, AppState>) -> Result<(), CommandError> {
     state.agent_manager.terminate_agent_daemon().await?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn is_agent_daemon_ready(
+    state: tauri::State<'_, AppState>,
+) -> Result<bool, CommandError> {
+    Ok(state.agent_manager.is_agent_daemon_ready().await)
 }
