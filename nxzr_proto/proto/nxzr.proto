@@ -85,7 +85,7 @@ message ButtonControlStreamRequest {
     DOWN = 3;
   }
   string action_id = 1;
-  string type = 2;
+  string kind = 2;
   KeyAction action = 3;
 }
 message ButtonControlStreamResponse {
@@ -95,7 +95,7 @@ message ButtonControlStreamResponse {
 
 message StickControlStreamRequest {
   string action_id = 1;
-  string type = 2;
+  string kind = 2;
   Position position = 3;
 }
 message StickControlStreamResponse {

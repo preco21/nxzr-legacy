@@ -1,12 +1,17 @@
-use nxzr_core::{controller, protocol};
+use crate::controller_key;
+use nxzr_core::{
+    controller::{self, state::button::ButtonKey},
+    protocol,
+};
 use nxzr_device::{connection, device, session};
 use nxzr_proto::{
-    connect_switch_response, connection_event, nxzr_server::Nxzr, ButtonControlStreamRequest,
-    ButtonControlStreamResponse, ConnectSwitchRequest, ConnectSwitchResponse, ConnectionEvent,
-    ConnectionMetadata, Error as ProtoError, GetDeviceStatusRequest, GetDeviceStatusResponse,
-    GetProtocolStateRequest, GetProtocolStateResponse, ImuControlStreamRequest,
-    ImuControlStreamResponse, ReconnectSwitchRequest, ReconnectSwitchResponse,
-    StickControlStreamRequest, StickControlStreamResponse,
+    button_control_stream_request::KeyAction, connect_switch_response, connection_event,
+    nxzr_server::Nxzr, ButtonControlStreamRequest, ButtonControlStreamResponse,
+    ConnectSwitchRequest, ConnectSwitchResponse, ConnectionEvent, ConnectionMetadata,
+    Error as ProtoError, GetDeviceStatusRequest, GetDeviceStatusResponse, GetProtocolStateRequest,
+    GetProtocolStateResponse, ImuControlStreamRequest, ImuControlStreamResponse,
+    ReconnectSwitchRequest, ReconnectSwitchResponse, StickControlStreamRequest,
+    StickControlStreamResponse,
 };
 use nxzr_shared::shutdown::Shutdown;
 use std::{
@@ -15,7 +20,7 @@ use std::{
     time::SystemTime,
 };
 use tokio::sync::mpsc;
-use tokio_stream::{wrappers::UnboundedReceiverStream, Stream};
+use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 use tonic::{async_trait, Request, Response, Status, Streaming};
 
 type ServiceResult<T> = Result<Response<T>, Status>;
@@ -271,10 +276,36 @@ impl Nxzr for NxzrService {
             return Err(NxzrServiceError::NotConnected.into());
         };
         drop(guard);
+        let protocol = conn.protocol();
+        let mut stream = req.into_inner();
+        let mut action_id: usize = 0;
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            while let Some(req) = stream.next().await {
+                tokio::spawn(async move {
+                    let button_req = req.unwrap();
+                    match KeyAction::from_i32(button_req.action).unwrap() {
+                        KeyAction::Press => {
+                            // FIXME: from string strum
+                            controller_key::key_press(protocol.clone(), ButtonKey::from(value))
+                                .await;
+                        }
+                        KeyAction::Up => {
+                            controller_key::key_up(protocol, key).await;
+                        }
+                        KeyAction::Down => {
+                            controller_key::key_down(protocol, key).await;
+                        }
+                        _ => {}
+                    }
+                });
+            }
+        });
         // FIXME: todo receive client stream
         // FIXME: send acknowledgement to client as a key press held.
         // FIXME: handle up/down (from client side, just interpret as-is from server side)
-        Ok(())
+        let out_stream = UnboundedReceiverStream::new(rx);
+        Ok(Response::new(out_stream))
     }
 
     type StickControlStreamStream = ResponseStream<StickControlStreamResponse>;
@@ -283,6 +314,11 @@ impl Nxzr for NxzrService {
         &self,
         req: Request<Streaming<StickControlStreamRequest>>,
     ) -> ServiceResult<Self::StickControlStreamStream> {
+        let mut guard = self.conn_state.lock().unwrap();
+        let ConnectionState::Connected(conn) = *guard else {
+            return Err(NxzrServiceError::NotConnected.into());
+        };
+
         unimplemented!()
     }
 
@@ -292,6 +328,11 @@ impl Nxzr for NxzrService {
         &self,
         req: Request<Streaming<ImuControlStreamRequest>>,
     ) -> ServiceResult<Self::ImuControlStreamStream> {
+        let mut guard = self.conn_state.lock().unwrap();
+        let ConnectionState::Connected(conn) = *guard else {
+            return Err(NxzrServiceError::NotConnected.into());
+        };
+
         unimplemented!()
     }
 

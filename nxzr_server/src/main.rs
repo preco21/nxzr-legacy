@@ -10,7 +10,7 @@ use std::{future::Future, net::ToSocketAddrs, sync::Arc};
 use tokio::{signal, sync::mpsc};
 use tracing_subscriber::prelude::*;
 
-mod controller;
+mod controller_key;
 mod service;
 
 #[derive(Parser)]
