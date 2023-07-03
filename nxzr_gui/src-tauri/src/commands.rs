@@ -309,3 +309,12 @@ pub async fn rpc_get_device_status(
         paired_switch_addresses: res.paired_switch_addresses,
     })
 }
+
+#[tauri::command]
+pub async fn rpc_connect_switch(
+    window: tauri::Window,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), CommandError> {
+    state.agent_manager.connect_switch(window).await?;
+    Ok(())
+}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Tag } from '@blueprintjs/core';
+import { Button, Tag, TextArea } from '@blueprintjs/core';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
@@ -115,25 +115,37 @@ function AppPage(): React.ReactElement {
     <MainContainer>
       <TitleBar />
       <Header
-        disabled={!setupGuard.ready}
+        disabled={!setupGuard.isReady}
         adapterInfo={adapterManager.selectedAdapter}
         adapterPending={adapterManager.pending}
         onAdapterDisplayClick={() => setAdapterModalOpen(true)}
       />
-      {!setupGuard.ready && (
+      {!setupGuard.isReady && (
         <Setup
           steps={setupGuard.steps}
           loading={setupGuard.pending}
-          ready={setupGuard.ready}
+          ready={setupGuard.isReady}
           installRequired={setupGuard.installRequired}
           error={firstSetupError?.error?.message}
           onInstall={() => setupGuard.performInstall()}
         />
       )}
-      {setupGuard.ready && (
+      {setupGuard.isReady && (
         <div>
           <Tag>Wsl status: {wslStatusText}</Tag>
           <Tag>Agent status: {agentStatusText}</Tag>
+          <TextArea
+            value={JSON.stringify(agent.deviceStatus)}
+            fill
+            readOnly
+          />
+          <Button
+            disabled={!agent.isReady || agent.switchConnected}
+            loading={agent.pending}
+            onClick={() => agent.connectSwitch()}
+          >
+            Connect Switch
+          </Button>
         </div>
       )}
       <AdapterSelectModal

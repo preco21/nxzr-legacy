@@ -2357,6 +2357,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tokio-stream",
  "tonic",
  "tracing",
  "tracing-appender",

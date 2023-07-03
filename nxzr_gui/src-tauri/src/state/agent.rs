@@ -1,6 +1,9 @@
 use crate::support::agent;
-use nxzr_proto::{nxzr_client::NxzrClient, GetDeviceStatusRequest, GetDeviceStatusResponse};
-use nxzr_shared::shutdown::Shutdown;
+use nxzr_proto::{
+    nxzr_client::{self, NxzrClient},
+    ConnectSwitchRequest, GetDeviceStatusRequest, GetDeviceStatusResponse,
+};
+use nxzr_shared::shutdown::{self, Shutdown};
 use std::{path::Path, sync::Arc};
 use tokio::{
     sync::{mpsc, oneshot, Mutex},
@@ -92,6 +95,7 @@ impl AgentManager {
                 let _shutdown_guard = shutdown.drop_guard();
                 let sig_close_tx = tokio::select! {
                     Some(tx) = req_terminate_rx.recv() => {
+                        // FIXME: sigterm is not accepted, only sigint is respected, we need to fix it for graceful shutdown to work.
                         let _ = child.kill();
                         Some(tx)
                     },
@@ -134,18 +138,31 @@ impl AgentManager {
     }
 
     pub async fn get_device_status(&self) -> Result<GetDeviceStatusResponse, AgentManagerError> {
-        let chan = self.agent_client().await?;
-        let mut nxzr_client = NxzrClient::new(chan);
-        let request = Request::new(GetDeviceStatusRequest {});
-        let response: tonic::Response<GetDeviceStatusResponse> =
-            nxzr_client.get_device_status(request).await?;
+        let mut client = self.agent_client().await?;
+        let response: tonic::Response<GetDeviceStatusResponse> = client
+            .get_device_status(Request::new(GetDeviceStatusRequest {}))
+            .await?;
         let body = response.into_inner();
         Ok(body)
     }
 
-    pub async fn connect_switch(&self) -> Result<(), AgentManagerError> {
-        // todo: spawn a task to monitor the switch connection
-        unimplemented!()
+    pub async fn connect_switch(&self, window: tauri::Window) -> Result<(), AgentManagerError> {
+        let mut client = self.agent_client().await?;
+        tokio::spawn({
+            let shutdown = self.shutdown.clone();
+            async move {
+                let _shutdown_guard = shutdown.drop_guard();
+                let mut stream = client
+                    .connect_switch(Request::new(ConnectSwitchRequest {}))
+                    .await?
+                    .into_inner();
+                while let Some(response) = stream.message().await? {
+                    tracing::info!("switch connect: {:?}", response);
+                }
+                Ok::<_, AgentManagerError>(())
+            }
+        });
+        Ok(())
     }
 
     pub async fn reconnect_switch(&self) -> Result<(), AgentManagerError> {
@@ -161,11 +178,11 @@ impl AgentManager {
         unimplemented!()
     }
 
-    async fn agent_client(&self) -> Result<Channel, AgentManagerError> {
+    async fn agent_client(&self) -> Result<NxzrClient<Channel>, AgentManagerError> {
         let agent_instance = self.agent_instance.lock().await;
         let Some((channel, ..)) = agent_instance.as_ref() else {
             return Err(AgentManagerError::AgentNotReady);
         };
-        Ok(channel.clone())
+        Ok(NxzrClient::new(channel.clone()))
     }
 }

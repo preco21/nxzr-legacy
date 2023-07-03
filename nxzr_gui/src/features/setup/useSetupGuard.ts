@@ -54,7 +54,7 @@ export interface UseSetupGuardOptions {
 export interface UseSetupGuardState {
   pending: boolean;
   inInstall: boolean;
-  ready: boolean;
+  isReady: boolean;
   installRequired: boolean;
   steps: StepDisplay[];
   currentStepIndex?: number;
@@ -62,7 +62,7 @@ export interface UseSetupGuardState {
 
 export interface UseSetupGuard {
   pending: boolean;
-  ready: boolean;
+  isReady: boolean;
   installRequired: boolean;
   steps: StepDisplay[];
   currentStep?: StepDisplay;
@@ -82,7 +82,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
   const [state, setState] = useState<UseSetupGuardState>(() => ({
     pending: false,
     inInstall: false,
-    ready: false,
+    isReady: false,
     installRequired: false,
     steps: SETUP_STEPS.map((step) => ({
       name: step.name,
@@ -135,7 +135,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     await sleep(100);
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = false;
-      draft.ready = !aborted;
+      draft.isReady = !aborted;
       draft.installRequired = aborted;
     }));
     if (!aborted) {
@@ -213,7 +213,7 @@ export function useSetupGuard(options?: UseSetupGuardOptions): UseSetupGuard {
     setState((prevState) => produce(prevState, (draft) => {
       draft.pending = false;
       draft.inInstall = false;
-      draft.ready = !aborted;
+      draft.isReady = !aborted;
       draft.installRequired = aborted;
     }));
     if (!aborted) {

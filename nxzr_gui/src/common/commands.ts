@@ -103,6 +103,19 @@ export async function isAgentDaemonReady(): Promise<boolean> {
   return wrapError(invoke<boolean>('is_agent_daemon_ready'));
 }
 
+export interface RpcGetDeviceStatusResponse {
+  adapterAddress: string;
+  pairedSwitchAddresses: string[];
+}
+
+export async function rpcGetDeviceStatus(): Promise<RpcGetDeviceStatusResponse> {
+  return wrapError(invoke<RpcGetDeviceStatusResponse>('rpc_get_device_status'));
+}
+
+export async function rpcConnectSwitch(): Promise<void> {
+  await wrapError(invoke('rpc_connect_switch'));
+}
+
 // Helpers
 async function wrapError<T>(promise: Promise<T>): Promise<T> {
   try {
