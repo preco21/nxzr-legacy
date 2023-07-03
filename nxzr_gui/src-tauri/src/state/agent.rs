@@ -1,10 +1,11 @@
 use crate::support::agent;
+use command_group::AsyncGroupChild;
 use nxzr_proto::{
     nxzr_client::{self, NxzrClient},
     ConnectSwitchRequest, GetDeviceStatusRequest, GetDeviceStatusResponse,
 };
 use nxzr_shared::shutdown::{self, Shutdown};
-use std::{path::Path, sync::Arc};
+use std::{future::Future, path::Path, sync::Arc};
 use tokio::{
     sync::{mpsc, oneshot, Mutex},
     time::{self, Duration},
@@ -78,7 +79,7 @@ impl AgentManager {
         }
         tracing::info!("launching agent daemon process...");
         // Sometimes, the agent daemon process is not terminated properly, so here we are trying to kill the dangling process.
-        agent::kill_dangling_agent().await?;
+        agent::kill_agent().await?;
         let mut child = agent::spawn_wsl_agent_daemon(server_exec_path).await?;
         let try_connect = || async move {
             let channel = Endpoint::from_static("http://[::1]:50052")
@@ -95,15 +96,14 @@ impl AgentManager {
                 let _shutdown_guard = shutdown.drop_guard();
                 let sig_close_tx = tokio::select! {
                     Some(tx) = req_terminate_rx.recv() => {
-                        // FIXME: sigterm is not accepted, only sigint is respected, we need to fix it for graceful shutdown to work.
-                        let _ = child.kill();
+                        kill_agent_gracefully(&mut child).await;
                         Some(tx)
                     },
-                    _ = child.wait() => None,
                     _ = shutdown.recv_shutdown() => {
-                        let _ = child.kill();
+                        kill_agent_gracefully(&mut child).await;
                         None
                     },
+                    _ = child.wait() => None,
                 };
                 // Wait for seconds loosely to make sure the agent daemon is terminated.
                 let _ = time::timeout(Duration::from_millis(3000), child.wait()).await;
@@ -184,5 +184,18 @@ impl AgentManager {
             return Err(AgentManagerError::AgentNotReady);
         };
         Ok(NxzrClient::new(channel.clone()))
+    }
+}
+
+fn kill_agent_gracefully<'a>(child: &'a mut AsyncGroupChild) -> impl Future<Output = ()> + 'a {
+    async move {
+        match child.id() {
+            Some(_) => {
+                let _ = agent::kill_agent().await;
+            }
+            None => {
+                let _ = child.kill();
+            }
+        }
     }
 }

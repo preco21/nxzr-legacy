@@ -51,7 +51,7 @@ pub async fn spawn_wsl_agent_daemon(
     Ok(child)
 }
 
-pub async fn kill_dangling_agent() -> Result<(), AgentError> {
+pub async fn kill_agent() -> Result<(), AgentError> {
     // Quietly kill the existing agent daemon process.
     let _ = util::run_system_command({
         let mut cmd = tokio::process::Command::new("wsl.exe");
@@ -60,6 +60,7 @@ pub async fn kill_dangling_agent() -> Result<(), AgentError> {
             config::WSL_DISTRO_NAME,
             "--",
             "pkill",
+            "-SIGINT",
             "-f",
             config::WSL_SERVER_EXEC_NAME,
         ]);
