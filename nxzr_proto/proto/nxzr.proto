@@ -78,18 +78,15 @@ message GetProtocolStateResponse {
 }
 
 message ButtonControlStreamRequest {
-  message Button {
-    enum KeyAction {
-      UNSPECIFIED = 0;
-      PRESS = 1;
-      UP = 2;
-      DOWN = 3;
-    }
-    string key_type = 2;
-    KeyAction key_action = 3;
+  enum KeyAction {
+    UNSPECIFIED = 0;
+    PRESS = 1;
+    UP = 2;
+    DOWN = 3;
   }
   string action_id = 1;
-  Button button = 2;
+  string type = 2;
+  KeyAction action = 3;
 }
 message ButtonControlStreamResponse {
   string action_id = 1;
@@ -98,7 +95,8 @@ message ButtonControlStreamResponse {
 
 message StickControlStreamRequest {
   string action_id = 1;
-  Position position = 2;
+  string type = 2;
+  Position position = 3;
 }
 message StickControlStreamResponse {
   string action_id = 1;

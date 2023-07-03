@@ -29,6 +29,8 @@ pub enum NxzrServiceError {
     StreamClosed,
     #[error("failed to connect to peer")]
     ConnectionFailed,
+    #[error("no connection available")]
+    NotConnected,
     #[error(transparent)]
     DeviceError(#[from] device::DeviceError),
     #[error(transparent)]
@@ -264,7 +266,15 @@ impl Nxzr for NxzrService {
         &self,
         req: Request<Streaming<ButtonControlStreamRequest>>,
     ) -> ServiceResult<Self::ButtonControlStreamStream> {
-        unimplemented!()
+        let mut guard = self.conn_state.lock().unwrap();
+        let ConnectionState::Connected(conn) = *guard else {
+            return Err(NxzrServiceError::NotConnected.into());
+        };
+        drop(guard);
+        // FIXME: todo receive client stream
+        // FIXME: send acknowledgement to client as a key press held.
+        // FIXME: handle up/down (from client side, just interpret as-is from server side)
+        Ok(())
     }
 
     type StickControlStreamStream = ResponseStream<StickControlStreamResponse>;
