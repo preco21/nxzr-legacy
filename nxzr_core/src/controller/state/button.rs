@@ -1,9 +1,9 @@
 use crate::controller::ControllerType;
-use strum::Display;
+use strum::{Display, EnumString};
 
 use super::StateError;
 
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, EnumString)]
 pub enum ButtonKey {
     Y,
     X,
@@ -288,4 +288,26 @@ fn check_bit(value: u8, n: usize) -> bool {
 
 fn flip_bit(value: u8, n: usize) -> u8 {
     value ^ (1 << n)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::ButtonKey;
+
+    #[test]
+    fn convert_string_to_button_key() {
+        let button = ButtonKey::from_str("s");
+        assert!(button.is_err(), "invalid string should fail conversion");
+        let button = ButtonKey::from_str("Capture").unwrap();
+        assert_eq!(button, ButtonKey::Capture);
+    }
+
+    #[test]
+    fn test_convert_button_key_to_string() {
+        let button = ButtonKey::Capture;
+        println!("{}", button);
+        assert_eq!(button.to_string(), "Capture");
+    }
 }
