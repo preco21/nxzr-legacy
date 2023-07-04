@@ -1,16 +1,20 @@
 use crate::support::agent;
 use command_group::AsyncGroupChild;
 use nxzr_proto::{
-    nxzr_client::{self, NxzrClient},
-    ConnectSwitchRequest, GetDeviceStatusRequest, GetDeviceStatusResponse,
+    nxzr_client::NxzrClient, ConnectSwitchRequest, ControlStreamRequest, GetDeviceStatusRequest,
+    GetDeviceStatusResponse, ImuControlReport, Position, StickControlReport,
 };
-use nxzr_shared::shutdown::{self, Shutdown};
+use nxzr_shared::shutdown::Shutdown;
 use std::{future::Future, path::Path, sync::Arc};
 use tokio::{
-    sync::{mpsc, oneshot, Mutex},
+    sync::{
+        mpsc::{self, UnboundedReceiver},
+        oneshot, Mutex,
+    },
     time::{self, Duration},
 };
 use tokio_retry::{strategy::FixedInterval, Retry};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{
     transport::{Channel, Endpoint, Error as TonicError},
     Request, Status as TonicStatus,
@@ -53,8 +57,6 @@ pub struct AgentManager {
 }
 
 pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
-
-pub struct SwitchConnection {}
 
 impl AgentManager {
     pub fn new(shutdown: Shutdown) -> Self {
@@ -159,6 +161,7 @@ impl AgentManager {
                 while let Some(response) = stream.message().await? {
                     tracing::info!("switch connect: {:?}", response);
                 }
+                // FIXME: Handle errors properly
                 Ok::<_, AgentManagerError>(())
             }
         });
@@ -174,7 +177,40 @@ impl AgentManager {
         unimplemented!()
     }
 
-    pub async fn create_button_control_stream(&self) -> Result<(), AgentManagerError> {
+    pub async fn run_control_stream(&self) -> Result<(), AgentManagerError> {
+        let mut client = self.agent_client().await?;
+        tokio::spawn({
+            let shutdown = self.shutdown.clone();
+            async move {
+                let _shutdown_guard = shutdown.drop_guard();
+                let (tx, rx) = mpsc::unbounded_channel();
+                tokio::spawn(async move {
+                    let mut interval = time::interval(Duration::from_secs(1));
+                    loop {
+                        interval.tick().await;
+                        let _ = tx.send(ControlStreamRequest {
+                            request_id: String::new(),
+                            buttons: Vec::new(),
+                            stick: Some(StickControlReport {
+                                left_position: Some(Position { x: 0.0, y: 0.0 }),
+                                right_position: Some(Position { x: 0.0, y: 0.0 }),
+                            }),
+                            imu: Some(ImuControlReport {
+                                // FIXME: todo
+                                ..Default::default()
+                            }),
+                        });
+                    }
+                });
+                let outbound_stream = UnboundedReceiverStream::new(rx);
+                let mut inbound_stream = client
+                    .control_stream(Request::new(outbound_stream))
+                    .await?
+                    .into_inner();
+                // FIXME: Handle errors properly
+                Ok::<_, AgentManagerError>(())
+            }
+        });
         unimplemented!()
     }
 
