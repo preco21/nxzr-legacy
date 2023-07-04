@@ -150,7 +150,7 @@ impl Shared {
         state.controller_state = controller_state;
     }
 
-    pub fn modify_controller_state(&self, f: impl FnOnce(&mut ControllerState)) {
+    pub fn modify_controller_state<T>(&self, f: impl FnOnce(&mut ControllerState) -> T) -> T {
         let mut write_lock = self.state.lock().unwrap();
         f(&mut write_lock.controller_state)
     }
@@ -211,9 +211,9 @@ impl ControllerProtocol {
     }
 
     // Modify the controller state in-place.
-    pub async fn modify_controller_state(&self, f: impl FnOnce(&mut ControllerState)) {
+    pub async fn modify_controller_state<T>(&self, f: impl FnOnce(&mut ControllerState) -> T) -> T {
         self.unpaused().await;
-        self.state.modify_controller_state(f);
+        self.state.modify_controller_state(f)
     }
 
     // Resolved when the first response is received by the reader.

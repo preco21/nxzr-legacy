@@ -1,21 +1,19 @@
-use crate::controller_key;
 use nxzr_core::{
     controller::{self, state::button::ButtonKey},
     protocol,
 };
 use nxzr_device::{connection, device, session};
 use nxzr_proto::{
-    button_control_stream_request::KeyAction, connect_switch_response, connection_event,
-    nxzr_server::Nxzr, ButtonControlStreamRequest, ButtonControlStreamResponse,
+    button_control_report::KeyAction, connect_switch_response, connection_event, nxzr_server::Nxzr,
     ConnectSwitchRequest, ConnectSwitchResponse, ConnectionEvent, ConnectionMetadata,
-    Error as ProtoError, GetDeviceStatusRequest, GetDeviceStatusResponse, GetProtocolStateRequest,
-    GetProtocolStateResponse, ImuControlStreamRequest, ImuControlStreamResponse,
-    ReconnectSwitchRequest, ReconnectSwitchResponse, StickControlStreamRequest,
-    StickControlStreamResponse,
+    ControlStreamRequest, ControlStreamResponse, Error as ProtoError, GetDeviceStatusRequest,
+    GetDeviceStatusResponse, GetProtocolStateRequest, GetProtocolStateResponse, Position,
+    ReconnectSwitchRequest, ReconnectSwitchResponse,
 };
 use nxzr_shared::shutdown::Shutdown;
 use std::{
     pin::Pin,
+    str::FromStr,
     sync::{Arc, Mutex},
     time::SystemTime,
 };
@@ -253,7 +251,6 @@ impl Nxzr for NxzrService {
         //     ..Default::default()
         // })
         // .await?;
-
         unimplemented!()
     }
 
@@ -265,88 +262,79 @@ impl Nxzr for NxzrService {
         unimplemented!()
     }
 
-    type ButtonControlStreamStream = ResponseStream<ButtonControlStreamResponse>;
+    type ControlStreamStream = ResponseStream<ControlStreamResponse>;
     #[tracing::instrument(target = "service")]
-    async fn button_control_stream(
+    async fn control_stream(
         &self,
-        req: Request<Streaming<ButtonControlStreamRequest>>,
-    ) -> ServiceResult<Self::ButtonControlStreamStream> {
-        let mut guard = self.conn_state.lock().unwrap();
-        let ConnectionState::Connected(conn) = *guard else {
-            return Err(NxzrServiceError::NotConnected.into());
+        req: Request<Streaming<ControlStreamRequest>>,
+    ) -> ServiceResult<Self::ControlStreamStream> {
+        let conn = {
+            let mut guard = self.conn_state.lock().unwrap();
+            let ConnectionState::Connected(conn) = &*guard else {
+                return Err(NxzrServiceError::NotConnected.into());
+            };
+            conn.clone()
         };
-        drop(guard);
         let protocol = conn.protocol();
         let mut stream = req.into_inner();
-        let mut action_id: usize = 0;
+        // FIXME: implement response stream
+        let mut request_id: usize = 0;
         let (tx, rx) = mpsc::unbounded_channel();
         tokio::spawn(async move {
             while let Some(req) = stream.next().await {
-                tokio::spawn(async move {
-                    let button_req = req.unwrap();
-                    match KeyAction::from_i32(button_req.action).unwrap() {
-                        KeyAction::Press => {
-                            // FIXME: from string strum
-                            controller_key::key_press(protocol.clone(), ButtonKey::from(value))
-                                .await;
+                match req {
+                    Ok(req) => {
+                        if let Err(err) = handle_control_report(protocol.clone(), req).await {
+                            tracing::error!("failed to process control report: {}", err);
                         }
-                        KeyAction::Up => {
-                            controller_key::key_up(protocol, key).await;
-                        }
-                        KeyAction::Down => {
-                            controller_key::key_down(protocol, key).await;
-                        }
-                        _ => {}
                     }
-                });
+                    Err(err) => tracing::warn!("failed to receive control stream: {}", err),
+                }
             }
         });
-        // FIXME: todo receive client stream
-        // FIXME: send acknowledgement to client as a key press held.
-        // FIXME: handle up/down (from client side, just interpret as-is from server side)
         let out_stream = UnboundedReceiverStream::new(rx);
-        Ok(Response::new(out_stream))
+        Ok(Response::new(Box::pin(out_stream)))
     }
+}
 
-    type StickControlStreamStream = ResponseStream<StickControlStreamResponse>;
-    #[tracing::instrument(target = "service")]
-    async fn stick_control_stream(
-        &self,
-        req: Request<Streaming<StickControlStreamRequest>>,
-    ) -> ServiceResult<Self::StickControlStreamStream> {
-        let mut guard = self.conn_state.lock().unwrap();
-        let ConnectionState::Connected(conn) = *guard else {
-            return Err(NxzrServiceError::NotConnected.into());
-        };
-
-        unimplemented!()
+async fn handle_control_report(
+    protocol: protocol::Protocol,
+    report: ControlStreamRequest,
+) -> Result<(), NxzrServiceError> {
+    let ret = protocol
+        .update_controller_state(|state| {
+            // Handle button states.
+            for button in report.buttons {
+                let key = ButtonKey::from_str(button.key_kind.as_str())?;
+                let should_key_down = match KeyAction::from_i32(button.key_action) {
+                    Some(KeyAction::Down) => true,
+                    Some(KeyAction::Up) => false,
+                    _ => false,
+                };
+                state.button_state_mut().set_button(key, should_key_down)?;
+            }
+            // Handle stick state.
+            if let Some(stick) = report.stick {
+                if let Some(left_position) = stick.left_position {
+                    let l_stick = state.l_stick_state_mut();
+                    l_stick.set_horizontal_scale(left_position.x)?;
+                    l_stick.set_vertical_scale(left_position.y)?;
+                }
+                if let Some(right_position) = stick.right_position {
+                    let r_stick = state.r_stick_state_mut();
+                    r_stick.set_horizontal_scale(right_position.x)?;
+                    r_stick.set_vertical_scale(right_position.y)?;
+                }
+            }
+            // Handle IMU state.
+            // FIXME: todo
+            anyhow::Ok(())
+        })
+        .await?;
+    if let Err(err) = ret {
+        tracing::warn!("error while handling control report: {}", err);
     }
-
-    type ImuControlStreamStream = ResponseStream<ImuControlStreamResponse>;
-    #[tracing::instrument(target = "service")]
-    async fn imu_control_stream(
-        &self,
-        req: Request<Streaming<ImuControlStreamRequest>>,
-    ) -> ServiceResult<Self::ImuControlStreamStream> {
-        let mut guard = self.conn_state.lock().unwrap();
-        let ConnectionState::Connected(conn) = *guard else {
-            return Err(NxzrServiceError::NotConnected.into());
-        };
-
-        unimplemented!()
-    }
-
-    // type ConnectSwitchStream = ResponseStream<ConnectSwitchResponse>;
-    // type LogStreamStream = ResponseStream<LogStreamResponse>;
-    // async fn log_stream(
-    //     &self,
-    //     req: Request<LogStreamRequest>,
-    // ) -> ServiceResult<Self::LogStreamStream> {
-    //     let out_stream = BroadcastStream::new(self.tracing_json_tx.subscribe())
-    //         .filter_map(|v| v.ok())
-    //         .map(|val| Ok::<_, Status>(LogStreamResponse { tracing_json: val }));
-    //     Ok(Response::new(Box::pin(out_stream) as Self::LogStreamStream))
-    // }
+    Ok(())
 }
 
 async fn handle_connect_switch(

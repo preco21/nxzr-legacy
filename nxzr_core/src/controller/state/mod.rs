@@ -10,6 +10,9 @@ pub enum StateError {
     // Invalid value range has been entered.
     #[error("invalid value range supplied")]
     InvalidRange,
+    // Invalid scale has been entered.
+    #[error("invalid scale range supplied")]
+    InvalidScale,
     // There is no calibration data available.
     #[error("no calibration data is supplied, unable to call the method")]
     NoCalibrationDataAvailable,

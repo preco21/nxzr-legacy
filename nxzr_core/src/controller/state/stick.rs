@@ -73,6 +73,21 @@ impl StickState {
         Ok(())
     }
 
+    pub fn set_horizontal_scale(&mut self, scale: f32) -> Result<(), StateError> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        if scale.is_nan() || scale.abs() <= 1.0 {
+            return Err(StateError::InvalidScale);
+        }
+        self.h_stick = if scale.is_sign_positive() {
+            stick_cal.h_center + (stick_cal.h_max_above_center as f32 * scale).round() as u16
+        } else {
+            stick_cal.h_center - (stick_cal.h_max_below_center as f32 * scale).round() as u16
+        };
+        Ok(())
+    }
+
     pub fn vertical(&self) -> u16 {
         self.v_stick
     }
@@ -82,6 +97,21 @@ impl StickState {
             return Err(StateError::InvalidRange);
         }
         self.v_stick = vertical;
+        Ok(())
+    }
+
+    pub fn set_vertical_scale(&mut self, scale: f32) -> Result<(), StateError> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        if scale.is_nan() || scale.abs() <= 1.0 {
+            return Err(StateError::InvalidScale);
+        }
+        self.v_stick = if scale.is_sign_positive() {
+            stick_cal.v_center + (stick_cal.v_max_above_center as f32 * scale).round() as u16
+        } else {
+            stick_cal.v_center - (stick_cal.v_max_below_center as f32 * scale).round() as u16
+        };
         Ok(())
     }
 
@@ -119,16 +149,7 @@ impl StickState {
             return Err(StateError::NoCalibrationDataAvailable);
         };
         self.h_stick = stick_cal.h_center;
-        self.v_stick = stick_cal.v_center - stick_cal.v_max_above_center;
-        Ok(())
-    }
-
-    pub fn set_left(&mut self) -> Result<(), StateError> {
-        let Some(ref stick_cal) = self.stick_cal else {
-            return Err(StateError::NoCalibrationDataAvailable);
-        };
-        self.h_stick = stick_cal.h_center - stick_cal.h_max_below_center;
-        self.v_stick = stick_cal.v_center;
+        self.v_stick = stick_cal.v_center - stick_cal.v_max_below_center;
         Ok(())
     }
 
@@ -137,6 +158,15 @@ impl StickState {
             return Err(StateError::NoCalibrationDataAvailable);
         };
         self.h_stick = stick_cal.h_center + stick_cal.h_max_above_center;
+        self.v_stick = stick_cal.v_center;
+        Ok(())
+    }
+
+    pub fn set_left(&mut self) -> Result<(), StateError> {
+        let Some(ref stick_cal) = self.stick_cal else {
+            return Err(StateError::NoCalibrationDataAvailable);
+        };
+        self.h_stick = stick_cal.h_center - stick_cal.h_max_below_center;
         self.v_stick = stick_cal.v_center;
         Ok(())
     }

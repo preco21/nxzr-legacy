@@ -252,10 +252,10 @@ impl Protocol {
     }
 
     // Update controller state in-place and wait for it to complete.
-    pub async fn update_controller_state(
+    pub async fn update_controller_state<T>(
         &self,
-        f: impl FnOnce(&mut ControllerState),
-    ) -> Result<(), ProtocolError> {
+        f: impl FnOnce(&mut ControllerState) -> T,
+    ) -> Result<T, ProtocolError> {
         self.inner.update_controller_state(f).await
     }
 
@@ -302,24 +302,22 @@ impl ProtocolInner {
         })
     }
 
-    pub async fn update_controller_state(
+    pub async fn update_controller_state<T>(
         &self,
-        f: impl FnOnce(&mut ControllerState),
-    ) -> Result<(), ProtocolError> {
+        f: impl FnOnce(&mut ControllerState) -> T,
+    ) -> Result<T, ProtocolError> {
         self.protocol.writer_ready().await;
         let (ready_tx, ready_rx) = oneshot::channel();
         let fut = async {
-            self.protocol.modify_controller_state(f).await;
+            let ret = self.protocol.modify_controller_state(f).await;
             let _ = self.state_send_tx.send(StateSendReq { ready_tx }).await;
             let _ = ready_rx.await;
+            ret
         };
         tokio::select! {
-            _ = fut => {}
-            _ = self.closing_tx.closed() => {
-                return Err(ProtocolError::ActionAbortedDueToClosing)
-            },
+            ret = fut => Ok(ret),
+            _ = self.closing_tx.closed() => Err(ProtocolError::ActionAbortedDueToClosing),
         }
-        Ok(())
     }
 
     pub async fn events(&self) -> Result<mpsc::UnboundedReceiver<Event>, ProtocolError> {

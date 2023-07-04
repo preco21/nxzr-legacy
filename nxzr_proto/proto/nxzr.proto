@@ -18,9 +18,7 @@ service Nxzr {
   rpc GetProtocolState(GetProtocolStateRequest) returns (GetProtocolStateResponse) {}
 
   // For high-frequency controller state updates. (requires connection to device)
-  rpc ButtonControlStream(stream ButtonControlStreamRequest) returns (stream ButtonControlStreamResponse) {}
-  rpc StickControlStream(stream StickControlStreamRequest) returns (stream StickControlStreamResponse) {}
-  rpc ImuControlStream(stream ImuControlStreamRequest) returns (stream ImuControlStreamResponse) {}
+  rpc ControlStream(stream ControlStreamRequest) returns (stream ControlStreamResponse) {}
 }
 
 message GetDeviceStatusRequest {}
@@ -77,44 +75,41 @@ message GetProtocolStateResponse {
   string controller_state_dump = 5;
 }
 
-message ButtonControlStreamRequest {
+message ControlStreamRequest {
+  string request_id = 1;
+  repeated ButtonControlReport buttons = 2;
+  optional StickControlReport stick = 3;
+  optional ImuControlReport imu = 4;
+}
+
+message ControlStreamResponse {
+  string request_id = 1;
+  bool success = 2;
+}
+
+message ButtonControlReport {
   enum KeyAction {
     UNSPECIFIED = 0;
-    PRESS = 1;
+    DOWN = 1;
     UP = 2;
-    DOWN = 3;
+    PRESS = 3;
   }
-  string action_id = 1;
-  string kind = 2;
-  KeyAction action = 3;
-}
-message ButtonControlStreamResponse {
-  string action_id = 1;
-  bool success = 2;
+  KeyAction key_action = 1;
+  string key_kind = 2;
 }
 
-message StickControlStreamRequest {
-  string action_id = 1;
-  string kind = 2;
-  Position position = 3;
-}
-message StickControlStreamResponse {
-  string action_id = 1;
-  bool success = 2;
+message StickControlReport {
+  Position left_position = 1;
+  Position right_position = 2;
 }
 
-message ImuControlStreamRequest {
-  string action_id = 1;
-  Position position = 2;
-}
-message ImuControlStreamResponse {
-  string action_id = 1;
-  bool success = 2;
+message ImuControlReport {
+  Position position = 1;
 }
 
 message Position {
-  uint32 x = 1;
-  uint32 y = 2;
+  float x = 1;
+  float y = 2;
 }
 
 message ConnectionMetadata {
