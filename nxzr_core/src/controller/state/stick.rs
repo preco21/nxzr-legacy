@@ -252,10 +252,10 @@ mod tests {
         let l_cal =
             StickCalibration::with_left_stick_bytes(&spi_flash.factory_l_stick_calibration())
                 .unwrap();
-        let stick_cal = StickState::with_config(super::StickStateConfig {
+        let stick_state = StickState::with_config(super::StickStateConfig {
             calibration: Some(l_cal),
             ..Default::default()
         });
-        println!("{:?}", &stick_cal);
+        println!("{:?}", &stick_state);
     }
 }
