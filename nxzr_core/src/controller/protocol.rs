@@ -448,12 +448,12 @@ impl ControllerProtocol {
                 // NOTE: Subcommand is set from caller
                 match id {
                     InputReportId::NfcIrMcu => {
-                        input_report.set_6axis_data();
+                        input_report.set_6axis_data(state.controller_state.imu_state().to_buf());
                         // INFO: Sets empty data for now.
                         input_report.set_ir_nfc_data(&[0xFF; 313])?;
                     }
                     InputReportId::Imu | InputReportId::Unknown1 | InputReportId::Unknown2 => {
-                        input_report.set_6axis_data();
+                        input_report.set_6axis_data(state.controller_state.imu_state().to_buf());
                     }
                     _ => {}
                 }

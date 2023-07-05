@@ -1,7 +1,6 @@
+use super::StateError;
 use crate::controller::ControllerType;
 use strum::{Display, EnumString};
-
-use super::StateError;
 
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq, Ord, PartialOrd, Hash, EnumString)]
 pub enum ButtonKey {
@@ -142,7 +141,7 @@ impl ButtonKey {
  * 2        Minus 	Plus 	R Stick L Stick Home 	Capture
  * 3        Down 	Up 	    Right 	Left 	SR 	    SL 	    L 	    ZL
  */
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ButtonState {
     // TODO: Refactor ButtonState later on such that no controller type is
     // retained in the state and split into granular ButtonState per controller

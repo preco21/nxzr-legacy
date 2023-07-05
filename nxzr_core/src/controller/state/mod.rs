@@ -1,8 +1,10 @@
 use super::{spi_flash::SpiFlash, ControllerType};
 use button::ButtonState;
+use imu::ImuState;
 use stick::{StickCalibration, StickState, StickStateConfig};
 
 pub mod button;
+pub mod imu;
 pub mod stick;
 
 #[derive(Clone, Debug, thiserror::Error)]
@@ -27,12 +29,13 @@ pub struct ControllerStateConfig {
     pub spi_flash: Option<SpiFlash>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ControllerState {
     controller: ControllerType,
     button_state: ButtonState,
     l_stick_state: StickState,
     r_stick_state: StickState,
+    imu_state: ImuState,
 }
 
 impl ControllerState {
@@ -74,6 +77,7 @@ impl ControllerState {
                     button_state: ButtonState::with_controller(config.controller),
                     l_stick_state,
                     r_stick_state,
+                    imu_state: ImuState::new(),
                 })
             }
             None => Ok(Self {
@@ -81,6 +85,7 @@ impl ControllerState {
                 button_state: ButtonState::with_controller(config.controller),
                 l_stick_state: StickState::new(),
                 r_stick_state: StickState::new(),
+                imu_state: ImuState::new(),
             }),
         }
     }
@@ -111,5 +116,13 @@ impl ControllerState {
 
     pub fn r_stick_state_mut(&mut self) -> &mut StickState {
         &mut self.r_stick_state
+    }
+
+    pub fn imu_state(&self) -> &ImuState {
+        &self.imu_state
+    }
+
+    pub fn imu_state_mut(&mut self) -> &mut ImuState {
+        &mut self.imu_state
     }
 }

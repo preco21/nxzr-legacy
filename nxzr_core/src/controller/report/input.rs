@@ -169,11 +169,8 @@ impl InputReport {
         self.buf[14] = ack;
     }
 
-    pub fn set_6axis_data(&mut self) {
-        // FIXME: revisit -> handle gyro
-        for i in 14..50 {
-            self.buf[i] = 0x00;
-        }
+    pub fn set_6axis_data(&mut self, imu_data: [u8; 36]) {
+        self.buf[14..50].copy_from_slice(&imu_data);
     }
 
     // Returns `true` if the total data length matches 313
