@@ -17,6 +17,7 @@ export function MainContainer(props: MainContainerProps): React.ReactElement {
 }
 
 const Main = styled.main`
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;

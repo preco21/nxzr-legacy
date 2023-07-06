@@ -58,6 +58,12 @@ pub struct AgentManager {
 
 pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all(deserialize = "camelCase"))]
+struct ControlInputPayload {
+    pub button_key: String,
+}
+
 impl AgentManager {
     pub fn new(shutdown: Shutdown) -> Self {
         Self {
@@ -162,6 +168,7 @@ impl AgentManager {
                     tracing::info!("switch connect: {:?}", response);
                 }
                 // FIXME: Handle errors properly
+                // FIXME: Handle disconnects properly.
                 Ok::<_, AgentManagerError>(())
             }
         });
@@ -177,30 +184,40 @@ impl AgentManager {
         unimplemented!()
     }
 
-    pub async fn run_control_stream(&self) -> Result<(), AgentManagerError> {
+    pub async fn run_control_stream(&self, window: tauri::Window) -> Result<(), AgentManagerError> {
         let mut client = self.agent_client().await?;
         tokio::spawn({
             let shutdown = self.shutdown.clone();
             async move {
                 let _shutdown_guard = shutdown.drop_guard();
                 let (tx, rx) = mpsc::unbounded_channel();
+                let (input_tx, mut input_rx) = mpsc::unbounded_channel::<ControlInputPayload>();
+                let event_id = window.listen("control:input", move |event| {
+                    if let Some(str) = event.payload() {
+                        let Ok(input_payload) = serde_json::from_str::<ControlInputPayload>(str) else {
+                            return;
+                        };
+                        let _ = input_tx.send(input_payload);
+                    }
+                });
                 tokio::spawn(async move {
-                    let mut interval = time::interval(Duration::from_secs(1));
-                    loop {
-                        interval.tick().await;
+                    while let Some(input) = input_rx.recv().await {
+                        // take input
                         let _ = tx.send(ControlStreamRequest {
                             request_id: String::new(),
+                            // FIXME: receive buttons in Rust Enum format.
                             buttons: Vec::new(),
                             stick: Some(StickControlReport {
                                 left_position: Some(Position { x: 0.0, y: 0.0 }),
                                 right_position: Some(Position { x: 0.0, y: 0.0 }),
                             }),
                             imu: Some(ImuControlReport {
-                                // FIXME: todo
-                                ..Default::default()
+                                position: Some(Position { x: 0.0, y: 0.0 }),
                             }),
                         });
                     }
+                    println!("unlisten");
+                    window.unlisten(event_id);
                 });
                 let outbound_stream = UnboundedReceiverStream::new(rx);
                 let mut inbound_stream = client

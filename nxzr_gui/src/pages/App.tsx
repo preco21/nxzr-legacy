@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { styled } from 'styled-components';
 import { Button, Tag, TextArea } from '@blueprintjs/core';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
@@ -115,7 +116,7 @@ function AppPage(): React.ReactElement {
     <MainContainer>
       <TitleBar />
       <Header
-        disabled={!setupGuard.isReady}
+        disabled={!setupGuard.isReady || agent.inControlMode}
         adapterInfo={adapterManager.selectedAdapter}
         adapterPending={adapterManager.pending}
         onAdapterDisplayClick={() => setAdapterModalOpen(true)}
@@ -131,7 +132,7 @@ function AppPage(): React.ReactElement {
         />
       )}
       {setupGuard.isReady && (
-        <div>
+        <Body>
           <Tag>Wsl status: {wslStatusText}</Tag>
           <Tag>Agent status: {agentStatusText}</Tag>
           <TextArea
@@ -146,7 +147,8 @@ function AppPage(): React.ReactElement {
           >
             Connect Switch
           </Button>
-        </div>
+          {agent.inControlMode && <InControlModeOverlay />}
+        </Body>
       )}
       <AdapterSelectModal
         isOpen={adapterModalOpen}
@@ -156,5 +158,20 @@ function AppPage(): React.ReactElement {
     </MainContainer>
   );
 }
+
+const Body = styled.section`
+  position: relative;
+`;
+
+const InControlModeOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  cursor: not-allowed;
+`;
 
 export default AppPage;

@@ -318,3 +318,12 @@ pub async fn rpc_connect_switch(
     state.agent_manager.connect_switch(window).await?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn rpc_run_control_stream(
+    window: tauri::Window,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), CommandError> {
+    state.agent_manager.run_control_stream(window).await?;
+    Ok(())
+}

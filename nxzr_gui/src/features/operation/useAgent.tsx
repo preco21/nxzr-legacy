@@ -5,11 +5,22 @@ import {
   launchAgentDaemon,
   rpcConnectSwitch,
   rpcGetDeviceStatus,
+  rpcRunControlStream,
   runAgentCheck,
   terminateAgentDaemon,
 } from '../../common/commands';
 import { WslStatus, useWslStatus } from './useWslStatus';
-import { UnlistenFn, listen } from '@tauri-apps/api/event';
+import { UnlistenFn, emit, listen } from '@tauri-apps/api/event';
+
+
+// @ts-ignore
+window.tauriemit = emit;
+
+export interface UseAgentOptions {
+  onLaunchFailed?: (error: Error) => void;
+  // FIXME:
+  // onCheckFailed?: (error: Error) => void;
+}
 
 export interface UseAgent {
   pending: boolean;
@@ -17,15 +28,10 @@ export interface UseAgent {
   error?: Error;
   deviceStatus?: RpcGetDeviceStatusResponse;
   switchConnected: boolean;
+  inControlMode: boolean;
   launchDaemon: () => Promise<void>;
   terminateDaemon: () => Promise<void>;
   connectSwitch: () => Promise<void>;
-}
-
-export interface UseAgentOptions {
-  onLaunchFailed?: (error: Error) => void;
-  // FIXME:
-  // onCheckFailed?: (error: Error) => void;
 }
 
 export function useAgent(options?: UseAgentOptions): UseAgent {
@@ -37,6 +43,7 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
     setDeviceStatus,
   ] = useState<RpcGetDeviceStatusResponse | undefined>(undefined);
   const [switchConnected, setSwitchConnected] = useState(false);
+  const [inControlMode, setInControlMode] = useState(false);
   const launchDaemon = useCallback(async () => {
     if (pending) {
       return;
@@ -79,6 +86,16 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
       setPending(true);
       await rpcConnectSwitch();
       setSwitchConnected(true);
+      setInControlMode(true);
+
+      // FIXME: move this logic to separate hook.
+      await rpcRunControlStream();
+      emit('control:input', {
+        messageFoo: 123,
+        bar: {
+          f: 123,
+        },
+      });
     } catch (err) {
       setError(err as Error);
     } finally {
@@ -108,6 +125,7 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
     error,
     deviceStatus,
     switchConnected,
+    inControlMode,
     launchDaemon,
     terminateDaemon,
     connectSwitch,

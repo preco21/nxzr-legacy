@@ -116,6 +116,10 @@ export async function rpcConnectSwitch(): Promise<void> {
   await wrapError(invoke('rpc_connect_switch'));
 }
 
+export async function rpcRunControlStream(): Promise<void> {
+  await wrapError(invoke('rpc_run_control_stream'));
+}
+
 // Helpers
 async function wrapError<T>(promise: Promise<T>): Promise<T> {
   try {
