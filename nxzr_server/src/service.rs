@@ -303,7 +303,7 @@ async fn handle_control_report(
 ) -> Result<(), NxzrServiceError> {
     let ret = protocol
         .update_controller_state(|state| {
-            // Handle button states.
+            // Handle buttons state.
             for button in report.buttons {
                 let key = ButtonKey::from_str(button.key_kind.as_str())?;
                 let should_key_down = match KeyAction::from_i32(button.key_action) {
@@ -327,7 +327,13 @@ async fn handle_control_report(
                 }
             }
             // Handle IMU state.
-            // FIXME: todo
+            if let Some(imu) = report.imu {
+                if let Some(position) = imu.position {
+                    let imu = state.imu_state_mut();
+                    imu.set_horizontal(position.x as u16);
+                    imu.set_vertical(position.y as u16);
+                }
+            }
             anyhow::Ok(())
         })
         .await?;
