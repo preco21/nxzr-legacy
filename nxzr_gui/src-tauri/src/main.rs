@@ -1,11 +1,16 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use multiinput::{DeviceType, RawEvent, RawInputManager};
 use nxzr_shared::shutdown::Shutdown;
+use serde_json::json;
 use state::AppState;
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::Duration};
 use tauri::Manager;
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::Instant,
+};
 use tracing_subscriber::prelude::*;
 
 mod commands;
@@ -54,11 +59,13 @@ async fn main() -> anyhow::Result<()> {
         // [WeakSender] from dropping immediately.
         let shutdown_complete_tx = shutdown_complete_tx.clone();
         async move {
-            let tx = sig_shutdown_rx.recv().await.unwrap();
+            let tx = sig_shutdown_rx.recv().await;
             drop(shutdown_rx);
             drop(shutdown_complete_tx);
             let _ = shutdown_complete_rx.recv().await;
-            let _ = tx.send(());
+            if let Some(tx) = tx {
+                let _ = tx.send(());
+            }
         }
     });
     let shutdown = Shutdown::new(shutdown_tx, shutdown_complete_tx);
@@ -100,6 +107,7 @@ async fn main() -> anyhow::Result<()> {
             commands::rpc_get_device_status,
             commands::rpc_connect_switch,
             commands::rpc_run_control_stream,
+            // commands::lock_cursor,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::Destroyed => {
@@ -124,6 +132,38 @@ async fn main() -> anyhow::Result<()> {
                     for window in windows.values() {
                         if window.is_closable().unwrap() {
                             window.close().unwrap();
+                        }
+                    }
+                }
+            });
+            // Setup raw mouse inputs.
+            tokio::task::spawn_blocking({
+                let app = app.app_handle();
+                move || {
+                    let mut manager = RawInputManager::new().unwrap();
+                    manager.register_devices(DeviceType::Mice);
+                    let mut acc_x = 0;
+                    let mut acc_y = 0;
+                    let mut last_emit_time = Instant::now();
+                    loop {
+                        if let Some(event) = manager.get_event() {
+                            match event {
+                                RawEvent::MouseMoveEvent(_, x, y) => {
+                                    acc_x += x;
+                                    acc_y += y;
+                                    let elapsed = last_emit_time.elapsed();
+                                    if elapsed > Duration::from_millis(8) {
+                                        let _ = app.emit_all(
+                                            "raw_input:mousemove",
+                                            json!({ "x": acc_x, "y": acc_y }),
+                                        );
+                                        acc_x = 0;
+                                        acc_y = 0;
+                                        last_emit_time = Instant::now();
+                                    }
+                                }
+                                _ => {}
+                            }
                         }
                     }
                 }

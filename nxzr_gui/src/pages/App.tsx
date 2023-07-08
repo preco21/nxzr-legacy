@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { Button, Tag, TextArea } from '@blueprintjs/core';
+import { preventCursorEscape } from '../utils/control';
 import { MainContainer } from '../components/MainContainer';
 import { TitleBar } from '../components/TitleBar';
 import { Header } from '../components/Header';
@@ -148,6 +149,31 @@ function AppPage(): React.ReactElement {
             Connect Switch
           </Button>
           {agent.inControlMode && <InControlModeOverlay />}
+          <Button onClick={async () => {
+            // invoke('lock_cursor');
+            // document.body.requestPointerLock();
+            // navigator.keyboard.lock(['Escape']);
+            // document.addEventListener('pointerlockchange', (e) => {
+            //   console.log('foobar', document.pointerLockElement);
+            //   if (document.pointerLockElement == null) {
+            //     e.preventDefault();
+            //     setTimeout(() => {
+            //       document.body.requestPointerLock();
+            //     }, 300);
+            //   }
+            // });
+
+            let x = 0;
+            let y = 0;
+            await preventCursorEscape((e) => {
+              x += e.x;
+              y += e.y;
+              console.log(`${x}, ${y}`);
+            });
+          }}
+          >
+            Pointer lock
+          </Button>
         </Body>
       )}
       <AdapterSelectModal
