@@ -4,11 +4,11 @@ use nxzr_core::{
 };
 use nxzr_device::{connection, device, session};
 use nxzr_proto::{
-    button_control_report::KeyAction, connect_switch_response, connection_event, nxzr_server::Nxzr,
-    ConnectSwitchRequest, ConnectSwitchResponse, ConnectionEvent, ConnectionMetadata,
-    ControlStreamRequest, ControlStreamResponse, Error as ProtoError, GetDeviceStatusRequest,
-    GetDeviceStatusResponse, GetProtocolStateRequest, GetProtocolStateResponse, Position,
-    ReconnectSwitchRequest, ReconnectSwitchResponse,
+    connect_switch_response, connection_event, nxzr_server::Nxzr, ConnectSwitchRequest,
+    ConnectSwitchResponse, ConnectionEvent, ConnectionMetadata, ControlStreamRequest,
+    ControlStreamResponse, Error as ProtoError, GetDeviceStatusRequest, GetDeviceStatusResponse,
+    GetProtocolStateRequest, GetProtocolStateResponse, ReconnectSwitchRequest,
+    ReconnectSwitchResponse,
 };
 use nxzr_shared::shutdown::Shutdown;
 use std::{
@@ -299,40 +299,31 @@ impl Nxzr for NxzrService {
 
 async fn handle_control_report(
     protocol: protocol::Protocol,
-    report: ControlStreamRequest,
+    control_req: ControlStreamRequest,
 ) -> Result<(), NxzrServiceError> {
     let ret = protocol
         .update_controller_state(|state| {
-            // Handle buttons state.
-            for button in report.buttons {
-                let key = ButtonKey::from_str(button.key_kind.as_str())?;
-                let should_key_down = match KeyAction::from_i32(button.key_action) {
-                    Some(KeyAction::Down) => true,
-                    Some(KeyAction::Up) => false,
-                    _ => false,
-                };
-                state.button_state_mut().set_button(key, should_key_down)?;
+            // Handle button mapping state.
+            for (key_kind, pressed) in control_req.button_map {
+                let key = ButtonKey::from_str(key_kind.as_str())?;
+                state.button_state_mut().set_button(key, pressed)?;
             }
             // Handle stick state.
-            if let Some(stick) = report.stick {
-                if let Some(left_position) = stick.left_position {
-                    let l_stick = state.l_stick_state_mut();
-                    l_stick.set_horizontal_scale(left_position.x)?;
-                    l_stick.set_vertical_scale(left_position.y)?;
-                }
-                if let Some(right_position) = stick.right_position {
-                    let r_stick = state.r_stick_state_mut();
-                    r_stick.set_horizontal_scale(right_position.x)?;
-                    r_stick.set_vertical_scale(right_position.y)?;
-                }
+            if let Some(left_stick_pos) = control_req.left_stick_pos {
+                let l_stick = state.l_stick_state_mut();
+                l_stick.set_horizontal_scale(left_stick_pos.x)?;
+                l_stick.set_vertical_scale(left_stick_pos.y)?;
+            }
+            if let Some(right_stick_pos) = control_req.right_stick_pos {
+                let r_stick = state.r_stick_state_mut();
+                r_stick.set_horizontal_scale(right_stick_pos.x)?;
+                r_stick.set_vertical_scale(right_stick_pos.y)?;
             }
             // Handle IMU state.
-            if let Some(imu) = report.imu {
-                if let Some(position) = imu.position {
-                    let imu = state.imu_state_mut();
-                    imu.set_horizontal(position.x as u16);
-                    imu.set_vertical(position.y as u16);
-                }
+            if let Some(imu_pos) = control_req.imu_pos {
+                let imu = state.imu_state_mut();
+                imu.set_horizontal(imu_pos.x as u16);
+                imu.set_vertical(imu_pos.y as u16);
             }
             anyhow::Ok(())
         })
