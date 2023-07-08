@@ -60,7 +60,7 @@ pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
-struct ControlInputPayload {
+struct ControllerInputPayload {
     pub button_key: String,
 }
 
@@ -191,10 +191,10 @@ impl AgentManager {
             async move {
                 let _shutdown_guard = shutdown.drop_guard();
                 let (tx, rx) = mpsc::unbounded_channel();
-                let (input_tx, mut input_rx) = mpsc::unbounded_channel::<ControlInputPayload>();
+                let (input_tx, mut input_rx) = mpsc::unbounded_channel::<ControllerInputPayload>();
                 let event_id = window.listen("control:input", move |event| {
                     if let Some(str) = event.payload() {
-                        let Ok(input_payload) = serde_json::from_str::<ControlInputPayload>(str) else {
+                        let Ok(input_payload) = serde_json::from_str::<ControllerInputPayload>(str) else {
                             return;
                         };
                         let _ = input_tx.send(input_payload);
