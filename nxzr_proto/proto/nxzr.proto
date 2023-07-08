@@ -77,34 +77,15 @@ message GetProtocolStateResponse {
 
 message ControlStreamRequest {
   string request_id = 1;
-  repeated ButtonControlReport buttons = 2;
-  optional StickControlReport stick = 3;
-  optional ImuControlReport imu = 4;
+  map<string, bool> button_map = 2;
+  optional Position left_stick_pos = 3;
+  optional Position right_stick_pos = 4;
+  optional Position imu_pos = 5;
 }
 
 message ControlStreamResponse {
   string request_id = 1;
   bool success = 2;
-}
-
-message ButtonControlReport {
-  enum KeyAction {
-    UNSPECIFIED = 0;
-    DOWN = 1;
-    UP = 2;
-    PRESS = 3;
-  }
-  KeyAction key_action = 1;
-  string key_kind = 2;
-}
-
-message StickControlReport {
-  Position left_position = 1;
-  Position right_position = 2;
-}
-
-message ImuControlReport {
-  Position position = 1;
 }
 
 message Position {
