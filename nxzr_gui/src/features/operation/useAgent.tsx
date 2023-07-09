@@ -193,11 +193,13 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
       setPending(false);
     }
   }, []);
-  const enterControlMode = useCallback(async () => {
+  // FIXME: to remove
+  const enterControlMode = useCallback(async (onUpdate: (data: any) => void) => {
     setInControlMode(true);
     await rpcRunControlStream();
     const controllerManager = new ControllerEventManager(CTRL_CONFIG);
     controllerManager.onUpdate((update) => {
+      onUpdate(update);
       emit('control:input', update);
     });
     await controllerManager.init();

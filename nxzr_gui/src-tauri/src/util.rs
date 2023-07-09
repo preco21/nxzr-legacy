@@ -361,22 +361,22 @@ pub fn register_mouse_event_emitter(app: tauri::AppHandle) {
     let mut now = Instant::now();
     tokio::task::spawn_blocking(move || loop {
         let elapsed = now.elapsed();
-        if let Some(event) = manager.get_event() {
-            match event {
-                RawEvent::MouseMoveEvent(_, x, y) => {
-                    acc_x += x;
-                    acc_y += y;
-                    if elapsed > Duration::from_millis(1) {
-                        let _ =
-                            app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
-                        acc_x = 0;
-                        acc_y = 0;
-                        now = Instant::now();
-                    }
-                }
-                _ => {}
-            }
-        }
+        // if let Some(event) = manager.get_event() {
+        //     match event {
+        //         RawEvent::MouseMoveEvent(_, x, y) => {
+        //             acc_x += x;
+        //             acc_y += y;
+        //             if elapsed > Duration::from_millis(1) {
+        //                 let _ =
+        //                     app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
+        //                 acc_x = 0;
+        //                 acc_y = 0;
+        //                 now = Instant::now();
+        //             }
+        //         }
+        //         _ => {}
+        //     }
+        // }
         if elapsed >= Duration::from_millis(1) {
             let _ = app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
             acc_x = 0;
