@@ -90,11 +90,11 @@ pub enum SystemCommandError {
 pub async fn run_system_command(mut command: Command) -> Result<String, SystemCommandError> {
     let output = command.kill_on_drop(true).output().await?;
     if !output.status.success() {
-        return Err(SystemCommandError::CommandFailed(
-            std::str::from_utf8(&output.stderr)?.to_owned(),
-        ));
+        let err_str = std::str::from_utf8(&output.stderr).unwrap_or("N/A");
+        return Err(SystemCommandError::CommandFailed(err_str.to_owned()));
     }
-    Ok(std::str::from_utf8(&output.stdout)?.to_owned())
+    let out_str = std::str::from_utf8(&output.stdout).unwrap_or("N/A");
+    Ok(out_str.to_owned())
 }
 
 pub async fn spawn_system_command(
