@@ -354,41 +354,34 @@ impl<'a, T: From<String> + Clone> MakeWriter<'a> for TracingChannelWriter<T> {
 }
 
 pub fn register_mouse_event_emitter(app: tauri::AppHandle) {
-    tokio::task::spawn_blocking({
-        move || {
-            let mut manager = RawInputManager::new().unwrap();
-            manager.register_devices(DeviceType::Mice);
-            let mut acc_x = 0;
-            let mut acc_y = 0;
-            let mut now = Instant::now();
-            loop {
-                if let Some(event) = manager.get_event() {
-                    match event {
-                        RawEvent::MouseMoveEvent(_, x, y) => {
-                            acc_x += x;
-                            acc_y += y;
-                            let elapsed = now.elapsed();
-                            if elapsed > Duration::from_millis(1) {
-                                let _ = app.emit_all(
-                                    "raw_input:mousemove",
-                                    json!({ "x": acc_x, "y": acc_y }),
-                                );
-                                acc_x = 0;
-                                acc_y = 0;
-                                now = Instant::now();
-                            }
-                        }
-                        _ => {}
+    let mut manager = RawInputManager::new().unwrap();
+    manager.register_devices(DeviceType::Mice);
+    let mut acc_x = 0;
+    let mut acc_y = 0;
+    let mut now = Instant::now();
+    tokio::task::spawn_blocking(move || loop {
+        let elapsed = now.elapsed();
+        if let Some(event) = manager.get_event() {
+            match event {
+                RawEvent::MouseMoveEvent(_, x, y) => {
+                    acc_x += x;
+                    acc_y += y;
+                    if elapsed > Duration::from_millis(1) {
+                        let _ =
+                            app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
+                        acc_x = 0;
+                        acc_y = 0;
+                        now = Instant::now();
                     }
                 }
-                let elapsed = now.elapsed();
-                if elapsed >= Duration::from_millis(1) {
-                    let _ = app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
-                    acc_x = 0;
-                    acc_y = 0;
-                    now = Instant::now();
-                }
+                _ => {}
             }
+        }
+        if elapsed >= Duration::from_millis(1) {
+            let _ = app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
+            acc_x = 0;
+            acc_y = 0;
+            now = Instant::now();
         }
     });
 }
