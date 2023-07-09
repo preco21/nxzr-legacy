@@ -77,7 +77,7 @@ impl StickState {
         let Some(ref stick_cal) = self.stick_cal else {
             return Err(StateError::NoCalibrationDataAvailable);
         };
-        if scale.is_nan() || scale.abs() < 1.0 {
+        if scale.is_nan() || scale.abs() > 1.0 {
             return Err(StateError::InvalidScale);
         }
         self.h_stick = if scale.is_sign_positive() {
@@ -104,7 +104,7 @@ impl StickState {
         let Some(ref stick_cal) = self.stick_cal else {
             return Err(StateError::NoCalibrationDataAvailable);
         };
-        if scale.is_nan() || scale.abs() < 1.0 {
+        if scale.is_nan() || scale.abs() > 1.0 {
             return Err(StateError::InvalidScale);
         }
         self.v_stick = if scale.is_sign_positive() {
