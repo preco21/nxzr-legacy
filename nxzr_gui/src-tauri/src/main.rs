@@ -1,16 +1,11 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use multiinput::{DeviceType, RawEvent, RawInputManager};
 use nxzr_shared::shutdown::Shutdown;
-use serde_json::json;
 use state::AppState;
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc};
 use tauri::Manager;
-use tokio::{
-    sync::{mpsc, oneshot},
-    time::Instant,
-};
+use tokio::sync::{mpsc, oneshot};
 use tracing_subscriber::prelude::*;
 
 mod commands;
@@ -136,38 +131,8 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             });
-            // Setup raw mouse inputs.
-            tokio::task::spawn_blocking({
-                let app = app.app_handle();
-                move || {
-                    let mut manager = RawInputManager::new().unwrap();
-                    manager.register_devices(DeviceType::Mice);
-                    let mut acc_x = 0;
-                    let mut acc_y = 0;
-                    let mut last_emit_time = Instant::now();
-                    loop {
-                        if let Some(event) = manager.get_event() {
-                            match event {
-                                RawEvent::MouseMoveEvent(_, x, y) => {
-                                    acc_x += x;
-                                    acc_y += y;
-                                    let elapsed = last_emit_time.elapsed();
-                                    if elapsed > Duration::from_millis(8) {
-                                        let _ = app.emit_all(
-                                            "raw_input:mousemove",
-                                            json!({ "x": acc_x, "y": acc_y }),
-                                        );
-                                        acc_x = 0;
-                                        acc_y = 0;
-                                        last_emit_time = Instant::now();
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-            });
+            // Setup raw mouse event emitter.
+            util::register_mouse_event_emitter(app.app_handle());
             // Enable devtools.
             #[cfg(debug_assertions)]
             {

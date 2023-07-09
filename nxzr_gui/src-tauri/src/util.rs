@@ -1,11 +1,14 @@
 use crate::config;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
+use multiinput::{DeviceType, RawEvent, RawInputManager};
+use serde_json::json;
 use std::{
     io::{self, SeekFrom},
     path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
 };
+use tauri::Manager;
 use tempfile::TempDir;
 use tokio::{
     fs::{self, File},
@@ -13,7 +16,7 @@ use tokio::{
     process::{ChildStderr, ChildStdout, Command},
     sync::mpsc,
     task::JoinError,
-    time::{self, Duration},
+    time::{self, Duration, Instant},
 };
 use tracing_subscriber::fmt::MakeWriter;
 
@@ -348,4 +351,44 @@ impl<'a, T: From<String> + Clone> MakeWriter<'a> for TracingChannelWriter<T> {
     fn make_writer(&'a self) -> Self::Writer {
         self.clone()
     }
+}
+
+pub fn register_mouse_event_emitter(app: tauri::AppHandle) {
+    tokio::task::spawn_blocking({
+        move || {
+            let mut manager = RawInputManager::new().unwrap();
+            manager.register_devices(DeviceType::Mice);
+            let mut acc_x = 0;
+            let mut acc_y = 0;
+            let mut now = Instant::now();
+            loop {
+                if let Some(event) = manager.get_event() {
+                    match event {
+                        RawEvent::MouseMoveEvent(_, x, y) => {
+                            acc_x += x;
+                            acc_y += y;
+                            let elapsed = now.elapsed();
+                            if elapsed > Duration::from_millis(1) {
+                                let _ = app.emit_all(
+                                    "raw_input:mousemove",
+                                    json!({ "x": acc_x, "y": acc_y }),
+                                );
+                                acc_x = 0;
+                                acc_y = 0;
+                                now = Instant::now();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                let elapsed = now.elapsed();
+                if elapsed >= Duration::from_millis(1) {
+                    let _ = app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
+                    acc_x = 0;
+                    acc_y = 0;
+                    now = Instant::now();
+                }
+            }
+        }
+    });
 }
