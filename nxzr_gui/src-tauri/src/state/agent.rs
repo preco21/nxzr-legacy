@@ -57,37 +57,37 @@ pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
-struct ControllerInputPayload {
+struct InputUpdatePayload {
     pub button_map: HashMap<String, bool>,
-    pub left_stick_pos: ControllerInputPayloadPosition,
-    pub right_stick_pos: ControllerInputPayloadPosition,
-    pub imu_pos: ControllerInputPayloadPosition,
+    pub left_stick_position: InputUpdatePayloadPosition,
+    pub right_stick_position: InputUpdatePayloadPosition,
+    pub imu_position: InputUpdatePayloadPosition,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
-struct ControllerInputPayloadPosition {
+struct InputUpdatePayloadPosition {
     pub x: f32,
     pub y: f32,
 }
 
-impl From<ControllerInputPayload> for ControlStreamRequest {
-    fn from(payload: ControllerInputPayload) -> Self {
+impl From<InputUpdatePayload> for ControlStreamRequest {
+    fn from(payload: InputUpdatePayload) -> Self {
         ControlStreamRequest {
             // FIXME: to use actual id
             request_id: String::new(),
             button_map: payload.button_map,
             left_stick_pos: Some(Position {
-                x: payload.left_stick_pos.x,
-                y: payload.left_stick_pos.y,
+                x: payload.left_stick_position.x,
+                y: payload.left_stick_position.y,
             }),
             right_stick_pos: Some(Position {
-                x: payload.right_stick_pos.x,
-                y: payload.right_stick_pos.y,
+                x: payload.right_stick_position.x,
+                y: payload.right_stick_position.y,
             }),
             imu_pos: Some(Position {
-                x: payload.imu_pos.x,
-                y: payload.imu_pos.y,
+                x: payload.imu_position.x,
+                y: payload.imu_position.y,
             }),
         }
     }
@@ -220,12 +220,10 @@ impl AgentManager {
             async move {
                 let _shutdown_guard = shutdown.drop_guard();
                 let (tx, rx) = mpsc::unbounded_channel();
-                let (input_tx, mut input_rx) = mpsc::unbounded_channel::<ControllerInputPayload>();
+                let (input_tx, mut input_rx) = mpsc::unbounded_channel::<InputUpdatePayload>();
                 let event_id = window.listen("control:input", move |event| {
                     if let Some(str) = event.payload() {
-                        if let Ok(input_payload) =
-                            serde_json::from_str::<ControllerInputPayload>(str)
-                        {
+                        if let Ok(input_payload) = serde_json::from_str::<InputUpdatePayload>(str) {
                             let _ = input_tx.send(input_payload);
                         }
                     }
@@ -245,7 +243,7 @@ impl AgentManager {
                 Ok::<_, AgentManagerError>(())
             }
         });
-        unimplemented!()
+        Ok(())
     }
 
     async fn agent_client(&self) -> Result<NxzrClient<Channel>, AgentManagerError> {
