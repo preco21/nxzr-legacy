@@ -117,8 +117,8 @@ export class ControllerEventManager {
   public async init(): Promise<void> {
     await preventCursorEscape();
     await listenRawMouseMove((pos) => {
-      this.imuState.x = convertNumberToU16(pos.x);
-      this.imuState.y = convertNumberToU16(pos.y);
+      this.imuState.x += pos.x;
+      this.imuState.y += pos.y;
     });
     const dispatchChanges = (): void => {
       // FIXME:
@@ -129,7 +129,10 @@ export class ControllerEventManager {
         buttonMap: this.buttonState,
         leftStickPosition,
         rightStickPosition,
-        imuPosition: this.imuState,
+        imuPosition: {
+          x: convertNumberToU16(this.imuState.x),
+          y: convertNumberToU16(this.imuState.y),
+        },
       });
     };
     // FIXME: hard-coded state, move this into dynamic config.
