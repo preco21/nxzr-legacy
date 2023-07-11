@@ -115,11 +115,12 @@ export class ControllerEventManager {
   }
 
   public async init(): Promise<void> {
-    await preventCursorEscape();
-    await listenRawMouseMove((pos) => {
-      this.imuState.x += pos.x;
-      this.imuState.y += pos.y;
-    });
+    // FIXME:
+    // await preventCursorEscape();
+    // await listenRawMouseMove((pos) => {
+    //   this.imuState.x += pos.x;
+    //   this.imuState.y += pos.y;
+    // });
     const dispatchChanges = (): void => {
       // FIXME:
       // States can overlap each other; this means, the last element in the state will win.
@@ -135,15 +136,23 @@ export class ControllerEventManager {
         },
       });
     };
+    window.addEventListener('mousemove', (e) => {
+      this.imuState.x += e.movementX * 10;
+      this.imuState.y += e.movementY * 10;
+      // FIXME: It's slow maybe because of the mutex.
+      // dispatchChanges();
+    });
     // FIXME: hard-coded state, move this into dynamic config.
     window.addEventListener('mousedown', (e) => {
       switch (e.button) {
         case 0: {
           this.buttonState['Zr'] = true;
+          dispatchChanges();
           break;
         }
         case 1: {
           this.buttonState['R'] = true;
+          dispatchChanges();
           break;
         }
         default: {
@@ -155,10 +164,12 @@ export class ControllerEventManager {
       switch (e.button) {
         case 0: {
           this.buttonState['Zr'] = false;
+          dispatchChanges();
           break;
         }
         case 1: {
           this.buttonState['R'] = false;
+          dispatchChanges();
           break;
         }
         default: {

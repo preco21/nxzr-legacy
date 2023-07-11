@@ -35,10 +35,11 @@ async fn main() -> anyhow::Result<()> {
                 .event_format(tracing_subscriber::fmt::format().json())
                 .with_writer(log_chan_writer),
         )
-        .with(
-            tracing_subscriber::fmt::Layer::default()
-                .event_format(tracing_subscriber::fmt::format().compact()),
-        )
+        // FIXME
+        // .with(
+        //     tracing_subscriber::fmt::Layer::default()
+        //         .event_format(tracing_subscriber::fmt::format().compact()),
+        // )
         .with(
             tracing_subscriber::fmt::Layer::default()
                 .event_format(tracing_subscriber::fmt::format().compact().with_ansi(false))
@@ -131,8 +132,9 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             });
+            // FIXME
             // Setup raw mouse event emitter.
-            util::register_mouse_event_emitter(app.app_handle());
+            // util::register_mouse_event_emitter(app.app_handle());
             // Enable devtools.
             #[cfg(debug_assertions)]
             {
