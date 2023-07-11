@@ -17,3 +17,4 @@ nxzr_shared = { version = "0.1.0", path = "../nxzr_shared" }
 strum = { version = "0.24.1", features = ["derive"] }
 thiserror = "1.0.40"
 tokio = { version = "1.28.2", features = ["rt", "sync", "time", "macros"] }
+tracing = "0.1.37"

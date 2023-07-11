@@ -80,6 +80,16 @@ impl ImuState {
         // Gyro 3 / round 3
         buf[34] = (gyro_z & 0xFF) as u8;
         buf[35] = ((gyro_z >> 8) & 0xFF) as u8;
+        // FIXME: to remove debug code (tracing crate also)
+        tracing::info!(
+            "@@@ imu state: x: {:?} y: {:?} gyro(x,y,z): {},{},{}, buf: {:?}",
+            self.x,
+            self.y,
+            gyro_x,
+            gyro_y,
+            gyro_z,
+            &buf
+        );
         buf
     }
 }
