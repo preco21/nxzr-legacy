@@ -77,13 +77,14 @@ impl StickState {
         let Some(ref stick_cal) = self.stick_cal else {
             return Err(StateError::NoCalibrationDataAvailable);
         };
-        if scale.is_nan() || scale.abs() <= 1.0 {
+        let abs_scale = scale.abs();
+        if scale.is_nan() || abs_scale > 1.0 {
             return Err(StateError::InvalidScale);
         }
         self.h_stick = if scale.is_sign_positive() {
-            stick_cal.h_center + (stick_cal.h_max_above_center as f32 * scale).round() as u16
+            stick_cal.h_center + (stick_cal.h_max_above_center as f32 * abs_scale).round() as u16
         } else {
-            stick_cal.h_center - (stick_cal.h_max_below_center as f32 * scale).round() as u16
+            stick_cal.h_center - (stick_cal.h_max_below_center as f32 * abs_scale).round() as u16
         };
         Ok(())
     }
@@ -104,13 +105,14 @@ impl StickState {
         let Some(ref stick_cal) = self.stick_cal else {
             return Err(StateError::NoCalibrationDataAvailable);
         };
-        if scale.is_nan() || scale.abs() <= 1.0 {
+        let abs_scale = scale.abs();
+        if scale.is_nan() || abs_scale > 1.0 {
             return Err(StateError::InvalidScale);
         }
         self.v_stick = if scale.is_sign_positive() {
-            stick_cal.v_center + (stick_cal.v_max_above_center as f32 * scale).round() as u16
+            stick_cal.v_center + (stick_cal.v_max_above_center as f32 * abs_scale).round() as u16
         } else {
-            stick_cal.v_center - (stick_cal.v_max_below_center as f32 * scale).round() as u16
+            stick_cal.v_center - (stick_cal.v_max_below_center as f32 * abs_scale).round() as u16
         };
         Ok(())
     }

@@ -24,9 +24,11 @@
   "bugs": "https://github.com/preco21/nxzr/issues",
   "dependencies": {
     "@blueprintjs/core": "^5.0.0",
+    "@code-editor/console-feed": "^3.3.1",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
     "@tauri-apps/api": "^1.4.0",
     "classnames": "^2.3.2",
-    "console-feed": "^3.5.0",
     "immer": "^10.0.2",
     "modern-normalize": "^2.0.0",
     "react": "^18.2.0",
@@ -80,6 +82,7 @@
           }
         },
         "rules": {
+          "@typescript-eslint/lines-between-class-members": "off",
           "react/react-in-jsx-scope": "off",
           "react/no-array-index-key": "off",
           "react/jsx-pascal-case": "off",

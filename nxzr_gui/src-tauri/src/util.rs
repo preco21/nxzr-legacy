@@ -1,11 +1,14 @@
 use crate::config;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
+use multiinput::{DeviceType, RawEvent, RawInputManager};
+use serde_json::json;
 use std::{
     io::{self, SeekFrom},
     path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
 };
+use tauri::Manager;
 use tempfile::TempDir;
 use tokio::{
     fs::{self, File},
@@ -13,7 +16,7 @@ use tokio::{
     process::{ChildStderr, ChildStdout, Command},
     sync::mpsc,
     task::JoinError,
-    time::{self, Duration},
+    time::{self, Duration, Instant},
 };
 use tracing_subscriber::fmt::MakeWriter;
 
@@ -87,11 +90,11 @@ pub enum SystemCommandError {
 pub async fn run_system_command(mut command: Command) -> Result<String, SystemCommandError> {
     let output = command.kill_on_drop(true).output().await?;
     if !output.status.success() {
-        return Err(SystemCommandError::CommandFailed(
-            std::str::from_utf8(&output.stderr)?.to_owned(),
-        ));
+        let err_str = std::str::from_utf8(&output.stderr).unwrap_or("N/A");
+        return Err(SystemCommandError::CommandFailed(err_str.to_owned()));
     }
-    Ok(std::str::from_utf8(&output.stdout)?.to_owned())
+    let out_str = std::str::from_utf8(&output.stdout).unwrap_or("N/A");
+    Ok(out_str.to_owned())
 }
 
 pub async fn spawn_system_command(
@@ -348,4 +351,40 @@ impl<'a, T: From<String> + Clone> MakeWriter<'a> for TracingChannelWriter<T> {
     fn make_writer(&'a self) -> Self::Writer {
         self.clone()
     }
+}
+
+pub fn register_mouse_event_emitter(app: tauri::AppHandle) {
+    tokio::task::spawn_blocking(move || {
+        let mut manager = RawInputManager::new().unwrap();
+        manager.register_devices(DeviceType::Mice);
+        let mut acc_x = 0;
+        let mut acc_y = 0;
+        let mut now = Instant::now();
+        loop {
+            let window_elapsed = now.elapsed() >= Duration::from_millis(100);
+            for event in manager.get_events() {
+                match event {
+                    RawEvent::MouseMoveEvent(_, x, y) => {
+                        acc_x += x;
+                        acc_y += y;
+                        if (acc_x != 0 || acc_y != 0) && window_elapsed {
+                            let _ = app
+                                .emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
+                            acc_x = 0;
+                            acc_y = 0;
+                            now = Instant::now();
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if (acc_x != 0 || acc_y != 0) && window_elapsed {
+                let _ = app.emit_all("raw_input:mousemove", json!({ "x": acc_x, "y": acc_y }));
+                acc_x = 0;
+                acc_y = 0;
+                now = Instant::now();
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    });
 }

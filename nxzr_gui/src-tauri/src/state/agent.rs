@@ -2,15 +2,12 @@ use crate::support::agent;
 use command_group::AsyncGroupChild;
 use nxzr_proto::{
     nxzr_client::NxzrClient, ConnectSwitchRequest, ControlStreamRequest, GetDeviceStatusRequest,
-    GetDeviceStatusResponse, ImuControlReport, Position, StickControlReport,
+    GetDeviceStatusResponse, Position,
 };
 use nxzr_shared::shutdown::Shutdown;
-use std::{future::Future, path::Path, sync::Arc};
+use std::{collections::HashMap, future::Future, path::Path, sync::Arc};
 use tokio::{
-    sync::{
-        mpsc::{self, UnboundedReceiver},
-        oneshot, Mutex,
-    },
+    sync::{mpsc, oneshot, Mutex},
     time::{self, Duration},
 };
 use tokio_retry::{strategy::FixedInterval, Retry};
@@ -60,8 +57,41 @@ pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
-struct ControllerInputPayload {
-    pub button_key: String,
+struct InputUpdatePayload {
+    // FIXME: wrap each state with Option<T> to make it optional
+    pub button_map: HashMap<String, bool>,
+    pub left_stick_position: InputUpdatePayloadPosition,
+    pub right_stick_position: InputUpdatePayloadPosition,
+    pub imu_position: InputUpdatePayloadPosition,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all(deserialize = "camelCase"))]
+struct InputUpdatePayloadPosition {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl From<InputUpdatePayload> for ControlStreamRequest {
+    fn from(payload: InputUpdatePayload) -> Self {
+        ControlStreamRequest {
+            // FIXME: to use actual id
+            request_id: String::new(),
+            button_map: payload.button_map,
+            left_stick_pos: Some(Position {
+                x: payload.left_stick_position.x,
+                y: payload.left_stick_position.y,
+            }),
+            right_stick_pos: Some(Position {
+                x: payload.right_stick_position.x,
+                y: payload.right_stick_position.y,
+            }),
+            imu_pos: Some(Position {
+                x: payload.imu_position.x,
+                y: payload.imu_position.y,
+            }),
+        }
+    }
 }
 
 impl AgentManager {
@@ -191,32 +221,18 @@ impl AgentManager {
             async move {
                 let _shutdown_guard = shutdown.drop_guard();
                 let (tx, rx) = mpsc::unbounded_channel();
-                let (input_tx, mut input_rx) = mpsc::unbounded_channel::<ControllerInputPayload>();
+                let (input_tx, mut input_rx) = mpsc::unbounded_channel::<InputUpdatePayload>();
                 let event_id = window.listen("control:input", move |event| {
                     if let Some(str) = event.payload() {
-                        let Ok(input_payload) = serde_json::from_str::<ControllerInputPayload>(str) else {
-                            return;
-                        };
-                        let _ = input_tx.send(input_payload);
+                        if let Ok(input_payload) = serde_json::from_str::<InputUpdatePayload>(str) {
+                            let _ = input_tx.send(input_payload);
+                        }
                     }
                 });
                 tokio::spawn(async move {
                     while let Some(input) = input_rx.recv().await {
-                        // take input
-                        let _ = tx.send(ControlStreamRequest {
-                            request_id: String::new(),
-                            // FIXME: receive buttons in Rust Enum format.
-                            buttons: Vec::new(),
-                            stick: Some(StickControlReport {
-                                left_position: Some(Position { x: 0.0, y: 0.0 }),
-                                right_position: Some(Position { x: 0.0, y: 0.0 }),
-                            }),
-                            imu: Some(ImuControlReport {
-                                position: Some(Position { x: 0.0, y: 0.0 }),
-                            }),
-                        });
+                        let _ = tx.send(input.into());
                     }
-                    println!("unlisten");
                     window.unlisten(event_id);
                 });
                 let outbound_stream = UnboundedReceiverStream::new(rx);
@@ -228,7 +244,7 @@ impl AgentManager {
                 Ok::<_, AgentManagerError>(())
             }
         });
-        unimplemented!()
+        Ok(())
     }
 
     async fn agent_client(&self) -> Result<NxzrClient<Channel>, AgentManagerError> {

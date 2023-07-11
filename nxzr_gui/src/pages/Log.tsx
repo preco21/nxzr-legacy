@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Checkbox, Colors, ControlGroup, HTMLSelect, InputGroup } from '@blueprintjs/core';
-import { Console } from 'console-feed';
+import { Console } from '@code-editor/console-feed';
 import { revealLogFolder } from '../common/commands';
 import * as logger from '../utils/logger';
 import { MainContainer } from '../components/MainContainer';

@@ -327,3 +327,23 @@ pub async fn rpc_run_control_stream(
     state.agent_manager.run_control_stream(window).await?;
     Ok(())
 }
+
+// FIXME: unused
+// #[tauri::command]
+// pub async fn lock_cursor(window: tauri::Window) -> Result<(), CommandError> {
+//     window.listen("tauri://blur", {
+//         let window = window.clone();
+//         move |_event| {
+//             window.set_focus().unwrap();
+//         }
+//     });
+//     window.set_resizable(false).unwrap();
+//     window.set_cursor_grab(true).unwrap();
+//     task::spawn_blocking(move || loop {
+//         let size = window.inner_size().unwrap();
+//         window
+//             .set_cursor_position(LogicalPosition::new(size.width / 2, size.height / 2))
+//             .unwrap();
+//     });
+//     Ok(())
+// }

@@ -1,3 +1,4 @@
+import { UnlistenFn, emit, listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useState } from 'react';
 import {
   RpcGetDeviceStatusResponse,
@@ -10,11 +11,110 @@ import {
   terminateAgentDaemon,
 } from '../../common/commands';
 import { WslStatus, useWslStatus } from './useWslStatus';
-import { UnlistenFn, emit, listen } from '@tauri-apps/api/event';
+import { ControllerConfig, ControllerEventManager } from '../control/controller';
 
-
-// @ts-ignore
-window.tauriemit = emit;
+const CTRL_CONFIG = {
+  button: [
+    {
+      keyboardKey: '1',
+      button: 'Left',
+    },
+    {
+      keyboardKey: '2',
+      button: 'Up',
+    },
+    {
+      keyboardKey: '3',
+      button: 'Down',
+    },
+    {
+      keyboardKey: '4',
+      button: 'Right',
+    },
+    {
+      keyboardKey: 'Tab',
+      button: 'X',
+    },
+    {
+      keyboardKey: 'q',
+      button: 'RStick',
+    },
+    {
+      keyboardKey: 'e',
+      button: 'Minus',
+    },
+    {
+      keyboardKey: 'r',
+      button: 'Plus',
+    },
+    {
+      keyboardKey: 'f',
+      button: 'Y',
+    },
+    {
+      keyboardKey: 'Control',
+      button: 'Zl',
+    },
+    {
+      keyboardKey: 'Alt',
+      button: 'A',
+    },
+    {
+      keyboardKey: ' ',
+      button: 'B',
+    },
+    {
+      keyboardKey: '.',
+      button: 'LStick',
+    },
+    {
+      keyboardKey: 'p',
+      button: 'Capture',
+    },
+  ],
+  stick: [
+    {
+      keyboardKey: 'w',
+      stick: 'left',
+      direction: 'up',
+    },
+    {
+      keyboardKey: 'a',
+      stick: 'left',
+      direction: 'left',
+    },
+    {
+      keyboardKey: 's',
+      stick: 'left',
+      direction: 'down',
+    },
+    {
+      keyboardKey: 'd',
+      stick: 'left',
+      direction: 'right',
+    },
+    {
+      keyboardKey: 'ArrowUp',
+      stick: 'right',
+      direction: 'up',
+    },
+    {
+      keyboardKey: 'ArrowLeft',
+      stick: 'right',
+      direction: 'left',
+    },
+    {
+      keyboardKey: 'ArrowDown',
+      stick: 'right',
+      direction: 'down',
+    },
+    {
+      keyboardKey: 'ArrowRight',
+      stick: 'right',
+      direction: 'right',
+    },
+  ],
+} satisfies ControllerConfig;
 
 export interface UseAgentOptions {
   onLaunchFailed?: (error: Error) => void;
@@ -32,6 +132,7 @@ export interface UseAgent {
   launchDaemon: () => Promise<void>;
   terminateDaemon: () => Promise<void>;
   connectSwitch: () => Promise<void>;
+  enterControlMode: () => Promise<void>;
 }
 
 export function useAgent(options?: UseAgentOptions): UseAgent {
@@ -86,21 +187,22 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
       setPending(true);
       await rpcConnectSwitch();
       setSwitchConnected(true);
-      setInControlMode(true);
-
-      // FIXME: move this logic to separate hook.
-      await rpcRunControlStream();
-      emit('control:input', {
-        messageFoo: 123,
-        bar: {
-          f: 123,
-        },
-      });
     } catch (err) {
       setError(err as Error);
     } finally {
       setPending(false);
     }
+  }, []);
+  // FIXME: to remove
+  const enterControlMode = useCallback(async (onUpdate: (data: any) => void) => {
+    setInControlMode(true);
+    await rpcRunControlStream();
+    const controllerManager = new ControllerEventManager(CTRL_CONFIG);
+    controllerManager.onUpdate((update) => {
+      onUpdate(update);
+      emit('control:input', update);
+    });
+    await controllerManager.init();
   }, []);
   useWslStatus({
     onUpdate: useCallback((status: WslStatus) => {
@@ -129,5 +231,6 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
     launchDaemon,
     terminateDaemon,
     connectSwitch,
+    enterControlMode,
   };
 }

@@ -18,7 +18,11 @@
         "minimize": true,
         "maximize": true,
         "unmaximize": true,
-        "startDragging": true
+        "startDragging": true,
+        "setCursorGrab": true,
+        "setCursorPosition": true,
+        "setResizable": true,
+        "setFocus": true
       }
     },
     "bundle": {

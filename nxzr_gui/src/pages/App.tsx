@@ -112,6 +112,8 @@ function AppPage(): React.ReactElement {
     return 'Ready';
   })();
 
+  const [updateData, setUpdateData] = useState({});
+
   return (
     <MainContainer>
       <TitleBar />
@@ -140,6 +142,11 @@ function AppPage(): React.ReactElement {
             fill
             readOnly
           />
+          <TextArea
+            value={JSON.stringify(updateData)}
+            fill
+            readOnly
+          />
           <Button
             disabled={!agent.isReady || agent.switchConnected}
             loading={agent.pending}
@@ -147,7 +154,15 @@ function AppPage(): React.ReactElement {
           >
             Connect Switch
           </Button>
-          {agent.inControlMode && <InControlModeOverlay />}
+          {/* {agent.inControlMode && <InControlModeOverlay />} */}
+          <Button
+            disabled={!agent.isReady || agent.inControlMode}
+            onClick={async () => {
+              agent.enterControlMode((data) => setUpdateData(data));
+            }}
+          >
+            Enter Control Mode
+          </Button>
         </Body>
       )}
       <AdapterSelectModal
