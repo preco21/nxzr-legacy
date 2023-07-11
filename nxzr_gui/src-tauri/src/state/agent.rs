@@ -58,6 +58,7 @@ pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct InputUpdatePayload {
+    // FIXME: wrap each state with Option<T> to make it optional
     pub button_map: HashMap<String, bool>,
     pub left_stick_position: InputUpdatePayloadPosition,
     pub right_stick_position: InputUpdatePayloadPosition,
