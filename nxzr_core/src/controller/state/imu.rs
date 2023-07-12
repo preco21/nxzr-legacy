@@ -4,8 +4,9 @@
 const GYROSCOPE_COEFF: f32 = 0.07;
 const GYROSCOPE_SENSITIVITY_MULTIPLIER: f32 = 57.3;
 
+// FIXME: update to 3000 as a default
 // Minimum value must be greater than 0.
-const DEFAULT_SENSITIVITY: i32 = 3000;
+const DEFAULT_SENSITIVITY: i32 = 8000;
 
 /// 6-Axis sensor state
 /// https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/master/imu_sensor_notes.md
@@ -15,6 +16,7 @@ const DEFAULT_SENSITIVITY: i32 = 3000;
 pub struct ImuState {
     x: i32,
     y: i32,
+    token: usize,
     // z: u16,
 }
 
@@ -24,6 +26,7 @@ impl ImuState {
         Self {
             x: 0,
             y: 0,
+            token: 0,
             /* z: 0 */
         }
     }
@@ -34,6 +37,7 @@ impl ImuState {
         } else {
             x as i32
         };
+        self.token += 1;
     }
 
     pub fn set_vertical(&mut self, y: u16) {
@@ -42,9 +46,10 @@ impl ImuState {
         } else {
             y as i32
         };
+        self.token += 1;
     }
 
-    pub fn to_buf(&self) -> [u8; 36] {
+    pub fn to_buf(&mut self) -> [u8; 36] {
         let gyro_x: i32 = 0;
         let gyro_y: i32 = ((self.y / DEFAULT_SENSITIVITY) as f32 * GYROSCOPE_SENSITIVITY_MULTIPLIER
             / GYROSCOPE_COEFF) as i32;
@@ -53,6 +58,10 @@ impl ImuState {
             / GYROSCOPE_COEFF) as i32;
         // The 6-axis data is repeated 3 times.
         let mut buf = [0u8; 36];
+        if self.token > 0 {
+            buf.fill(0x7F);
+            self.token -= 1;
+        }
         // Gyro 1 / round 1
         buf[6] = (gyro_x & 0xFF) as u8;
         buf[7] = ((gyro_x >> 8) & 0xFF) as u8;
