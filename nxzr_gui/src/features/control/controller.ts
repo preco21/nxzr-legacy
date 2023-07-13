@@ -41,10 +41,10 @@ export interface ControllerConfig {
 }
 
 export interface InputUpdatePayload {
-  buttonMap: Record<ButtonKey, boolean>;
-  leftStickPosition: Position;
-  rightStickPosition: Position;
-  imuPosition: Position;
+  buttonMap?: Record<ButtonKey, boolean>;
+  leftStickPosition?: Position;
+  rightStickPosition?: Position;
+  imuPosition?: Position;
 }
 
 export interface Position {
@@ -130,15 +130,21 @@ export class ControllerEventManager {
         buttonMap: this.buttonState,
         leftStickPosition,
         rightStickPosition,
-        imuPosition: {
-          x: convertNumberToU16(this.imuState.x),
-          y: convertNumberToU16(this.imuState.y),
-        },
+        // imuPosition: {
+        //   x: this.imuState.x,
+        //   y: this.imuState.y,
+        // },
       });
     };
     window.addEventListener('mousemove', (e) => {
       this.imuState.x += e.movementX * 10;
       this.imuState.y += e.movementY * 10;
+      this.emitUpdate({
+        imuPosition: {
+          x: this.imuState.x,
+          y: this.imuState.y,
+        },
+      });
       // FIXME: It's slow maybe because of the mutex.
       // dispatchChanges();
     });

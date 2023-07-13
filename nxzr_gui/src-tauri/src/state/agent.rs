@@ -59,10 +59,10 @@ pub type AgentInstance = (Channel, mpsc::Sender<oneshot::Sender<()>>);
 #[serde(rename_all(deserialize = "camelCase"))]
 struct InputUpdatePayload {
     // FIXME: wrap each state with Option<T> to make it optional
-    pub button_map: HashMap<String, bool>,
-    pub left_stick_position: InputUpdatePayloadPosition,
-    pub right_stick_position: InputUpdatePayloadPosition,
-    pub imu_position: InputUpdatePayloadPosition,
+    pub button_map: Option<HashMap<String, bool>>,
+    pub left_stick_position: Option<InputUpdatePayloadPosition>,
+    pub right_stick_position: Option<InputUpdatePayloadPosition>,
+    pub imu_position: Option<InputUpdatePayloadPosition>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -77,19 +77,16 @@ impl From<InputUpdatePayload> for ControlStreamRequest {
         ControlStreamRequest {
             // FIXME: to use actual id
             request_id: String::new(),
-            button_map: payload.button_map,
-            left_stick_pos: Some(Position {
-                x: payload.left_stick_position.x,
-                y: payload.left_stick_position.y,
-            }),
-            right_stick_pos: Some(Position {
-                x: payload.right_stick_position.x,
-                y: payload.right_stick_position.y,
-            }),
-            imu_pos: Some(Position {
-                x: payload.imu_position.x,
-                y: payload.imu_position.y,
-            }),
+            button_map: payload.button_map.unwrap_or(HashMap::new()),
+            left_stick_pos: payload
+                .left_stick_position
+                .map(|pos| Position { x: pos.x, y: pos.y }),
+            right_stick_pos: payload
+                .right_stick_position
+                .map(|pos| Position { x: pos.x, y: pos.y }),
+            imu_pos: payload
+                .imu_position
+                .map(|pos| Position { x: pos.x, y: pos.y }),
         }
     }
 }
