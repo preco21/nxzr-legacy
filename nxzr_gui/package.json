@@ -23,7 +23,7 @@
   "repository": "preco21/nxzr",
   "bugs": "https://github.com/preco21/nxzr/issues",
   "dependencies": {
-    "@blueprintjs/core": "^5.0.0",
+    "@blueprintjs/core": "^5.1.1",
     "@code-editor/console-feed": "^3.3.1",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
