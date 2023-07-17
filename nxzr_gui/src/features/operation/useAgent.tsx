@@ -56,6 +56,10 @@ const CTRL_CONFIG = {
       button: 'Zl',
     },
     {
+      keyboardKey: 'Shift',
+      button: 'Zr',
+    },
+    {
       keyboardKey: 'Alt',
       button: 'A',
     },
