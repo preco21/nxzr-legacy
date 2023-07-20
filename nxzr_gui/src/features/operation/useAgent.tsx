@@ -207,6 +207,7 @@ export function useAgent(options?: UseAgentOptions): UseAgent {
       emit('control:input', update);
     });
     await controllerManager.init();
+    return controllerManager;
   }, []);
   useWslStatus({
     onUpdate: useCallback((status: WslStatus) => {
