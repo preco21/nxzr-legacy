@@ -217,9 +217,10 @@ impl InputReport {
         size: u8,
         data: &[u8],
     ) -> Result<(), ReportError> {
-        if size > 0x1D || data.len() != size.into() {
-            return Err(ReportError::OutOfBounds);
-        }
+        // FIXME:
+        // if size > 0x1D || data.len() != size.into() {
+        //     return Err(ReportError::OutOfBounds);
+        // }
         // Creates input report data with spi flash read subcommand
         self.set_response_subcommand(Subcommand::SpiFlashRead)?;
         let mut cur_offset = offset;
@@ -228,7 +229,8 @@ impl InputReport {
             self.buf[i] = (cur_offset % 0x100) as u8;
             cur_offset = cur_offset / 0x100;
         }
-        self.buf[20] = size;
+        // FIXME
+        self.buf[20] = data.len() as u8;
         self.buf[21..21 + data.len()].copy_from_slice(data);
         Ok(())
     }
