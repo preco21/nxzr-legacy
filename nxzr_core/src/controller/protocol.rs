@@ -560,7 +560,7 @@ impl ControllerProtocol {
                 // FIXME: temporarily disabled due to custom spi flash responses
                 // let spi_flash_data = &spi_flash[(offset as usize)..(offset + size as u64) as usize];
                 // input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
-                match &subcommand_reply_data[11..13] {
+                match &subcommand_reply_data[..2] {
                     b"\x00\x60" => input_report.sub_0x10_spi_flash_read(
                         offset,
                         size,
