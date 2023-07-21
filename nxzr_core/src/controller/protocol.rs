@@ -410,58 +410,58 @@ impl ControllerProtocol {
         mode: Option<u8>,
     ) -> Result<InputReport, ControllerProtocolError> {
         self.state.modify(|state| {
-        let mode = match mode {
-            Some(_) => mode,
-            None => state.report_mode,
-        };
-        if self.controller_type != state.controller_state.controller() {
-            return Err(
-                ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one that's passed on `Protocol` init.".into())
-            );
-        }
-        let Some(mode) = mode else {
-            return Err(ControllerProtocolError::NoInputReportModeSupplied);
-        };
-        let mut input_report = InputReport::new();
-        let Some(id) = InputReportId::from_byte(mode) else {
-            return Err(ControllerProtocolError::UnknownInputReportMode);
-        };
-        input_report.set_input_report_id(id);
-        match id {
-            InputReportId::Default => input_report.fill_default_report(self.controller_type),
-            _ => {
-                let timer: u64 = match state.connected_at {
-                    Some(connected_at) => {
-                        let elapsed = connected_at.elapsed();
-                        (elapsed.as_secs_f64() / 0.005).round() as u64
-                    }
-                    None => 0,
-                };
-                input_report.set_timer(timer);
-                input_report.set_misc();
-                input_report.set_button(state.controller_state.button_state().as_bytes());
-                input_report.set_analog_stick(
-                    Some(state.controller_state.l_stick_state().to_buf()),
-                    Some(state.controller_state.r_stick_state().to_buf()),
+            let mode = match mode {
+                Some(_) => mode,
+                None => state.report_mode,
+            };
+            if self.controller_type != state.controller_state.controller() {
+                return Err(
+                    ControllerProtocolError::Invariant("supplied controller type in `ControllerState` does not match with one that's passed on `Protocol` init.".into())
                 );
-                input_report.set_vibrator_input();
-                // NOTE: Subcommand is set from caller
-                match id {
-                    InputReportId::NfcIrMcu => {
-                            input_report
-                                .set_6axis_data(state.controller_state.imu_state_mut().to_buf());
-                        // INFO: Sets empty data for now.
-                        input_report.set_ir_nfc_data(&[0xFF; 313])?;
-                    }
-                    InputReportId::Imu | InputReportId::Unknown1 | InputReportId::Unknown2 => {
-                            input_report
-                                .set_6axis_data(state.controller_state.imu_state_mut().to_buf());
-                    }
-                    _ => {}
-                }
             }
-        };
-        Ok(input_report)
+            let Some(mode) = mode else {
+                return Err(ControllerProtocolError::NoInputReportModeSupplied);
+            };
+            let mut input_report = InputReport::new();
+            let Some(id) = InputReportId::from_byte(mode) else {
+                return Err(ControllerProtocolError::UnknownInputReportMode);
+            };
+            input_report.set_input_report_id(id);
+            match id {
+                InputReportId::Default => input_report.fill_default_report(self.controller_type),
+                _ => {
+                    let timer: u64 = match state.connected_at {
+                        Some(connected_at) => {
+                            let elapsed = connected_at.elapsed();
+                            (elapsed.as_secs_f64() / 0.005).round() as u64
+                        }
+                        None => 0,
+                    };
+                    input_report.set_timer(timer);
+                    input_report.set_misc();
+                    input_report.set_button(state.controller_state.button_state().as_bytes());
+                    input_report.set_analog_stick(
+                        Some(state.controller_state.l_stick_state().to_buf()),
+                        Some(state.controller_state.r_stick_state().to_buf()),
+                    );
+                    input_report.set_vibrator_input();
+                    // NOTE: Subcommand is set from caller
+                    match id {
+                        InputReportId::NfcIrMcu => {
+                            input_report
+                                .set_6axis_data(state.controller_state.imu_state_mut().to_buf());
+                            // INFO: Sets empty data for now.
+                            input_report.set_ir_nfc_data(&[0xFF; 313])?;
+                        }
+                        InputReportId::Imu | InputReportId::Unknown1 | InputReportId::Unknown2 => {
+                            input_report
+                                .set_6axis_data(state.controller_state.imu_state_mut().to_buf());
+                        }
+                        _ => {}
+                    }
+                }
+            };
+            Ok(input_report)
         })
     }
 
@@ -557,8 +557,78 @@ impl ControllerProtocol {
         let state = self.state.get();
         match state.spi_flash {
             Some(spi_flash) => {
-                let spi_flash_data = &spi_flash[(offset as usize)..(offset + size as u64) as usize];
-                input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
+                // FIXME: temporarily disabled due to custom spi flash responses
+                // let spi_flash_data = &spi_flash[(offset as usize)..(offset + size as u64) as usize];
+                // input_report.sub_0x10_spi_flash_read(offset, size, spi_flash_data)?;
+                match &subcommand_reply_data[11..13] {
+                    b"\x00\x60" => input_report.sub_0x10_spi_flash_read(
+                        offset,
+                        size,
+                        &[
+                            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                            0xff, 0xff, 0xff, 0xff,
+                        ],
+                    )?,
+                    b"\x50\x60" => input_report.sub_0x10_spi_flash_read(
+                        offset,
+                        size,
+                        &[
+                            0xbc, 0x11, 0x42, 0x75, 0xa9, 0x28, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                            0xff, 0xff, 0xff, 0xff,
+                        ],
+                    )?,
+                    b"\x80\x60" => input_report.sub_0x10_spi_flash_read(
+                        offset,
+                        size,
+                        &[
+                            0x50, 0xfd, 0x00, 0x00, 0xc6, 0x0f, 0x0f, 0x30, 0x61, 0x96, 0x30, 0xf3,
+                            0xd4, 0x14, 0x54, 0x41, 0x15, 0x54, 0xc7, 0x77, 0x99, 0xc3, 0x33, 0x66,
+                            0x3,
+                        ],
+                    )?,
+                    b"\x98\x60" => input_report.sub_0x10_spi_flash_read(
+                        offset,
+                        size,
+                        &[
+                            0x0f, 0x30, 0x61, 0x96, 0x30, 0xf3, 0xd4, 0x14, 0x54, 0x41, 0x15, 0x54,
+                            0xc7, 0x77, 0x99, 0xc3, 0x33, 0x66, 0x3,
+                        ],
+                    )?,
+                    b"\x3d\x60" => input_report.sub_0x10_spi_flash_read(
+                        offset,
+                        size,
+                        &[
+                            0xba, 0x15, 0x62, 0x11, 0xb8, 0x7f, 0x29, 0x06, 0x5b, 0xff, 0xe7, 0x7e,
+                            0x0e, 0x36, 0x56, 0x9e, 0x85, 0x60, 0xff, 0x32, 0x32, 0x32, 0xff, 0xff,
+                            0xff,
+                        ],
+                    )?,
+                    b"\x10\x80" => input_report.sub_0x10_spi_flash_read(
+                        offset,
+                        size,
+                        &[
+                            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xb2,
+                            0xa1,
+                        ],
+                    )?,
+                    b"\x28\x80" => input_report.sub_0x10_spi_flash_read(
+                        offset,
+                        size,
+                        &[
+                            0xbe, 0xff, 0x3e, 0x00, 0xf0, 0x01, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40,
+                            0xfe, 0xff, 0xff, 0xff, 0x08, 0x00, 0xe7, 0x3b, 0xe7, 0x3b, 0xe7, 0x3b,
+                        ],
+                    )?,
+                    _ => {
+                        self.emit_event(Event::Warning(ControllerProtocolError::NotImplemented(
+                            format!(
+                                "unsupported spi flash read command: \"{:?}\", ignoring.",
+                                &subcommand_reply_data[11..13]
+                            ),
+                        )));
+                    }
+                }
             }
             None => {
                 let zeroed_spi_flash_data: Vec<u8> = vec![0; size as usize];
